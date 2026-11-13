@@ -1,0 +1,2 @@
+Poné acá archivos .wav u .ogg con estos nombres para reemplazar los sonidos generados por código:
+arrullo, aleteo, picoteo, grito_nene, silbato, chillido_halcon, ambiente, recoger, victoria

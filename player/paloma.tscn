@@ -1,0 +1,38 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://player/paloma.gd" id="1"]
+[ext_resource type="Script" path="res://player/modelo_paloma.gd" id="2"]
+[ext_resource type="Script" path="res://player/camara_orbital.gd" id="3"]
+
+[sub_resource type="SphereShape3D" id="Forma"]
+radius = 0.22
+
+[sub_resource type="SphereShape3D" id="FormaBrazo"]
+radius = 0.2
+
+[node name="Paloma" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1")
+
+[node name="Colision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, 0)
+shape = SubResource("Forma")
+
+[node name="Modelo" type="Node3D" parent="."]
+script = ExtResource("2")
+es_jugador = true
+color_cuello = Color(0.48, 0.36, 0.62, 1)
+
+[node name="CamaraOrbital" type="Node3D" parent="."]
+script = ExtResource("3")
+
+[node name="Brazo" type="SpringArm3D" parent="CamaraOrbital"]
+collision_mask = 1
+shape = SubResource("FormaBrazo")
+spring_length = 3.0
+
+[node name="Camara" type="Camera3D" parent="CamaraOrbital/Brazo"]
+current = true
+fov = 70.0
+far = 400.0

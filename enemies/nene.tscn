@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://enemies/nene.gd" id="1"]
+[ext_resource type="Script" path="res://enemies/modelo_humano.gd" id="2"]
+
+[node name="Nene" type="Node3D"]
+script = ExtResource("1")
+
+[node name="Modelo" type="Node3D" parent="."]
+script = ExtResource("2")
+alto = 1.15
+color_ropa = Color(0.9, 0.35, 0.25, 1)
+color_piernas = Color(0.2, 0.3, 0.55, 1)
+accesorio = "gorra"
+color_accesorio = Color(0.25, 0.55, 0.95, 1)

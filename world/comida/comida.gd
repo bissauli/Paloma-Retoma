@@ -1,0 +1,146 @@
+class_name Comida
+extends Node3D
+## Un pedazo de comida que la paloma puede picotear.
+## - miga: se come en el acto, recupera stamina y suma 1 de comida.
+## - medialuna / papa / factura: se lleva en el pico (te hace más lenta) hasta el nido.
+## - choripan: sólo se puede levantar con 5 palomas o más en la bandada.
+
+signal comida_tomada(tipo: String, posicion: Vector3)
+
+const VALORES := {
+	"miga": Config.COMIDA_MIGA,
+	"papa": Config.COMIDA_PAPA,
+	"medialuna": Config.COMIDA_MEDIALUNA,
+	"factura": Config.COMIDA_PAPA,
+	"choripan": Config.COMIDA_CHORIPAN,
+}
+
+@export_enum("miga", "medialuna", "papa", "factura", "choripan") var tipo := "miga"
+@export var reaparece := true               ## Vuelve a aparecer un rato después
+@export var tiempo_reaparicion := 35.0
+@export var vida := 0.0                     ## > 0: desaparece sola (migas tiradas al piso)
+
+var activa := true
+var _visual: Node3D
+var _t := 0.0
+var _avisado := 0.0
+
+
+func _ready() -> void:
+	add_to_group("comida")
+	_visual = Node3D.new()
+	add_child(_visual)
+	_armar()
+	_t = randf() * 10.0
+
+
+func _process(delta: float) -> void:
+	_t += delta
+	_avisado = maxf(_avisado - delta, 0.0)
+	if not activa:
+		return
+	# La comida "pesada" flota y gira un poquito para que se note que se puede agarrar
+	if tipo != "miga":
+		_visual.position.y = 0.05 + sin(_t * 3.0) * 0.04
+		_visual.rotation.y += delta * 0.8
+	if vida > 0.0:
+		vida -= delta
+		if vida <= 0.0:
+			queue_free()
+
+
+## La llama la paloma del jugador al picotear cerca.
+func picoteada(_jugador: Node3D) -> void:
+	if not activa:
+		return
+	match tipo:
+		"miga":
+			GameState.set_stamina(GameState.stamina + Config.STAMINA_MIGA)
+			GameState.sumar_comida(VALORES["miga"])
+			GameState.comio_miga()
+			AudioManager.reproducir("recoger", -6.0)
+			_consumir()
+		"choripan":
+			if GameState.bandada >= Config.UMBRAL_CHORIPAN:
+				GameState.sumar_comida(VALORES["choripan"])
+				GameState.mensaje.emit("¡La bandada levantó el choripán! +%d de comida" % VALORES["choripan"], 3.5)
+				AudioManager.reproducir("victoria", -6.0)
+				AudioManager.reproducir("arrullo")
+				_consumir()
+			elif _avisado <= 0.0:
+				_avisado = 2.0
+				GameState.mensaje.emit("Es muy pesado... necesitás %d palomas para levantarlo" % Config.UMBRAL_CHORIPAN, 3.0)
+		_:
+			if GameState.carga != "":
+				if _avisado <= 0.0:
+					_avisado = 2.0
+					GameState.mensaje.emit("Ya tenés el pico ocupado: llevá la comida al nido", 2.5)
+				return
+			GameState.set_carga(tipo)
+			GameState.mensaje.emit("¡Robaste una %s! Llevala al nido (Pirámide)" % tipo, 2.5)
+			AudioManager.reproducir("recoger")
+			_consumir()
+
+
+func _consumir() -> void:
+	comida_tomada.emit(tipo, global_position)
+	if not reaparece:
+		queue_free()
+		return
+	activa = false
+	visible = false
+	remove_from_group("comida")
+	get_tree().create_timer(tiempo_reaparicion, false).timeout.connect(_reaparecer)
+
+
+func _reaparecer() -> void:
+	activa = true
+	visible = true
+	add_to_group("comida")
+	_visual.scale = Vector3.ONE * 0.1
+	create_tween().tween_property(_visual, "scale", Vector3.ONE, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+# ---------------------------------------------------------------- Visual
+
+func _armar() -> void:
+	match tipo:
+		"miga":
+			# Un puñadito de migas
+			for i in 4:
+				var p := Construir.caja(_visual, Vector3(randf_range(-0.12, 0.12), 0.025, randf_range(-0.12, 0.12)),
+					Vector3(0.06, 0.04, 0.05), Color("e9cf9a"), false)
+				p.rotation.y = randf() * TAU
+		"medialuna":
+			# Medialuna: tres esferas doradas en arco
+			for i in 3:
+				var a := (i - 1) * 0.6
+				Construir.esfera(_visual, Vector3(sin(a) * 0.12, 0.06, -cos(a) * 0.12 + 0.1), 0.07,
+					Color("d9a24a"), Vector3(1, 0.7, 1.3), 6)
+			Construir.cilindro(_visual, Vector3(0, 0.0, 0), 0.22, 0.01, Color("ffffff"), false, 10)
+		"papa":
+			# Cucurucho de papas fritas
+			Construir.cilindro(_visual, Vector3(0, 0.1, 0), 0.08, 0.2, Color("c8372d"), false, 6, 0.11)
+			for i in 6:
+				var p := Construir.caja(_visual, Vector3(randf_range(-0.05, 0.05), 0.25, randf_range(-0.05, 0.05)),
+					Vector3(0.025, 0.14, 0.025), Color("f2d36b"), false)
+				p.rotation = Vector3(randf_range(-0.3, 0.3), 0, randf_range(-0.3, 0.3))
+		"factura":
+			Construir.esfera(_visual, Vector3(0, 0.05, 0), 0.1, Color("c97b3a"), Vector3(1.4, 0.6, 1.0), 6)
+			Construir.esfera(_visual, Vector3(0, 0.09, 0), 0.05, Color("f0e6d2"), Vector3(1.6, 0.4, 0.8), 6)
+		"choripan":
+			# Pan con chorizo: grande y tentador
+			Construir.esfera(_visual, Vector3(0, 0.12, 0), 0.18, Color("e0b26a"), Vector3(0.9, 0.6, 2.2), 8)
+			Construir.esfera(_visual, Vector3(0, 0.2, 0), 0.1, Color("8f3a22"), Vector3(1.0, 0.9, 3.6), 8)
+			Construir.esfera(_visual, Vector3(0, 0.27, 0), 0.04, Color("3e7d2a"), Vector3(2.5, 0.5, 6.0), 6)
+	# Brillito para que se vea de lejos (no para las migas, que son muchas)
+	if tipo != "miga":
+		var brillo := Label3D.new()
+		brillo.text = "✦"
+		brillo.font_size = 64
+		brillo.modulate = Color(1, 0.95, 0.6, 0.9)
+		brillo.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		brillo.no_depth_test = false
+		brillo.position = Vector3(0, 0.55 if tipo != "choripan" else 0.8, 0)
+		brillo.pixel_size = 0.004
+		_visual.add_child(brillo)
