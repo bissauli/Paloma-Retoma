@@ -10,6 +10,7 @@ extends Node3D
 @export var alcance := 1.3
 @export var desde_x := -38.0
 @export var hasta_x := 20.0
+@export var enfriamiento := 3.0            ## Después de perseguirte tarda esto en volver a verte
 
 enum Estado { PATRULLA, PERSIGUE, VUELVE }
 
@@ -19,18 +20,25 @@ var _vel := Vector3.ZERO
 var _rumbo := 0.0
 var _z_patrulla := 0.0
 var _t := 0.0
+var _enfriamiento := 0.0
+var _iniciado := false
 
 @onready var modelo: ModeloHumano = $Modelo
 
 
 func _ready() -> void:
 	add_to_group("enemigos")
-	_z_patrulla = global_position.z
 
 
 func _physics_process(delta: float) -> void:
+	# La línea de patrulla se toma en el primer cuadro: la escena lo ubica DESPUÉS de add_child,
+	# así que en _ready todavía está en el origen (y patrullaba en el medio de la plaza).
+	if not _iniciado:
+		_iniciado = true
+		_z_patrulla = global_position.z
 	var j := get_tree().get_first_node_in_group("jugador") as Node3D
 	_t -= delta
+	_enfriamiento = maxf(_enfriamiento - delta, 0.0)
 	match estado:
 		Estado.PATRULLA:
 			# Va y viene por la vereda frenando en cada mesa
@@ -38,20 +46,20 @@ func _physics_process(delta: float) -> void:
 				_sentido = -1.0
 			elif global_position.x < desde_x:
 				_sentido = 1.0
-			var v := Vector3(_sentido * velocidad_patrulla, 0, (_z_patrulla - global_position.z))
+			var v := Vector3(_sentido * velocidad_patrulla, 0, clampf(_z_patrulla - global_position.z, -1.0, 1.0))
 			if fmod(absf(global_position.x), 7.0) < 0.3 and _t <= -1.0:
 				_t = 1.5  # Pausa: atiende una mesa
 			if _t > 0.0:
 				v = Vector3.ZERO
 			_vel = _vel.lerp(v, minf(delta * 4.0, 1.0))
-			if j and _ve(j):
+			if j and _enfriamiento <= 0.0 and _ve(j):
 				estado = Estado.PERSIGUE
 				_t = 5.0
 				AudioManager.reproducir_en("silbato", global_position, -6.0)
 				GameState.mensaje.emit("¡El mozo te vio! ¡Rajá!", 1.8)
 		Estado.PERSIGUE:
 			if j == null or _t <= 0.0 or j.global_position.y > 3.0 or j.global_position.z < 26.0:
-				estado = Estado.VUELVE
+				_volver()
 			else:
 				var hacia := j.global_position - global_position
 				hacia.y = 0
@@ -102,4 +110,12 @@ func _espantar(j: Node3D) -> void:
 			var lejos := j.global_position - global_position
 			lejos.z -= 2.0  # Siempre la manda hacia la plaza
 			j.empujar(lejos, 7.0)
+	_volver()
+
+
+## Deja de perseguir y vuelve a la vereda. No te puede volver a ver enseguida:
+## así no silba y arranca de nuevo en cada cuadro.
+func _volver() -> void:
 	estado = Estado.VUELVE
+	_enfriamiento = enfriamiento
+	_t = 0.0  # Que no se quede parado con lo que le sobraba de la persecución

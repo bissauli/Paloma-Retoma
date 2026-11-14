@@ -11,6 +11,10 @@ extends Node3D
 @export var color_accesorio := Color("c43c3c")
 @export var sentado := false
 
+## Capa física de la gente: la jugadora choca contra ella (las palomas NPC no usan física y
+## se apartan solas en flock/bandada.gd, que lee el grupo "cuerpos_humanos").
+const CAPA_GENTE := 4
+
 static var _mallas := {}
 
 var cuerpo: Node3D
@@ -22,6 +26,34 @@ var _brazo_levantado := 0.0
 
 func _ready() -> void:
 	_armar()
+	_crear_cuerpo_fisico()
+	add_to_group("cuerpos_humanos")
+
+
+## Radio y altura del cuerpo para las colisiones.
+func radio_colision() -> float:
+	return (0.38 if sentado else 0.3) * alto / 1.75
+
+
+func alto_colision() -> float:
+	return alto * (0.8 if sentado else 1.0)
+
+
+## Cápsula cinemática que sigue al humano: la paloma de la jugadora no lo atraviesa.
+func _crear_cuerpo_fisico() -> void:
+	var cuerpo_fisico := AnimatableBody3D.new()
+	cuerpo_fisico.name = "CuerpoFisico"
+	cuerpo_fisico.sync_to_physics = false
+	cuerpo_fisico.collision_layer = CAPA_GENTE
+	cuerpo_fisico.collision_mask = 0
+	var forma := CollisionShape3D.new()
+	var capsula := CapsuleShape3D.new()
+	capsula.radius = radio_colision()
+	capsula.height = maxf(alto_colision(), capsula.radius * 2.0)
+	forma.shape = capsula
+	forma.position.y = capsula.height / 2.0
+	cuerpo_fisico.add_child(forma)
+	add_child(cuerpo_fisico)
 
 
 static func _capsula(r: float, h: float) -> CapsuleMesh:

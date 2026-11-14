@@ -45,6 +45,28 @@ func _ready() -> void:
 	print("  bandada antes/después del nene: ", antes, " -> ", GameState.bandada, " (", espera, " frames)")
 	_check("el nene dispersa parte de la bandada", GameState.bandada < antes and GameState.bandada > 0)
 
+	# Mozo: patrulla la vereda de los cafés (no el centro de la plaza) y si te alcanza te espanta
+	var mozo := gente.get_children().filter(func(n: Node) -> bool: return n is Mozo)[0] as Mozo
+	print("  línea de patrulla del mozo: z = ", snappedf(mozo.global_position.z, 0.1))
+	_check("el mozo patrulla la vereda de los cafés", mozo.global_position.z > 30.0)
+	GameState.invulnerable = 0.0
+	mozo.estado = Mozo.Estado.PATRULLA
+	paloma.global_position = mozo.global_position + Vector3(1.6, 0.1, -1.0)
+	paloma.reset_physics_interpolation()
+	var persecuciones := 0
+	var previo := mozo.estado
+	espera = 0
+	while GameState.invulnerable <= 0.0 and espera < 300:
+		await get_tree().physics_frame
+		if mozo.estado == Mozo.Estado.PERSIGUE and previo != Mozo.Estado.PERSIGUE:
+			persecuciones += 1
+		previo = mozo.estado
+		espera += 1
+	print("  el mozo te espantó en ", espera, " frames (", persecuciones, " persecución/es)")
+	_check("el mozo te alcanza y te espanta", GameState.invulnerable > 0.0)
+	_check("el mozo no silba en bucle", persecuciones == 1)
+	GameState.invulnerable = 0.0
+
 	# Halcón: se activa con 15 palomas y ataca si volás alto al descubierto
 	var halcon := gente.get_children().filter(func(n: Node) -> bool: return n is Halcon)[0] as Halcon
 	_check("el halcón empieza inactivo", halcon.estado == Halcon.Estado.INACTIVO)

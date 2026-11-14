@@ -160,6 +160,8 @@ static func cartel(padre: Node, pos: Vector3, texto: String, color_texto := Colo
 	l.outline_size = 10
 	l.outline_modulate = Color(0, 0, 0, 0.8)
 	l.pixel_size = 0.01
+	# De una sola cara: desde atrás no se ve el texto en espejo
+	l.double_sided = false
 	if mirar_camara:
 		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	padre.add_child(l)

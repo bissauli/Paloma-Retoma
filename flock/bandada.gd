@@ -15,6 +15,10 @@ const ESCENA_PALOMA := preload("res://flock/paloma_npc.tscn")
 @export var velocidad_minima := 5.0
 @export var distancia_lejana := 25.0      ## Más lejos que esto se actualizan con menos frecuencia
 
+@export_group("Choques")
+@export var radio_cuerpo := 0.2           ## Radio de cada paloma: dos palomas no se acercan a menos del doble
+@export var radio_jugadora := 0.24
+
 @export_group("Población")
 @export var minimo_sueltas := 14          ## Si quedan menos, llegan palomas nuevas volando
 @export var maximo_total := 110
@@ -145,10 +149,105 @@ func _physics_process(delta: float) -> void:
 	_aviso_sin_comida = maxf(_aviso_sin_comida - delta, 0.0)
 	if _jugador == null or not is_instance_valid(_jugador):
 		return
-	if GameState.partida_terminada:
-		return  # En la victoria cada paloma festeja por su cuenta
-	_mover_seguidoras(delta)
-	_llegadas(delta)
+	if not GameState.partida_terminada:  # En la victoria cada paloma festeja por su cuenta
+		_mover_seguidoras(delta)
+		_llegadas(delta)
+	_resolver_choques()
+
+
+# ---------------------------------------------------------------- Choques
+
+const CELDA := 1.0
+
+
+static func _celda(p: Vector3) -> Vector2i:
+	return Vector2i(floori(p.x / CELDA), floori(p.z / CELDA))
+
+
+## Las palomas NPC no usan física, así que acá se separan a mano para que no se atraviesen:
+## entre ellas (se empujan las dos), y contra la jugadora y la gente (sólo se corre la paloma).
+## Usa una grilla de 1 m para no comparar todas contra todas.
+func _resolver_choques() -> void:
+	var palomas: Array[PalomaNPC] = []
+	for n in get_children():
+		var p := n as PalomaNPC
+		if p:
+			palomas.append(p)
+	var cant := palomas.size()
+	if cant == 0:
+		return
+	var pos := PackedVector3Array()
+	pos.resize(cant)
+	var grilla := {}
+	for i in cant:
+		pos[i] = palomas[i].global_position
+		var c := _celda(pos[i])
+		if grilla.has(c):
+			(grilla[c] as Array).append(i)
+		else:
+			grilla[c] = [i]
+	var corr := PackedVector3Array()
+	corr.resize(cant)
+
+	# Paloma contra paloma
+	var min_d := radio_cuerpo * 2.0
+	for i in cant:
+		var c := _celda(pos[i])
+		for dx in range(-1, 2):
+			for dz in range(-1, 2):
+				var lista: Variant = grilla.get(c + Vector2i(dx, dz))
+				if lista == null:
+					continue
+				for k: int in lista:
+					if k <= i:
+						continue
+					var d := pos[k] - pos[i]
+					if absf(d.y) > 0.35:
+						continue
+					var h := Vector2(d.x, d.z)
+					var l := h.length()
+					if l >= min_d:
+						continue
+					if l < 0.001:
+						h = Vector2.from_angle(float(i * 7 + k) * 1.3)  # Encimadas justo: las separa en cualquier dirección
+						l = 0.0
+					else:
+						h /= l
+					var empuje := h * (min_d - l) * 0.5
+					corr[i] -= Vector3(empuje.x, 0, empuje.y)
+					corr[k] += Vector3(empuje.x, 0, empuje.y)
+
+	# Obstáculos fijos para las palomas: la jugadora y cada humano (cilindros)
+	var obstaculos: Array = [[_jugador.global_position, radio_jugadora, 0.45]]
+	for n in get_tree().get_nodes_in_group("cuerpos_humanos"):
+		var m := n as ModeloHumano
+		if m and m.is_visible_in_tree():
+			obstaculos.append([m.global_position, m.radio_colision(), m.alto_colision()])
+	for o: Array in obstaculos:
+		var centro: Vector3 = o[0]
+		var radio: float = o[1] + radio_cuerpo
+		var alto: float = o[2]
+		var c := _celda(centro)
+		for dx in range(-1, 2):
+			for dz in range(-1, 2):
+				var lista: Variant = grilla.get(c + Vector2i(dx, dz))
+				if lista == null:
+					continue
+				for k: int in lista:
+					var p := pos[k] + corr[k]
+					if p.y < centro.y - 0.3 or p.y > centro.y + alto:
+						continue
+					var h := Vector2(p.x - centro.x, p.z - centro.z)
+					var l := h.length()
+					if l >= radio:
+						continue
+					h = h / l if l > 0.001 else Vector2.from_angle(float(k) * 2.1)
+					var empuje := h * (radio - l)
+					corr[k] += Vector3(empuje.x, 0, empuje.y)
+
+	for i in cant:
+		if corr[i] != Vector3.ZERO:
+			palomas[i].global_position = pos[i] + corr[i]
 
 
 func _mover_seguidoras(delta: float) -> void:

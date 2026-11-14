@@ -173,7 +173,8 @@ func _crear_jardines() -> void:
 	var bancos := [
 		[Vector3(-7, 0, -18), PI], [Vector3(-3, 0, -18), PI], [Vector3(3, 0, -18), PI], [Vector3(7, 0, -18), PI],
 		[Vector3(-36, 0, -8), PI / 2.0], [Vector3(-36, 0, 8), PI / 2.0],
-		[Vector3(-8, 0, 6), PI], [Vector3(8, 0, -6), 0.0], [Vector3(28, 0, -20), 0.0],
+		# Junto a la Pirámide: sobre el pasto de los canteros, mirando hacia el paso central
+		[Vector3(-11, 0.1, 7.3), 0.0], [Vector3(11, 0.1, -7.3), PI], [Vector3(28, 0, -20), 0.0],
 	]
 	for b: Array in bancos:
 		Edificios.banco(j, b[0], b[1])
@@ -245,9 +246,11 @@ func _carrito_choripan(padre: Node3D, pos: Vector3) -> void:
 	Construir.caja(n, Vector3(0, 1.12, 0), Vector3(2.0, 0.04, 0.9), Color("2a2a2a"))
 	for x in [-0.8, 0.8]:
 		Construir.cilindro(n, Vector3(x, 0.2, 0.56), 0.2, 0.08, Color("1f1f1f"), false, 10)
-	Construir.cartel(n, Vector3(0, 0.6, -0.57), "El Chori Feliz", Color("ffe08a"), 40)
-	var cartel := Construir.cartel(n, Vector3(0, 0.6, 0.57), "El Chori Feliz", Color("ffe08a"), 40)
+	# Un Label3D se lee de frente desde +Z: el de la cara norte (-Z, la que da a la plaza) va girado
+	# 180° y el de la cara sur no. Si no, los dos miran hacia adentro del carrito y se ven en espejo.
+	var cartel := Construir.cartel(n, Vector3(0, 0.6, -0.57), "El Chori Feliz", Color("ffe08a"), 30)
 	cartel.rotation.y = PI
+	Construir.cartel(n, Vector3(0, 0.6, 0.57), "El Chori Feliz", Color("ffe08a"), 30)
 	var chori := Comida.new()
 	chori.tipo = "choripan"
 	chori.tiempo_reaparicion = 60.0

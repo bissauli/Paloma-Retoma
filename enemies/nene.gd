@@ -25,13 +25,19 @@ var _timer_grito := 0.0
 @onready var modelo: ModeloHumano = $Modelo
 
 
+var _iniciado := false
+
+
 func _ready() -> void:
 	add_to_group("enemigos")
-	_destino = global_position
-	zona_centro = global_position
 
 
 func _physics_process(delta: float) -> void:
+	# La escena lo ubica después de add_child: la zona se toma en el primer cuadro, no en _ready
+	if not _iniciado:
+		_iniciado = true
+		zona_centro = global_position
+		_destino = global_position
 	var j := get_tree().get_first_node_in_group("jugador") as Node3D
 	_t -= delta
 	_timer_grito -= delta

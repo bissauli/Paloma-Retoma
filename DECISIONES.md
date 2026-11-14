@@ -39,6 +39,7 @@ Elegí siempre la opción más simple y divertida cuando algo era ambiguo. Las a
 - **Reclutar cuesta 1 de comida por paloma.** Un arrullo recluta a todas las palomas sueltas que haya en 7 m, de la más cercana a la más lejana, mientras tengas comida. Cada una muestra un corazón.
 - Hay unas 48 palomas sueltas al empezar, repartidas en seis zonas (la Catedral es la que más tiene). Si quedan menos de 14 sueltas, llegan palomas nuevas volando desde los bordes del mapa.
 - Cada paloma de la bandada tiene un "lugar" propio alrededor tuyo y se queda un poco atrás cuando vas rápido. Si aterrizás, aterrizan a tu alrededor y caminan.
+- **Choques**: las palomas NPC no se atraviesan. Como no usan física, `flock/bandada.gd` las separa a mano cada cuadro con una grilla de 1 m: entre ellas se empujan las dos (radio 0,2 m), y contra la jugadora o la gente se corre sólo la paloma. La gente tiene además una cápsula física (capa 3) para que la jugadora choque contra ella en vez de atravesarla. Las palomas NPC siguen midiendo el piso sólo contra la capa 1.
 - **Boids**: separación, alineación, cohesión y seguir a la jugadora. Las que están a más de 25 m se actualizan 1 de cada 3 frames. Las NPC no usan física: miden el piso con un rayo cada 0,3-0,6 s.
 - Cuando perdés palomas se dispersan las más cercanas al peligro. Vuelan lejos, eligen una zona al azar y aterrizan ahí, y las podés volver a reclutar.
 - Las palomas NPC salen en seis colores al azar (gris, oscura, marrón, canela, manchada y blanca), y cada una tiene un nombre (Carlos, La Tana, El Ruso, Coqui...) para los créditos.
@@ -50,7 +51,8 @@ Elegí siempre la opción más simple y divertida cuando algo era ambiguo. Las a
 - **Señoras** sentadas en los bancos de la Catedral: tiran migas cada 3-5 s. Zona segura, sin enemigos.
 - **Oficinistas**: salen del subte en oleadas de 4 a 7 cada 28 s, caminan hasta el borde del mapa y a la mitad se les cae una factura.
 - **Nene** (centro de la plaza): te corre si estás en el piso o volando a menos de ~2 m, más rápido de lo que caminás pero más lento de lo que volás. Se cansa a los 6 s. Si te alcanza **dispersa el 25% de la bandada** y te hace volar, pero **no** te manda al nido.
-- **Mozo** (cafés): patrulla la vereda con cono de visión. Si te ve cerca de las mesas, silba y corre. Si te alcanza te espanta (salís volando hacia la plaza) y **se te cae la comida** que llevabas. No perdés palomas.
+- **Mozo** (cafés): patrulla la vereda con cono de visión. Si te ve cerca de las mesas, silba y corre. Si te alcanza te espanta (salís volando hacia la plaza) y **se te cae la comida** que llevabas. No perdés palomas. Después de una persecución tarda 3 s en poder volver a verte, para que no silbe en bucle.
+- Los enemigos que la escena ubica después de `add_child` (mozo, nene) toman su línea de patrulla o su zona en el primer cuadro de física, no en `_ready` (ahí todavía están en el origen).
 - **Granaderos** (2, frente a la Casa Rosada): tienen el **cono de visión dibujado en el piso** (amarillo; rojo cuando te están viendo). Si te ven pasando las vallas sin 30 palomas, en 0,6 s silban y **volvés al nido perdiendo 2 palomas**. Con 30 o más se distraen mirando la bandada (aparece "♪") y el cono desaparece.
 - **Halcón**: aparece al llegar a 15 palomas y da vueltas a 27 m. Si volás **por encima de 7 m sin nada arriba** (árbol, techo, galería), chilla, avisa con 1,4 s de margen y se tira en picada. Zafás aterrizando, bajando o escondiéndote. Si te atrapa **perdés 3 palomas y volvés al nido**.
 - Después de que te atrapan tenés **3 s de invulnerabilidad**, para que no te encadenen castigos.
@@ -76,6 +78,7 @@ Elegí siempre la opción más simple y divertida cuando algo era ambiguo. Las a
 - Las probabilidades de cada color para las NPC están en `ModeloPaloma.PESOS_NPC`.
 - Las texturas se importan sin pérdida (`compress/mode=0`) y con filtro "nearest", para que el pixel-art no se vea borroso ni cambie de color.
 - Con 110 palomas rinde igual que el modelo anterior de primitivas (unos 7,4 ms por cuadro contra 7,9 ms en una RX 5500 XT). Lo que más cuesta son las sombras.
+- Los carteles con nombre (`Construir.cartel`) son de una sola cara: un Label3D se lee de frente desde +Z, así que los que miran hacia -Z van girados 180°. Desde atrás no se ven en espejo.
 - Los archivos fuente (`Paloma.blend`, las texturas y las vistas previas) están fuera del repo, en la carpeta "Paloma 3D" del escritorio.
 
 ## Menú principal pixel-art
