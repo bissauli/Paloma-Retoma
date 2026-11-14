@@ -21,6 +21,23 @@ static func material(color: Color, rugosidad := 0.9, sin_sombra := false) -> Sta
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	if color.a < 1.0:
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	elif not sin_sombra:
+		# Color liso y opaco: las piezas con este material se pueden fusionar (ver fusionar_estaticas)
+		m.set_meta(&"color_plano", color)
+	_materiales[clave] = m
+	return m
+
+
+## Material que toma el color de los vértices: lo usan las mallas fusionadas, donde cada pieza
+## guarda su color en sus vértices. Se ve igual que material(color, rugosidad).
+static func material_vertices(rugosidad := 0.9) -> StandardMaterial3D:
+	var clave := "vtx_%.2f" % rugosidad
+	if _materiales.has(clave):
+		return _materiales[clave]
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true
+	m.roughness = rugosidad
 	_materiales[clave] = m
 	return m
 
@@ -71,10 +88,28 @@ static func _malla(padre: Node, malla: Mesh, pos: Vector3, mat: Material, rot :=
 	var mi := MeshInstance3D.new()
 	mi.mesh = malla
 	mi.material_override = mat
+	if not proyecta_sombra(malla):
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	padre.add_child(mi)
 	mi.position = pos
 	mi.rotation = rot
 	return mi
+
+
+## ¿Vale la pena dibujar esta malla en el mapa de sombras? No si es una lámina casi plana
+## (líneas de la calle, felpudos) ni si es muy chica: no se nota su sombra y cada
+## pieza cuesta un dibujo extra por cada corte de la sombra del sol. El piso grande tampoco:
+## sólo recibe sombras.
+static func proyecta_sombra(malla: Mesh) -> bool:
+	var tam := malla.get_aabb().size
+	var mayor := maxf(tam.x, maxf(tam.y, tam.z))
+	if tam.y < 0.1 and maxf(tam.x, tam.z) > 1.0:
+		return false  # lámina horizontal
+	if mayor < 0.35:
+		return false  # detalle diminuto
+	if tam.y < 1.5 and tam.x > 60.0 and tam.z > 60.0:
+		return false  # piso
+	return true
 
 
 ## Caja de color (con colisión opcional).
@@ -188,3 +223,186 @@ static func letrero(padre: Node, pos: Vector3, texto: String, color_texto: Color
 	var l := cartel(n, Vector3(0, 0, 0.012), texto, color_texto, tam)
 	l.outline_size = 6
 	return n
+
+
+# ---------------------------------------------------------------- Fusión de mallas
+# Cada MeshInstance3D es un dibujo aparte para la placa de video (y uno más por cada corte de la
+# sombra del sol). El mundo tiene miles de piezas chicas, así que al terminar de armarlo se juntan
+# en pocas mallas grandes: es lo que más rinde, sobre todo en el teléfono (WebGL).
+
+static var _unitarias := {}   ## Forma de primitiva -> arrays de su versión "unitaria" (sin escalar)
+
+
+## Junta en pocas mallas todas las MeshInstance3D estáticas que cuelgan de "raiz".
+## No entra en los nodos con script (autos, comida, el nido...: se mueven o cambian) ni en los que
+## tienen la meta "no_fusionar". Las piezas de color liso se juntan por rugosidad (con el color en
+## los vértices); las demás, por material. Además se separan por celdas de "celda" metros (así la
+## cámara sigue descartando lo que no ve) y por si proyectan sombra o no.
+## Las colisiones no se tocan. Devuelve cuántas piezas se fusionaron.
+static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
+	var grupos := {}
+	var fusionadas: Array[MeshInstance3D] = []
+	var inv := raiz.global_transform.affine_inverse()
+	var pendientes: Array[Node] = [raiz]
+	while not pendientes.is_empty():
+		var n: Node = pendientes.pop_back()
+		for h in n.get_children():
+			if h.get_script() != null or h.has_meta(&"no_fusionar"):
+				continue
+			var mi := h as MeshInstance3D
+			if mi and mi.get_child_count() == 0:
+				var mat := mi.material_override
+				if mi.mesh == null or mat == null or not mi.is_visible_in_tree():
+					continue
+				if mat is BaseMaterial3D and (mat as BaseMaterial3D).transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+					continue   # Lo transparente se ordena por distancia: queda suelto
+				var con_color := mat.has_meta(&"color_plano")
+				var t := inv * mi.global_transform
+				var centro := t * mi.mesh.get_aabb().get_center()
+				var clave_mat := ("v%.2f" % (mat as BaseMaterial3D).roughness) if con_color else ("m%d" % mat.get_instance_id())
+				var clave := "%d_%d_%s_%d" % [floori(centro.x / celda), floori(centro.z / celda), clave_mat, mi.cast_shadow]
+				if not grupos.has(clave):
+					grupos[clave] = {"mat": material_vertices((mat as BaseMaterial3D).roughness) if con_color else mat,
+						"color": con_color, "sombra": mi.cast_shadow, "piezas": []}
+				var color: Color = mat.get_meta(&"color_plano") if con_color else Color.WHITE
+				(grupos[clave]["piezas"] as Array).append([mi.mesh, t, color])
+				fusionadas.append(mi)
+				continue
+			pendientes.append(h)
+	var i := 0
+	for clave: String in grupos:
+		var g: Dictionary = grupos[clave]
+		var mi := MeshInstance3D.new()
+		mi.name = "Fusion%d" % i
+		mi.mesh = combinar(g["piezas"], g["color"], not g["color"])
+		mi.material_override = g["mat"]
+		mi.cast_shadow = g["sombra"]
+		raiz.add_child(mi)
+		i += 1
+	for mi in fusionadas:
+		mi.get_parent().remove_child(mi)
+		mi.queue_free()
+	return fusionadas.size()
+
+
+## Junta piezas [malla, Transform3D, Color] en una sola ArrayMesh. Con "con_color" cada pieza
+## guarda su color en los vértices (para usar con material_vertices()). No le pide nada a la
+## placa de video: las primitivas se arman escalando una versión unitaria cacheada por forma.
+static func combinar(piezas: Array, con_color := true, con_uv := false) -> ArrayMesh:
+	var verts := PackedVector3Array()
+	var norms := PackedVector3Array()
+	var cols := PackedColorArray()
+	var uvs := PackedVector2Array()
+	var idx := PackedInt32Array()
+	for p: Array in piezas:
+		var u := _unitaria(p[0] as Mesh)
+		var arr: Array = u[0]
+		var t: Transform3D = (p[1] as Transform3D) * Transform3D(Basis.from_scale(u[1]), Vector3.ZERO)
+		var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var base := verts.size()
+		verts.append_array(t * v)
+		# Normales con la inversa transpuesta (sirve aunque la escala no sea pareja)
+		norms.append_array(Transform3D(t.basis.inverse().transposed(), Vector3.ZERO) * (arr[Mesh.ARRAY_NORMAL] as PackedVector3Array))
+		if con_color:
+			var c := PackedColorArray()
+			c.resize(v.size())
+			c.fill(p[2])
+			cols.append_array(c)
+		if con_uv:
+			var uv = arr[Mesh.ARRAY_TEX_UV]
+			if uv is PackedVector2Array and (uv as PackedVector2Array).size() == v.size():
+				uvs.append_array(uv)
+			else:
+				var vacio := PackedVector2Array()
+				vacio.resize(v.size())
+				uvs.append_array(vacio)
+		var ii: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
+		var n0 := idx.size()
+		idx.resize(n0 + ii.size())
+		if t.basis.determinant() < 0.0:
+			# Espejada: se invierte el orden de cada triángulo para que no quede del revés
+			for k in range(0, ii.size(), 3):
+				idx[n0 + k] = ii[k] + base
+				idx[n0 + k + 1] = ii[k + 2] + base
+				idx[n0 + k + 2] = ii[k + 1] + base
+		else:
+			for k in ii.size():
+				idx[n0 + k] = ii[k] + base
+	var a := []
+	a.resize(Mesh.ARRAY_MAX)
+	a[Mesh.ARRAY_VERTEX] = verts
+	a[Mesh.ARRAY_NORMAL] = norms
+	a[Mesh.ARRAY_INDEX] = idx
+	if con_color:
+		a[Mesh.ARRAY_COLOR] = cols
+	if con_uv:
+		a[Mesh.ARRAY_TEX_UV] = uvs
+	var am := ArrayMesh.new()
+	if not verts.is_empty():
+		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
+	return am
+
+
+## [arrays de la forma unitaria, escala para llevarla al tamaño de "m"].
+## Caja, esfera, cilindro y prisma escalados dan exactamente la misma malla que con su tamaño real.
+## Cualquier otra malla (cápsulas, por ejemplo) se lee tal cual una sola vez y se cachea.
+static func _unitaria(m: Mesh) -> Array:
+	var firma := ""
+	var esc := Vector3.ONE
+	if m is BoxMesh:
+		var b := m as BoxMesh
+		if b.subdivide_width == 0 and b.subdivide_height == 0 and b.subdivide_depth == 0:
+			firma = "caja"
+			esc = b.size
+	elif m is SphereMesh:
+		var s := m as SphereMesh
+		if not s.is_hemisphere:
+			firma = "esf_%d_%d" % [s.radial_segments, s.rings]
+			esc = Vector3(s.radius, s.height / 2.0, s.radius)
+	elif m is CylinderMesh:
+		var c := m as CylinderMesh
+		if c.bottom_radius > 0.0:
+			firma = "cil_%d_%d_%.4f_%s_%s" % [c.radial_segments, c.rings, c.top_radius / c.bottom_radius, c.cap_top, c.cap_bottom]
+			esc = Vector3(c.bottom_radius, c.height, c.bottom_radius)
+	elif m is PrismMesh:
+		var pr := m as PrismMesh
+		if pr.subdivide_width == 0 and pr.subdivide_height == 0 and pr.subdivide_depth == 0:
+			firma = "prisma_%.4f" % pr.left_to_right
+			esc = pr.size
+	if firma == "":
+		firma = "id_%d" % m.get_instance_id()
+		esc = Vector3.ONE
+	if not _unitarias.has(firma):
+		_unitarias[firma] = _molde(firma, m).surface_get_arrays(0)
+	return [_unitarias[firma], esc]
+
+
+static func _molde(firma: String, m: Mesh) -> Mesh:
+	if firma == "caja":
+		var b := BoxMesh.new()
+		b.size = Vector3.ONE
+		return b
+	if firma.begins_with("esf_"):
+		var s := SphereMesh.new()
+		s.radius = 1.0
+		s.height = 2.0
+		s.radial_segments = (m as SphereMesh).radial_segments
+		s.rings = (m as SphereMesh).rings
+		return s
+	if firma.begins_with("cil_"):
+		var o := m as CylinderMesh
+		var c := CylinderMesh.new()
+		c.bottom_radius = 1.0
+		c.top_radius = o.top_radius / o.bottom_radius
+		c.height = 1.0
+		c.radial_segments = o.radial_segments
+		c.rings = o.rings
+		c.cap_top = o.cap_top
+		c.cap_bottom = o.cap_bottom
+		return c
+	if firma.begins_with("prisma_"):
+		var p := PrismMesh.new()
+		p.size = Vector3.ONE
+		p.left_to_right = (m as PrismMesh).left_to_right
+		return p
+	return m

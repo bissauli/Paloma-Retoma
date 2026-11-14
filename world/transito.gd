@@ -30,6 +30,8 @@ func _ready() -> void:
 	for x: float in CRUCES:
 		_armar_cruce(x)
 	_mostrar_luz()
+	# Sendas, postes y cabezales quedan fijos: se fusionan (las lámparas no, cambian de color)
+	Construir.fusionar_estaticas(self)
 	# Arranca con algunos autos ya andando
 	for dir: int in [1, -1]:
 		var x := -X_LIMITE + randf_range(5.0, 25.0)
@@ -73,6 +75,7 @@ func _semaforo(padre: Node3D, pos: Vector3, dir: int) -> void:
 		var y := y_base + 3.9 - i * 0.33
 		var lam := Construir.cilindro(s, Vector3(0, y, 0.16), 0.11, 0.04, Color("333333"), false, 10)
 		lam.rotation.x = PI / 2.0
+		lam.set_meta(&"no_fusionar", true)
 		lamparas.append(lam)
 		Construir.caja(s, Vector3(0, y + 0.13, 0.22), Vector3(0.26, 0.03, 0.12), Color("1d2a22"), false)
 	# De espaldas, un cabezal chico para los peatones (sólo decorativo)
@@ -120,7 +123,13 @@ func _physics_process(delta: float) -> void:
 	_avanzar_luz(delta)
 	_salidas(delta)
 	var jugador := get_tree().get_first_node_in_group("jugador") as Node3D
-	var gente := get_tree().get_nodes_in_group("cuerpos_humanos")
+	# Sólo importa la gente que está sobre la avenida (casi nunca hay nadie): se filtra una vez
+	# acá y no por cada auto
+	var gente: Array[Node3D] = []
+	for n in get_tree().get_nodes_in_group("cuerpos_humanos"):
+		var h := n as Node3D
+		if h and absf(h.global_position.z - 30.0) < 6.0 and h.is_visible_in_tree():
+			gente.append(h)
 	for dir: int in [1, -1]:
 		var carril: Array[Auto] = []
 		for a in _autos:
@@ -161,7 +170,7 @@ func _salidas(delta: float) -> void:
 			_timer_salida[dir] = randf_range(2.5, 6.5)
 
 
-func _conducir(a: Auto, adelante: Auto, delta: float, gente: Array) -> void:
+func _conducir(a: Auto, adelante: Auto, delta: float, gente: Array[Node3D]) -> void:
 	var dir := a.sentido
 	var deseada := a.velocidad_crucero
 	var frente := a.trompa()
@@ -180,10 +189,7 @@ func _conducir(a: Auto, adelante: Auto, delta: float, gente: Array) -> void:
 			if luz == Luz.ROJO or dist > frenado:
 				deseada = minf(deseada, maxf(dist - 0.2, 0.0) * 1.2)
 	# Gente cruzando delante
-	for n in gente:
-		var h := n as Node3D
-		if h == null or not h.is_visible_in_tree():
-			continue
+	for h: Node3D in gente:
 		var delante := (h.global_position.x - frente) * dir
 		if delante > -0.5 and delante < 9.0 and absf(h.global_position.z - a.global_position.z) < a.ancho / 2.0 + 0.5:
 			deseada = minf(deseada, maxf(delante - 1.5, 0.0))

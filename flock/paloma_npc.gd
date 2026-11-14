@@ -31,6 +31,16 @@ var _timer_paseo := 0.0
 var _timer_suelo := 0.0
 var _timer_huida := 0.0
 var _picoteo_timer := 0.0
+var _acum_fisica := 0.0    ## Tiempo acumulado de los pasos de física salteados (sueltas lejanas)
+var _desfase := 0
+
+## Un solo pedido de rayo para todas (crear uno nuevo en cada movimiento cuesta).
+static var _rayo := PhysicsRayQueryParameters3D.new()
+## Posición de la cámara en este paso de física (se lee una vez para todas las palomas).
+static var _ref_paso := -1
+static var _ref_pos := Vector3.ZERO
+## Más lejos que esto de la cámara, las palomas sueltas se actualizan 1 de cada 3 pasos de física.
+const LEJOS_CAMARA := 25.0
 
 @onready var modelo: ModeloPaloma = $Modelo
 
@@ -39,6 +49,7 @@ func _ready() -> void:
 	add_to_group("palomas_npc")
 	nombre = NOMBRES[randi() % NOMBRES.size()]
 	_rumbo = randf() * TAU
+	_desfase = randi() % 3
 	_timer_suelo = randf() * 0.5
 	_timer_paseo = randf() * 3.0
 	_destino = global_position
@@ -112,6 +123,13 @@ func _corazon() -> void:
 # ---------------------------------------------------------------- Actualización propia
 
 func _physics_process(delta: float) -> void:
+	if modo == Modo.SUELTA:
+		# Las sueltas lejos de la cámara pasean igual, pero se calculan 1 de cada 3 pasos
+		_acum_fisica += delta
+		if (Engine.get_physics_frames() + _desfase) % 3 != 0 and _lejos_de_camara():
+			return
+		delta = _acum_fisica
+		_acum_fisica = 0.0
 	match modo:
 		Modo.SUELTA:
 			_paso_suelta(delta)
@@ -211,12 +229,27 @@ func _actualizar_suelo(delta: float, cada: float) -> void:
 
 
 func medir_suelo(p: Vector3) -> float:
-	var espacio := get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(p + Vector3.UP * 1.5, p + Vector3.DOWN * 40.0, 1)
-	var r := espacio.intersect_ray(q)
+	var r := _rayo_mundo(p + Vector3.UP * 1.5, p + Vector3.DOWN * 40.0)
 	if r.is_empty():
 		return 0.0
 	return (r["position"] as Vector3).y
+
+
+## Rayo contra el mundo (capa 1).
+func _rayo_mundo(desde: Vector3, hasta: Vector3) -> Dictionary:
+	_rayo.from = desde
+	_rayo.to = hasta
+	_rayo.collision_mask = 1
+	return get_world_3d().direct_space_state.intersect_ray(_rayo)
+
+
+func _lejos_de_camara() -> bool:
+	var paso := Engine.get_physics_frames()
+	if paso != _ref_paso:
+		_ref_paso = paso
+		var cam := get_viewport().get_camera_3d()
+		_ref_pos = cam.global_position if cam else Vector3.ZERO
+	return global_position.distance_squared_to(_ref_pos) > LEJOS_CAMARA * LEJOS_CAMARA
 
 
 ## Mueve la paloma sin atravesar el mundo: un rayo desde el cuerpo hasta un poco más allá
@@ -229,8 +262,7 @@ func mover_con_choques(desp: Vector3) -> void:
 	var hasta := desde + desp
 	if largo_h > 0.0001:
 		hasta += horiz / largo_h * RADIO_CHOQUE
-	var q := PhysicsRayQueryParameters3D.create(desde, hasta, 1)
-	var r := get_world_3d().direct_space_state.intersect_ray(q)
+	var r := _rayo_mundo(desde, hasta)
 	if r.is_empty():
 		global_position += desp
 		return
@@ -252,8 +284,7 @@ func mover_con_choques(desp: Vector3) -> void:
 	if vel_adentro < 0.0:
 		velocidad -= n * vel_adentro
 	# El deslizamiento también se chequea (por ejemplo en una esquina)
-	var q2 := PhysicsRayQueryParameters3D.create(desde, desde + desp + n * 0.01, 1)
-	if get_world_3d().direct_space_state.intersect_ray(q2).is_empty():
+	if _rayo_mundo(desde, desde + desp + n * 0.01).is_empty():
 		global_position += desp
 	# Si quedó demasiado pegada, la separa un poquito de la pared
 	var hn := Vector3(n.x, 0.0, n.z)

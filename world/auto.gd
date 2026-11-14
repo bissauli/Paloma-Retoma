@@ -18,6 +18,12 @@ var velocidad_crucero := 11.0
 var bocina_enfriamiento := 0.0
 
 var _ruedas: Array[Node3D] = []
+var _con_sombra: Array[GeometryInstance3D] = []
+## Mientras se arma: "sombra_rugosidad" -> piezas [malla, Transform3D, color]. Al terminar se
+## juntan en una malla por grupo (unos 4 dibujos por auto en vez de 13 a 17, más las ruedas).
+var _piezas := {}
+## Malla de cada rueda (cubierta + llanta), compartida por todos los autos del mismo radio.
+static var _mallas_rueda := {}
 
 
 ## Elige tipo y color al azar (llamar antes de agregarlo al árbol).
@@ -51,7 +57,10 @@ func _ready() -> void:
 		_armar_colectivo()
 	else:
 		_armar_auto()
+	_juntar_piezas()
 	_cuerpo_fisico()
+	# La carrocería y la cabina proyectan sombra sólo en calidad Media o Alta
+	Ajustes.registrar_sombra_dinamica(_con_sombra)
 
 
 func _process(delta: float) -> void:
@@ -91,18 +100,27 @@ func _cuerpo_fisico() -> void:
 
 
 ## Sólo las piezas grandes (carrocería y cabina) proyectan sombra: las chicas casi no se notan
-## y cada una sumaría un dibujo más por cada corte de la sombra.
-func _caja(tam: Vector3, pos: Vector3, color: Color, rugosidad := 0.6, sombra := false) -> MeshInstance3D:
+## y sumarían dibujos al mapa de sombras.
+func _caja(tam: Vector3, pos: Vector3, color: Color, rugosidad := 0.6, sombra := false) -> void:
 	var bm := BoxMesh.new()
 	bm.size = tam
-	var mi := MeshInstance3D.new()
-	mi.mesh = bm
-	mi.material_override = Construir.material(color, rugosidad)
-	mi.position = pos
-	if not sombra:
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mi)
-	return mi
+	var clave := "%d_%.2f" % [int(sombra), rugosidad]
+	if not _piezas.has(clave):
+		_piezas[clave] = []
+	(_piezas[clave] as Array).append([bm, Transform3D(Basis(), pos), color])
+
+
+func _juntar_piezas() -> void:
+	for clave: String in _piezas:
+		var mi := MeshInstance3D.new()
+		mi.mesh = Construir.combinar(_piezas[clave])
+		mi.material_override = Construir.material_vertices(float(clave.get_slice("_", 1)))
+		if clave.begins_with("1"):
+			_con_sombra.append(mi)
+		else:
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mi)
+	_piezas.clear()
 
 
 func _rueda(pos: Vector3, radio: float) -> void:
@@ -110,25 +128,24 @@ func _rueda(pos: Vector3, radio: float) -> void:
 	pivote.position = pos
 	pivote.rotation.x = PI / 2.0
 	add_child(pivote)
-	var cm := CylinderMesh.new()
-	cm.top_radius = radio
-	cm.bottom_radius = radio
-	cm.height = 0.24
-	cm.radial_segments = 8
-	cm.rings = 1
+	var clave := "%.3f" % radio
+	if not _mallas_rueda.has(clave):
+		var cm := CylinderMesh.new()
+		cm.top_radius = radio
+		cm.bottom_radius = radio
+		cm.height = 0.24
+		cm.radial_segments = 8
+		cm.rings = 1
+		# Llanta clara para que se note el giro
+		var llanta := BoxMesh.new()
+		llanta.size = Vector3(radio * 1.2, 0.26, radio * 0.35)
+		_mallas_rueda[clave] = Construir.combinar([[cm, Transform3D(), Color("1a1a1c")],
+			[llanta, Transform3D(), Color("9ea3a8")]])
 	var mi := MeshInstance3D.new()
-	mi.mesh = cm
-	mi.material_override = Construir.material(Color("1a1a1c"))
+	mi.mesh = _mallas_rueda[clave]
+	mi.material_override = Construir.material_vertices(0.9)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	pivote.add_child(mi)
-	# Llanta clara para que se note el giro
-	var llanta := BoxMesh.new()
-	llanta.size = Vector3(radio * 1.2, 0.26, radio * 0.35)
-	var ml := MeshInstance3D.new()
-	ml.mesh = llanta
-	ml.material_override = Construir.material(Color("9ea3a8"))
-	ml.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	pivote.add_child(ml)
 	_ruedas.append(pivote)
 
 

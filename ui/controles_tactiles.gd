@@ -30,6 +30,11 @@ var _joy_base := Vector2.ZERO
 var _joy_pos := Vector2.ZERO
 var _cam_toque := -1
 var _fin := false   ## Ganaste: los controles no vuelven
+## Se redibuja sólo cuando algo cambió (un dedo, un botón, despegar o aterrizar), no cada cuadro:
+## en el teléfono dibujar círculos y textos con contorno no es gratis.
+var _sucio := true
+var _en_aire_dibujado := false
+var _tam_dibujado := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -77,6 +82,7 @@ func _centro(b: Dictionary) -> Vector2:
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
+	_sucio = true
 	if event is InputEventScreenTouch:
 		var e := event as InputEventScreenTouch
 		if e.pressed:
@@ -174,6 +180,7 @@ func _fijar(accion: StringName, fuerza: float) -> void:
 
 ## Suelta todo (al pausar, al perder el foco o al ganar), así nada queda "apretado".
 func _soltar_todo() -> void:
+	_sucio = true
 	_joy_toque = -1
 	_cam_toque = -1
 	_aplicar_joystick()
@@ -198,9 +205,16 @@ func _process(_delta: float) -> void:
 	var activos := not _fin and not GameState.menu_activo and _jugador != null and _jugador.controlable
 	if visible != activos:
 		visible = activos
+		_sucio = true
 		if not activos:
 			_soltar_todo()
-	if visible:
+	if not visible:
+		return
+	var en_aire := _jugador != null and _jugador.estado == PalomaJugador.Estado.AIRE
+	if _sucio or en_aire != _en_aire_dibujado or _lienzo.size != _tam_dibujado:
+		_sucio = false
+		_en_aire_dibujado = en_aire
+		_tam_dibujado = _lienzo.size
 		_lienzo.queue_redraw()
 
 

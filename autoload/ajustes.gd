@@ -14,6 +14,8 @@ const BRILLO_MIN := 0.6
 const BRILLO_MAX := 1.4
 
 const CALIDADES := ["Baja", "Media", "Alta"]
+const GRUPO_SOMBRA_DINAMICA := &"sombra_dinamica"
+const GRUPO_DISTANCIA_PALOMAS := &"distancia_palomas"
 ## Por calidad: distancia de sombras (m), cortes de la sombra direccional (1, 2 o 4), tamaño del
 ## mapa de sombras, filtro suave (0..5) y MSAA. Las sombras son lo que más cuesta en esta escena.
 const PRESETS := [
@@ -21,6 +23,8 @@ const PRESETS := [
 	{"sombra_dist": 140.0, "cortes": 2, "atlas": 4096, "suave": 1, "msaa": Viewport.MSAA_2X},
 	{"sombra_dist": 240.0, "cortes": 4, "atlas": 4096, "suave": 2, "msaa": Viewport.MSAA_4X},
 ]
+## En el teléfono la calidad "Baja" usa un mapa de sombras más chico y menos distancia.
+const PRESET_MOVIL_BAJA := {"sombra_dist": 45.0, "cortes": 1, "atlas": 1024, "suave": 0, "msaa": Viewport.MSAA_DISABLED}
 ## Resoluciones ofrecidas (se filtran por el tamaño de la pantalla). Índice 0 = nativa.
 const RESOLUCIONES := [Vector2i(0, 0), Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080),
 	Vector2i(2560, 1440), Vector2i(3840, 2160)]
@@ -56,6 +60,7 @@ func _ready() -> void:
 		calidad = 0
 		resolucion = Vector2i(1280, 720)
 		_preparar_movil()
+		aplicar_perfil_movil()
 	_cargar()
 	_asegurar_buses()
 	_aplicar_audio()
@@ -190,6 +195,19 @@ func capturar_mouse(si: bool) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if si else Input.MOUSE_MODE_VISIBLE
 
 
+## Versión para teléfonos: la física corre a 30 pasos por segundo en vez de 60. Todo lo que se ve
+## se interpola entre pasos (physics_interpolation), así que se mueve igual de suave, y la
+## lógica del juego (palomas, gente, autos, enemigos) le cuesta la mitad al procesador.
+## Con pocos cuadros por segundo no se acumulan más de 3 pasos por cuadro (si no, cada cuadro
+## lento hace más lento al siguiente).
+const FISICA_MOVIL := 30
+
+
+func aplicar_perfil_movil() -> void:
+	Engine.physics_ticks_per_second = FISICA_MOVIL
+	Engine.max_physics_steps_per_frame = 3
+
+
 ## Godot convierte el primer dedo en un click del mouse (así andan los botones de los menús).
 ## Para que tocar la pantalla no picotee ni arrulle, esas acciones pierden sus clicks:
 ## en el teléfono se disparan sólo con los botones táctiles (ui/controles_tactiles.gd).
@@ -231,14 +249,56 @@ func _aplicar_pantalla() -> void:
 	_aplicar_resolucion.call_deferred(true)
 
 
+## Preset de gráficos vigente (el de teléfono en calidad baja es más liviano).
+func preset_actual() -> Dictionary:
+	if movil and calidad == 0:
+		return PRESET_MOVIL_BAJA
+	return PRESETS[calidad]
+
+
+## ¿Las palomas NPC, la gente y los autos proyectan sombra? Sólo de calidad Media para arriba: son
+## decenas de cuerpos que se mueven y en calidad Baja cada uno sumaba un dibujo al mapa de sombras.
+func sombras_dinamicas() -> bool:
+	return calidad >= 1
+
+
+func _modo_sombra_dinamica() -> GeometryInstance3D.ShadowCastingSetting:
+	if sombras_dinamicas():
+		return GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	return GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+## Anota mallas de cosas que se mueven (palomas NPC, gente, autos): proyectan sombra según
+## sombras_dinamicas() y se actualizan solas cuando el jugador cambia la calidad (por grupo:
+## cuando la malla se borra sale sola del grupo, no queda nada colgado).
+func registrar_sombra_dinamica(mallas: Array) -> void:
+	var modo := _modo_sombra_dinamica()
+	for m in mallas:
+		var g := m as GeometryInstance3D
+		if g:
+			g.add_to_group(GRUPO_SOMBRA_DINAMICA)
+			g.cast_shadow = modo
+
+
+## Hasta qué distancia de la cámara se dibujan las palomas NPC (miden 35 cm: más lejos son un par
+## de píxeles). Más allá tampoco se les calcula la animación. Alcanza para ver de lejos dónde hay
+## palomas sueltas para reclutar (cruzando la plaza son unos 60 m).
+func distancia_palomas() -> float:
+	if movil:
+		return 60.0
+	return [60.0, 80.0, 100.0][calidad]
+
+
 func _aplicar_graficos() -> void:
-	var p: Dictionary = PRESETS[calidad]
+	var p: Dictionary = preset_actual()
 	var vp := get_viewport()
 	vp.msaa_3d = p["msaa"]
 	RenderingServer.directional_shadow_atlas_set_size(p["atlas"], true)
 	RenderingServer.directional_soft_shadow_filter_set_quality(p["suave"])
 	for n in get_tree().get_nodes_in_group("sol"):
 		aplicar_sombras(n as DirectionalLight3D)
+	get_tree().set_group(GRUPO_SOMBRA_DINAMICA, "cast_shadow", _modo_sombra_dinamica())
+	get_tree().call_group(GRUPO_DISTANCIA_PALOMAS, "aplicar_distancia", distancia_palomas())
 
 
 func _aplicar_fps() -> void:
@@ -255,7 +315,7 @@ func _aplicar_fps() -> void:
 func aplicar_sombras(sol: DirectionalLight3D) -> void:
 	if sol == null:
 		return
-	var p: Dictionary = PRESETS[calidad]
+	var p: Dictionary = preset_actual()
 	sol.directional_shadow_max_distance = p["sombra_dist"]
 	sol.directional_shadow_fade_start = 0.9
 	match int(p["cortes"]):

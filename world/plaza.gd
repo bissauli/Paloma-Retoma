@@ -22,6 +22,8 @@ func _ready() -> void:
 	_crear_zonas()
 	GameState.fase_dia_cambio.connect(_al_cambiar_fase)
 	_al_cambiar_fase(0.0)
+	# Miles de piezas fijas (edificios, árboles, bancos...) pasan a ser unas pocas mallas grandes
+	Construir.fusionar_estaticas(self)
 
 
 # ---------------------------------------------------------------- Luz y cielo

@@ -22,6 +22,9 @@ var brazo_izq: Node3D
 var brazo_der: Node3D
 var _fase := 0.0
 var _brazo_levantado := 0.0
+## Mientras se arma: nodo -> piezas [malla, Transform3D, color]. Al terminar, las piezas de cada
+## nodo (el cuerpo y cada brazo) se juntan en una sola malla: 3 dibujos por persona en vez de 8 a 11.
+var _partes := {}
 
 
 func _ready() -> void:
@@ -56,8 +59,10 @@ func _crear_cuerpo_fisico() -> void:
 	add_child(cuerpo_fisico)
 
 
+## Cápsula de tamaño base (para un humano de 1,75 m): las piezas se escalan con "k" al juntarlas,
+## así hay pocas cápsulas distintas en todo el juego.
 static func _capsula(r: float, h: float) -> CapsuleMesh:
-	var clave := "cap_%.2f_%.2f" % [r, h]
+	var clave := "cap_%.3f_%.3f" % [r, h]
 	if not _mallas.has(clave):
 		var m := CapsuleMesh.new()
 		m.radius = r
@@ -68,13 +73,27 @@ static func _capsula(r: float, h: float) -> CapsuleMesh:
 	return _mallas[clave]
 
 
-func _pieza(padre: Node3D, malla: Mesh, color: Color, pos: Vector3) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	mi.mesh = malla
-	mi.material_override = Construir.material(color, 0.85)
-	mi.position = pos
-	padre.add_child(mi)
-	return mi
+## Agrega una pieza a la malla de "padre" ("escala" agranda la malla de forma pareja).
+func _pieza(padre: Node3D, malla: Mesh, color: Color, pos: Vector3, rot := Vector3.ZERO, escala := 1.0) -> void:
+	if not _partes.has(padre):
+		_partes[padre] = []
+	var t := Transform3D(Basis.from_euler(rot).scaled(Vector3.ONE * escala), pos)
+	(_partes[padre] as Array).append([malla, t, color])
+
+
+## Junta las piezas de cada nodo en una MeshInstance3D (con el color en los vértices).
+func _juntar_piezas() -> void:
+	var mallas: Array[GeometryInstance3D] = []
+	for padre: Node3D in _partes:
+		var mi := MeshInstance3D.new()
+		mi.name = "Malla"
+		mi.mesh = Construir.combinar(_partes[padre])
+		mi.material_override = Construir.material_vertices(0.85)
+		padre.add_child(mi)
+		mallas.append(mi)
+	_partes.clear()
+	# Sombra sólo en calidad Media o Alta (son muchos cuerpos que se mueven)
+	Ajustes.registrar_sombra_dinamica(mallas)
 
 
 func _armar() -> void:
@@ -86,11 +105,10 @@ func _armar() -> void:
 		y_cadera = 0.5 * k
 	# Piernas (una cápsula ancha) y torso
 	if sentado:
-		var piernas := _pieza(cuerpo, _capsula(0.2 * k, 0.75 * k), color_piernas, Vector3(0, y_cadera, -0.25 * k))
-		piernas.rotation.x = PI / 2.0
+		_pieza(cuerpo, _capsula(0.2, 0.75), color_piernas, Vector3(0, y_cadera, -0.25 * k), Vector3(PI / 2.0, 0, 0), k)
 	else:
-		_pieza(cuerpo, _capsula(0.2 * k, 0.95 * k), color_piernas, Vector3(0, 0.47 * k, 0))
-	_pieza(cuerpo, _capsula(0.26 * k, 0.8 * k), color_ropa, Vector3(0, y_cadera + 0.35 * k, 0))
+		_pieza(cuerpo, _capsula(0.2, 0.95), color_piernas, Vector3(0, 0.47 * k, 0), Vector3.ZERO, k)
+	_pieza(cuerpo, _capsula(0.26, 0.8), color_ropa, Vector3(0, y_cadera + 0.35 * k, 0), Vector3.ZERO, k)
 	# Cabeza (sin cara)
 	var y_cabeza := y_cadera + 0.92 * k
 	var esf := SphereMesh.new()
@@ -105,7 +123,7 @@ func _armar() -> void:
 	# Accesorios
 	match accesorio:
 		"gorra":
-			_pieza(cuerpo, _capsula(0.15 * k, 0.3 * k), color_accesorio, Vector3(0, y_cabeza + 0.1 * k, 0))
+			_pieza(cuerpo, _capsula(0.15, 0.3), color_accesorio, Vector3(0, y_cabeza + 0.1 * k, 0), Vector3.ZERO, k)
 			var visera := BoxMesh.new()
 			visera.size = Vector3(0.22, 0.03, 0.18) * k
 			_pieza(cuerpo, visera, color_accesorio, Vector3(0, y_cabeza + 0.07 * k, -0.17 * k))
@@ -145,14 +163,15 @@ func _armar() -> void:
 			bandeja.height = 0.02
 			bandeja.radial_segments = 12
 			_pieza(brazo_izq, bandeja, Color("c9ccd1"), Vector3(-0.05, -0.42 * k, -0.2 * k))
+	_juntar_piezas()
 
 
 func _brazo(lado: float, y: float, k: float) -> Node3D:
 	var pivote := Node3D.new()
 	pivote.position = Vector3(0.31 * k * lado, y, 0)
 	cuerpo.add_child(pivote)
-	_pieza(pivote, _capsula(0.07 * k, 0.62 * k), color_ropa, Vector3(0, -0.27 * k, 0))
-	_pieza(pivote, _capsula(0.06 * k, 0.12 * k), color_piel, Vector3(0, -0.6 * k, 0))
+	_pieza(pivote, _capsula(0.07, 0.62), color_ropa, Vector3(0, -0.27 * k, 0), Vector3.ZERO, k)
+	_pieza(pivote, _capsula(0.06, 0.12), color_piel, Vector3(0, -0.6 * k, 0), Vector3.ZERO, k)
 	return pivote
 
 

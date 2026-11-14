@@ -7,6 +7,10 @@ var fallas := 0
 
 
 func _ready() -> void:
+	# Con "-- movil" corre con el perfil del teléfono (física a 30 Hz)
+	if OS.get_cmdline_user_args().has("movil"):
+		Ajustes.movil = true
+		Ajustes.aplicar_perfil_movil()
 	var main: Node = load("res://main.tscn").instantiate()
 	add_child(main)
 	paloma = main.get_node("Paloma")
@@ -57,8 +61,10 @@ func _ready() -> void:
 	get_tree().quit(fallas)
 
 
+## Espera n pasos de física "de 60 Hz" (con la física a 30 Hz, la mitad: el mismo tiempo).
+## Las esperas cortas (que la física vea una tecla) no se achican.
 func _frames(n: int) -> void:
-	for i in n:
+	for i in (n if n <= 4 else roundi(n * Engine.physics_ticks_per_second / 60.0)):
 		await get_tree().physics_frame
 
 

@@ -27,6 +27,10 @@ var pitch := -0.28
 var _sacudida := 0.0
 var _objetivo: Node3D
 var _t_sin_tocar := 10.0   ## Segundos desde que el dedo movió la cámara (sólo teléfono)
+## El resorte del brazo (que la cámara no atraviese paredes) se calcula acá en cada cuadro y no en
+## cada paso de física: en el teléfono la física va a 30 Hz y el acercamiento de la cámara al
+## despegar o al hacer picada se vería a los saltos.
+var _consulta_resorte := PhysicsShapeQueryParameters3D.new()
 
 @onready var brazo: SpringArm3D = $Brazo
 @onready var camara: Camera3D = $Brazo/Camara
@@ -38,6 +42,10 @@ func _ready() -> void:
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	if _objetivo is CollisionObject3D:
 		brazo.add_excluded_object((_objetivo as CollisionObject3D).get_rid())
+		_consulta_resorte.exclude = [(_objetivo as CollisionObject3D).get_rid()]
+	brazo.set_physics_process_internal(false)
+	_consulta_resorte.shape = brazo.shape
+	_consulta_resorte.collision_mask = brazo.collision_mask
 	yaw = _objetivo.global_rotation.y
 	global_position = _objetivo.global_position + Vector3.UP * altura
 
@@ -95,6 +103,7 @@ func _process(delta: float) -> void:
 		fov = fov_aire
 	brazo.spring_length = lerpf(brazo.spring_length, dist, 1.0 - exp(-4.0 * delta))
 	camara.fov = lerpf(camara.fov, fov, 1.0 - exp(-5.0 * delta))
+	_resorte()
 
 	# Sacudida de cámara (golpes, aterrizajes en picada)
 	if _sacudida > 0.0:
@@ -121,3 +130,16 @@ func sacudir(intensidad: float) -> void:
 func reubicar() -> void:
 	if _objetivo:
 		global_position = _objetivo.global_position + Vector3.UP * altura
+		_resorte()
+
+
+## Lo mismo que hace el SpringArm3D: estira el brazo hacia atrás hasta spring_length o hasta
+## chocar con el mundo (con la esfera del brazo), y ahí pone la cámara.
+func _resorte() -> void:
+	var t := brazo.global_transform
+	var mov := t.basis.z.normalized() * brazo.spring_length
+	_consulta_resorte.transform = t
+	_consulta_resorte.motion = mov
+	var r := get_world_3d().direct_space_state.cast_motion(_consulta_resorte)
+	var k: float = r[0] if r.size() > 0 else 1.0
+	camara.position = Vector3(0, 0, brazo.spring_length * k)

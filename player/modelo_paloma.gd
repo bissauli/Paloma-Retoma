@@ -39,6 +39,16 @@ var _anim: AnimationPlayer
 var _skel: Skeleton3D
 var _base := ""        ## Animación de base actual (Idle, Walk, Fly, Glide, Dive)
 var _accion := ""      ## Animación de un solo uso en curso (Peck, Coo)
+var _mallas: Array[GeometryInstance3D] = []
+
+# Animación de las NPC: se avanza a mano, más espaciado cuanto más lejos está de la cámara (o si
+# está fuera de cuadro). De cerca se ve igual; de lejos nadie nota que el aleteo va a 15 cuadros.
+var _anim_acum := 0.0      ## Tiempo acumulado sin aplicar a la animación
+var _anim_desfase := 0     ## Para repartir las palomas entre cuadros
+var _distancia2 := 4900.0  ## Distancia de dibujo al cuadrado (Ajustes.distancia_palomas)
+static var _cam_cuadro := -1
+static var _cam: Camera3D
+static var _cam_pos := Vector3.ZERO
 
 
 ## Variante al azar para una paloma NPC, según PESOS_NPC.
@@ -85,6 +95,55 @@ func _armar() -> void:
 	# Arranca en reposo, cada una en un punto distinto del ciclo para que no se muevan todas igual
 	_reproducir_base("Idle", 1.0, 0.0)
 	_anim.seek(randf() * _anim.current_animation_length, true)
+	if not es_jugador:
+		for m in _glb.find_children("*", "GeometryInstance3D", true, false):
+			_mallas.append(m as GeometryInstance3D)
+		# Sombra sólo en calidad Media o Alta (la jugadora siempre)
+		Ajustes.registrar_sombra_dinamica(_mallas)
+		# Lejos no se dibujan, y la animación la maneja _process (ver _avanzar_animacion)
+		add_to_group(Ajustes.GRUPO_DISTANCIA_PALOMAS)
+		aplicar_distancia(Ajustes.distancia_palomas())
+		_anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+		_anim_desfase = randi() % 16
+	set_process(not es_jugador)
+
+
+## Distancia máxima a la que se dibuja esta paloma NPC (la cambia Ajustes según la calidad).
+func aplicar_distancia(d: float) -> void:
+	_distancia2 = d * d
+	for m in _mallas:
+		m.visibility_range_end = d
+		m.visibility_range_end_margin = 2.0
+
+
+func _process(delta: float) -> void:
+	_avanzar_animacion(delta)
+
+
+## Avanza la animación cada 1, 2, 4 u 8 cuadros según la distancia a la cámara (con el tiempo
+## acumulado, así nada se atrasa). Fuera de cuadro o más lejos que la distancia de dibujo, cada 16.
+func _avanzar_animacion(delta: float) -> void:
+	_anim_acum += delta
+	var cuadro := Engine.get_process_frames()
+	if cuadro != _cam_cuadro:
+		_cam_cuadro = cuadro
+		_cam = get_viewport().get_camera_3d()
+		if _cam:
+			_cam_pos = _cam.global_position
+	var cada := 1
+	if _cam:
+		var p := global_position
+		var d2 := p.distance_squared_to(_cam_pos)
+		if d2 > _distancia2 or not _cam.is_position_in_frustum(p):
+			cada = 16
+		elif d2 > 900.0:
+			cada = 8 if d2 > 2500.0 else 4
+		elif d2 > 144.0:
+			cada = 2
+	if (cuadro + _anim_desfase) % cada != 0:
+		return
+	_anim.advance(_anim_acum)
+	_anim_acum = 0.0
 
 
 ## Transform de "hijo" relativo a su ancestro "ancestro".
@@ -138,6 +197,7 @@ func _accion_unica(nombre: String, vel: float) -> void:
 	_anim.play(nombre, 0.08)
 	_anim.seek(0.0, true)
 	_anim.speed_scale = vel
+	_anim_acum = 0.0
 
 
 func _al_terminar_animacion(nombre: StringName) -> void:

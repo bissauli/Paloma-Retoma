@@ -30,12 +30,22 @@ var seguidoras: Array[PalomaNPC] = []
 var zona_libre: Array = []
 var _zonas: Array[Marker3D] = []
 var _jugador: PalomaJugador
+## Todas las palomas NPC (hijas de este nodo). Se mantiene sola al agregar o sacar hijos, así no
+## hay que recorrer get_children() en cada paso de física.
+var _palomas: Array[PalomaNPC] = []
 var _frame := 0
 var _timer_llegada := 0.0
 var _aviso_sin_comida := 0.0
 
 
 func _ready() -> void:
+	child_entered_tree.connect(func(n: Node) -> void:
+		if n is PalomaNPC:
+			_palomas.append(n as PalomaNPC))
+	child_exiting_tree.connect(func(n: Node) -> void:
+		if n is PalomaNPC:
+			_palomas.erase(n as PalomaNPC)
+			seguidoras.erase(n as PalomaNPC))
 	GameState.arrullo.connect(_al_arrullar)
 	GameState.perder_palomas.connect(_al_perder)
 	GameState.victoria.connect(_al_ganar)
@@ -186,65 +196,60 @@ func _physics_process(delta: float) -> void:
 
 # ---------------------------------------------------------------- Choques
 
-const CELDA := 1.0
-
-
-static func _celda(p: Vector3) -> Vector2i:
-	return Vector2i(floori(p.x / CELDA), floori(p.z / CELDA))
-
-
 ## Las palomas NPC no usan física, así que acá se separan a mano para que no se atraviesen:
 ## entre ellas (se empujan las dos), y contra la jugadora y la gente (sólo se corre la paloma).
-## Usa una grilla de 1 m para no comparar todas contra todas.
+## Usa una grilla de 1 m (listas enlazadas en arreglos, sin crear un arreglo por celda) para no
+## comparar todas contra todas.
 func _resolver_choques() -> void:
-	var palomas: Array[PalomaNPC] = []
-	for n in get_children():
-		var p := n as PalomaNPC
-		if p:
-			palomas.append(p)
-	var cant := palomas.size()
+	var cant := _palomas.size()
 	if cant == 0:
 		return
 	var pos := PackedVector3Array()
 	pos.resize(cant)
-	var grilla := {}
+	var cx := PackedInt32Array()
+	cx.resize(cant)
+	var cz := PackedInt32Array()
+	cz.resize(cant)
+	var siguiente := PackedInt32Array()
+	siguiente.resize(cant)
+	var primera := {}   # celda -> primera paloma de la celda (las demás siguen en "siguiente")
 	for i in cant:
-		pos[i] = palomas[i].global_position
-		var c := _celda(pos[i])
-		if grilla.has(c):
-			(grilla[c] as Array).append(i)
-		else:
-			grilla[c] = [i]
+		var p := _palomas[i].global_position
+		pos[i] = p
+		var c := Vector2i(floori(p.x), floori(p.z))
+		cx[i] = c.x
+		cz[i] = c.y
+		siguiente[i] = primera.get(c, -1)
+		primera[c] = i
 	var corr := PackedVector3Array()
 	corr.resize(cant)
 
 	# Paloma contra paloma
 	var min_d := radio_cuerpo * 2.0
+	var min_d2 := min_d * min_d
 	for i in cant:
-		var c := _celda(pos[i])
+		var pi := pos[i]
 		for dx in range(-1, 2):
 			for dz in range(-1, 2):
-				var lista: Variant = grilla.get(c + Vector2i(dx, dz))
-				if lista == null:
-					continue
-				for k: int in lista:
-					if k <= i:
-						continue
-					var d := pos[k] - pos[i]
-					if absf(d.y) > 0.35:
-						continue
-					var h := Vector2(d.x, d.z)
-					var l := h.length()
-					if l >= min_d:
-						continue
-					if l < 0.001:
-						h = Vector2.from_angle(float(i * 7 + k) * 1.3)  # Encimadas justo: las separa en cualquier dirección
-						l = 0.0
-					else:
-						h /= l
-					var empuje := h * (min_d - l) * 0.5
-					corr[i] -= Vector3(empuje.x, 0, empuje.y)
-					corr[k] += Vector3(empuje.x, 0, empuje.y)
+				var k: int = primera.get(Vector2i(cx[i] + dx, cz[i] + dz), -1)
+				while k != -1:
+					if k > i:
+						var d := pos[k] - pi
+						if absf(d.y) <= 0.35:
+							var l2 := d.x * d.x + d.z * d.z
+							if l2 < min_d2:
+								var h: Vector2
+								var l := sqrt(l2)
+								if l < 0.001:
+									h = Vector2.from_angle(float(i * 7 + k) * 1.3)  # Encimadas justo: las separa en cualquier dirección
+									l = 0.0
+								else:
+									h = Vector2(d.x, d.z) / l
+								var empuje := h * (min_d - l) * 0.5
+								var e3 := Vector3(empuje.x, 0, empuje.y)
+								corr[i] -= e3
+								corr[k] += e3
+					k = siguiente[k]
 
 	# Obstáculos fijos para las palomas: la jugadora y cada humano (cilindros)
 	var obstaculos: Array = [[_jugador.global_position, radio_jugadora, 0.45]]
@@ -254,38 +259,36 @@ func _resolver_choques() -> void:
 			obstaculos.append([m.global_position, m.radio_colision(), m.alto_colision()])
 	# Los autos: dos círculos cada uno (adelante y atrás)
 	for n in get_tree().get_nodes_in_group("autos"):
-		if n.has_method("circulos"):
-			obstaculos.append_array(n.circulos())
+		if n is Auto:
+			obstaculos.append_array((n as Auto).circulos())
 	for o: Array in obstaculos:
 		var centro: Vector3 = o[0]
 		var radio: float = o[1] + radio_cuerpo
 		var alto: float = o[2]
-		var c := _celda(centro)
+		var ox := floori(centro.x)
+		var oz := floori(centro.z)
 		for dx in range(-1, 2):
 			for dz in range(-1, 2):
-				var lista: Variant = grilla.get(c + Vector2i(dx, dz))
-				if lista == null:
-					continue
-				for k: int in lista:
+				var k: int = primera.get(Vector2i(ox + dx, oz + dz), -1)
+				while k != -1:
 					var p := pos[k] + corr[k]
-					if p.y < centro.y - 0.3 or p.y > centro.y + alto:
-						continue
-					var h := Vector2(p.x - centro.x, p.z - centro.z)
-					var l := h.length()
-					if l >= radio:
-						continue
-					h = h / l if l > 0.001 else Vector2.from_angle(float(k) * 2.1)
-					var empuje := h * (radio - l)
-					corr[k] += Vector3(empuje.x, 0, empuje.y)
+					if p.y >= centro.y - 0.3 and p.y <= centro.y + alto:
+						var h := Vector2(p.x - centro.x, p.z - centro.z)
+						var l := h.length()
+						if l < radio:
+							h = h / l if l > 0.001 else Vector2.from_angle(float(k) * 2.1)
+							var empuje := h * (radio - l)
+							corr[k] += Vector3(empuje.x, 0, empuje.y)
+					k = siguiente[k]
 
 	if zona_libre.size() == 3:
 		_despejar_pasillo(pos, corr)
 
 	# Las correcciones también se chequean contra las paredes: si la bandada se aprieta contra
-	# un edificio, ninguna queda empujada adentro.
+	# un edificio, ninguna queda empujada adentro. Las de menos de 1 mm no hacen falta.
 	for i in cant:
-		if corr[i].length_squared() > 0.0000001:
-			palomas[i].mover_con_choques(corr[i])
+		if corr[i].length_squared() > 0.000001:
+			_palomas[i].mover_con_choques(corr[i])
 
 
 ## Corre hacia afuera las palomas (en el piso) que estén dentro del pasillo libre.
@@ -312,16 +315,71 @@ func _despejar_pasillo(pos: PackedVector3Array, corr: PackedVector3Array) -> voi
 
 
 func _mover_seguidoras(delta: float) -> void:
+	var cant := seguidoras.size()
+	if cant == 0:
+		return
 	var jpos := _jugador.global_position
 	var jvel := _jugador.velocity
 	var j_suelo := _jugador.estado == PalomaJugador.Estado.SUELO
 	var j_picada := _jugador.en_picada
 	var vel_max := maxf(jvel.length() * 1.15, velocidad_minima)
 	var rumbo_j := Vector2(jvel.x, jvel.z)
-	var cant := seguidoras.size()
+	# Si va rápido, la formación queda un poco detrás
+	var atras := Vector3.ZERO
+	if rumbo_j.length() > 1.0:
+		atras = -Vector3(rumbo_j.x, 0, rumbo_j.y).normalized() * (1.5 + rumbo_j.length() * 0.15)
+
+	# Posiciones y velocidades de todas una sola vez (leer global_position de un nodo cuesta)
+	var pos := PackedVector3Array()
+	pos.resize(cant)
+	var vel := PackedVector3Array()
+	vel.resize(cant)
+	for i in cant:
+		pos[i] = seguidoras[i].global_position
+		vel[i] = seguidoras[i].velocidad
+	# Separación, alineación y cohesión: cada par se mira una sola vez y suma a las dos
+	var sep := PackedVector3Array()
+	sep.resize(cant)
+	var ali := PackedVector3Array()
+	ali.resize(cant)
+	var coh := PackedVector3Array()
+	coh.resize(cant)
+	var vecinos := PackedInt32Array()
+	vecinos.resize(cant)
+	var rs2 := radio_separacion * radio_separacion
+	var rv2 := radio_vecinos * radio_vecinos
+	for i in cant:
+		var pi := pos[i]
+		var vi := vel[i]
+		var s_i := Vector3.ZERO
+		var a_i := Vector3.ZERO
+		var c_i := Vector3.ZERO
+		var n_i := 0
+		for k in range(i + 1, cant):
+			var pk := pos[k]
+			var d := pi - pk
+			var dl2 := d.length_squared()
+			if dl2 >= rv2:
+				continue
+			a_i += vel[k]
+			c_i += pk
+			n_i += 1
+			ali[k] += vi
+			coh[k] += pi
+			vecinos[k] += 1
+			if dl2 < rs2 and dl2 > 0.000001:
+				var e := d / dl2
+				s_i += e
+				sep[k] -= e
+		sep[i] += s_i
+		ali[i] += a_i
+		coh[i] += c_i
+		vecinos[i] += n_i
+
 	for i in cant:
 		var p := seguidoras[i]
-		var dist_j := p.global_position.distance_to(jpos)
+		var pos_i := pos[i]
+		var dist_j := pos_i.distance_to(jpos)
 		# Las lejanas se actualizan 1 de cada 3 frames (con delta triple)
 		var paso := delta
 		if dist_j > distancia_lejana:
@@ -329,50 +387,33 @@ func _mover_seguidoras(delta: float) -> void:
 				continue
 			paso = delta * 3.0
 
-		var pos := p.global_position
-		var sep := Vector3.ZERO
-		var ali := Vector3.ZERO
-		var coh := Vector3.ZERO
-		var vecinos := 0
-		for k in cant:
-			if k == i:
-				continue
-			var o := seguidoras[k]
-			var d := pos - o.global_position
-			var dl := d.length()
-			if dl < radio_separacion and dl > 0.001:
-				sep += d / (dl * dl)
-			if dl < radio_vecinos:
-				ali += o.velocidad
-				coh += o.global_position
-				vecinos += 1
-		if vecinos > 0:
-			ali = ali / vecinos - p.velocidad
-			coh = coh / vecinos - pos
+		var a := Vector3.ZERO
+		var c := Vector3.ZERO
+		if vecinos[i] > 0:
+			a = ali[i] / vecinos[i] - vel[i]
+			c = coh[i] / vecinos[i] - pos_i
 
-		# Punto propio en la formación alrededor de la jugadora (un poco detrás si va rápido)
-		var objetivo := jpos + Vector3(p.desplazamiento.x, 0, p.desplazamiento.z)
-		if rumbo_j.length() > 1.0:
-			var atras := -Vector3(rumbo_j.x, 0, rumbo_j.y).normalized()
-			objetivo += atras * (1.5 + rumbo_j.length() * 0.15)
+		# Punto propio en la formación alrededor de la jugadora
+		var objetivo := jpos + Vector3(p.desplazamiento.x, 0, p.desplazamiento.z) + atras
 		var aterrizar := j_suelo and dist_j < 7.0
 		if aterrizar:
 			objetivo.y = p.altura_suelo
 		else:
 			objetivo.y = jpos.y + p.desplazamiento.y
 
-		var hacia := objetivo - pos
+		var hacia := objetivo - pos_i
+		var largo_hacia := hacia.length()
 		var deseada := hacia.limit_length(1.0) * vel_max
-		if hacia.length() > 1.0:
-			deseada = hacia.normalized() * minf(vel_max + hacia.length() * 0.35, 30.0)
-		var seek := deseada - p.velocidad
+		if largo_hacia > 1.0:
+			deseada = hacia / largo_hacia * minf(vel_max + largo_hacia * 0.35, 30.0)
+		var seek := deseada - vel[i]
 
-		var acel := sep * peso_separacion + ali * peso_alineacion + coh * peso_cohesion + seek * peso_seguir
+		var acel := sep[i] * peso_separacion + a * peso_alineacion + c * peso_cohesion + seek * peso_seguir
 		if aterrizar:
 			acel.y = seek.y * peso_seguir * 2.0   # Al aterrizar no se amontonan en altura
-		var nueva := p.velocidad + acel * paso
-		var limite := minf(vel_max + hacia.length() * 0.35, 30.0)
-		if aterrizar and hacia.length() < 1.5:
+		var nueva := vel[i] + acel * paso
+		var limite := minf(vel_max + largo_hacia * 0.35, 30.0)
+		if aterrizar and largo_hacia < 1.5:
 			limite = 2.6
 		nueva = nueva.limit_length(limite)
 
@@ -395,9 +436,8 @@ func _llegadas(delta: float) -> void:
 		return
 	_timer_llegada = intervalo_llegada
 	var sueltas := 0
-	for n in get_children():
-		var p := n as PalomaNPC
-		if p and p.modo != PalomaNPC.Modo.SIGUIENDO:
+	for p in _palomas:
+		if p.modo != PalomaNPC.Modo.SIGUIENDO:
 			sueltas += 1
 	if sueltas >= minimo_sueltas or get_child_count() >= maximo_total:
 		return

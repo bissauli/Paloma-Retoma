@@ -25,6 +25,10 @@ const DESTELLO_LEJOS := 6.0
 const DESTELLO_CERCA := 2.5
 
 static var _paloma_jugadora: Node3D
+## Malla ya fusionada de cada tipo de comida (las migas tienen varias formas al azar): cada pedazo
+## es un solo dibujo en vez de 2 a 7.
+static var _mallas := {}
+const FORMAS_MIGA := 6
 
 var activa := true
 var _visual: Node3D
@@ -133,35 +137,65 @@ func _animar_destello(delta: float) -> void:
 
 
 func _armar() -> void:
+	var mi := MeshInstance3D.new()
+	mi.mesh = _malla_visual()
+	mi.material_override = Construir.material_vertices(0.9)
+	if not Construir.proyecta_sombra(mi.mesh):
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_visual.add_child(mi)
+	_armar_brillo()
+
+
+## La malla de este tipo de comida: se arma una vez con primitivas y se fusiona.
+func _malla_visual() -> ArrayMesh:
+	var clave := tipo
+	if tipo == "miga":
+		clave = "miga_%d" % (randi() % FORMAS_MIGA)
+	if not _mallas.has(clave):
+		var molde := Node3D.new()
+		_armar_piezas(molde)
+		var piezas := []
+		for h in molde.get_children():
+			var p := h as MeshInstance3D
+			piezas.append([p.mesh, p.transform, p.material_override.get_meta(&"color_plano", Color.WHITE)])
+		molde.free()
+		_mallas[clave] = Construir.combinar(piezas)
+	return _mallas[clave]
+
+
+func _armar_piezas(padre: Node3D) -> void:
 	match tipo:
 		"miga":
 			# Un puñadito de migas
 			for i in 4:
-				var p := Construir.caja(_visual, Vector3(randf_range(-0.12, 0.12), 0.025, randf_range(-0.12, 0.12)),
+				var p := Construir.caja(padre, Vector3(randf_range(-0.12, 0.12), 0.025, randf_range(-0.12, 0.12)),
 					Vector3(0.06, 0.04, 0.05), Color("e9cf9a"), false)
 				p.rotation.y = randf() * TAU
 		"medialuna":
 			# Medialuna: tres esferas doradas en arco
 			for i in 3:
 				var a := (i - 1) * 0.6
-				Construir.esfera(_visual, Vector3(sin(a) * 0.12, 0.06, -cos(a) * 0.12 + 0.1), 0.07,
+				Construir.esfera(padre, Vector3(sin(a) * 0.12, 0.06, -cos(a) * 0.12 + 0.1), 0.07,
 					Color("d9a24a"), Vector3(1, 0.7, 1.3), 6)
-			Construir.cilindro(_visual, Vector3(0, 0.0, 0), 0.22, 0.01, Color("ffffff"), false, 10)
+			Construir.cilindro(padre, Vector3(0, 0.0, 0), 0.22, 0.01, Color("ffffff"), false, 10)
 		"papa":
 			# Cucurucho de papas fritas
-			Construir.cilindro(_visual, Vector3(0, 0.1, 0), 0.08, 0.2, Color("c8372d"), false, 6, 0.11)
+			Construir.cilindro(padre, Vector3(0, 0.1, 0), 0.08, 0.2, Color("c8372d"), false, 6, 0.11)
 			for i in 6:
-				var p := Construir.caja(_visual, Vector3(randf_range(-0.05, 0.05), 0.25, randf_range(-0.05, 0.05)),
+				var p := Construir.caja(padre, Vector3(randf_range(-0.05, 0.05), 0.25, randf_range(-0.05, 0.05)),
 					Vector3(0.025, 0.14, 0.025), Color("f2d36b"), false)
 				p.rotation = Vector3(randf_range(-0.3, 0.3), 0, randf_range(-0.3, 0.3))
 		"factura":
-			Construir.esfera(_visual, Vector3(0, 0.05, 0), 0.1, Color("c97b3a"), Vector3(1.4, 0.6, 1.0), 6)
-			Construir.esfera(_visual, Vector3(0, 0.09, 0), 0.05, Color("f0e6d2"), Vector3(1.6, 0.4, 0.8), 6)
+			Construir.esfera(padre, Vector3(0, 0.05, 0), 0.1, Color("c97b3a"), Vector3(1.4, 0.6, 1.0), 6)
+			Construir.esfera(padre, Vector3(0, 0.09, 0), 0.05, Color("f0e6d2"), Vector3(1.6, 0.4, 0.8), 6)
 		"choripan":
 			# Pan con chorizo: grande y tentador
-			Construir.esfera(_visual, Vector3(0, 0.12, 0), 0.18, Color("e0b26a"), Vector3(0.9, 0.6, 2.2), 8)
-			Construir.esfera(_visual, Vector3(0, 0.2, 0), 0.1, Color("8f3a22"), Vector3(1.0, 0.9, 3.6), 8)
-			Construir.esfera(_visual, Vector3(0, 0.27, 0), 0.04, Color("3e7d2a"), Vector3(2.5, 0.5, 6.0), 6)
+			Construir.esfera(padre, Vector3(0, 0.12, 0), 0.18, Color("e0b26a"), Vector3(0.9, 0.6, 2.2), 8)
+			Construir.esfera(padre, Vector3(0, 0.2, 0), 0.1, Color("8f3a22"), Vector3(1.0, 0.9, 3.6), 8)
+			Construir.esfera(padre, Vector3(0, 0.27, 0), 0.04, Color("3e7d2a"), Vector3(2.5, 0.5, 6.0), 6)
+
+
+func _armar_brillo() -> void:
 	# Las migas: un destello chiquito que sólo aparece si la paloma está cerca
 	if tipo == "miga":
 		_destello = Label3D.new()

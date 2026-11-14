@@ -25,3 +25,7 @@ botones DESPEGAR/ALETEAR (mantener), PICADA (mantener), PICOTEAR y ARRULLAR · I
 - Build para teléfonos en `docs/android/` (preset "Web Android", con la feature `movil` que activa los
   controles táctiles de `ui/controles_tactiles.gd`; la versión de PC no los carga):
   `godot --headless --export-release "Web Android" docs/android/index.html`.
+- Pruebas automáticas en `tests/` (headless): `godot --headless --path . res://tests/test_vuelo.tscn`
+  (también `test_bandada` y `test_enemigos`; con `-- movil` corren con la física del teléfono).
+- Rendimiento: `godot --path . res://tests/bench_rendimiento.tscn --disable-vsync` (con `-- movil` emula
+  la versión para teléfonos). Las decisiones de optimización están en `DECISIONES.md`.
