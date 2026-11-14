@@ -51,7 +51,9 @@ func _crear_ambiente() -> void:
 	var we := WorldEnvironment.new()
 	we.name = "WorldEnvironment"
 	we.environment = entorno
+	we.add_to_group("entorno")
 	add_child(we)
+	Ajustes.aplicar_brillo(entorno)  # Opciones > Pantalla > Brillo
 
 	sol = DirectionalLight3D.new()
 	sol.name = "Sol"

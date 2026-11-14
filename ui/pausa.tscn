@@ -11,7 +11,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.1, 0.08, 0.16, 0.65)
+color = Color(0, 0.03, 0.06, 0.55)
 
 [node name="Centro" type="VBoxContainer" parent="."]
 anchors_preset = 8
@@ -30,11 +30,8 @@ alignment = 1
 
 [node name="Titulo" type="Label" parent="Centro"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_colors/font_outline_color = Color(0.25, 0.22, 0.35, 1)
-theme_override_constants/outline_size = 14
-theme_override_font_sizes/font_size = 56
-text = "Pausa"
+theme_type_variation = &"TituloPantalla"
+text = "PAUSA"
 horizontal_alignment = 1
 
 [node name="Continuar" type="Button" parent="Centro"]
@@ -42,37 +39,36 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(280, 56)
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 26
-text = "Continuar"
+theme_override_font_sizes/font_size = 20
+text = "CONTINUAR"
 
 [node name="Reiniciar" type="Button" parent="Centro"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(280, 56)
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 26
-text = "Reiniciar"
+theme_override_font_sizes/font_size = 20
+text = "REINICIAR"
 
 [node name="Opciones" type="Button" parent="Centro"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(280, 56)
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 26
-text = "Opciones"
+theme_override_font_sizes/font_size = 20
+text = "OPCIONES"
 
 [node name="Salir" type="Button" parent="Centro"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(280, 56)
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 26
-text = "Salir al título"
+theme_override_font_sizes/font_size = 20
+text = "SALIR AL MENÚ"
 
 [node name="Ayuda" type="Label" parent="Centro"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.9, 0.95, 1)
-theme_override_font_sizes/font_size = 17
+theme_type_variation = &"TextoChico"
 text = "WASD caminar · Espacio despegar/aletear · Shift picada
 Click izq. picotear · Click der. arrullar (recluta con comida)
 Llevá medialunas y papas al nido · Juntá 30 palomas · ¡Tomá el balcón!"

@@ -4,15 +4,20 @@ extends Node
 ## Si no, el sonido se sintetiza por código al arrancar (placeholder).
 ## Nombres previstos: arrullo, aleteo, picoteo, grito_nene, silbato,
 ## chillido_halcon, ambiente, recoger, victoria, bocina.
+## Cada sonido sale por un bus (ver default_bus_layout.tres): las voces (arrullo, grito, chillido)
+## por "Voces", el ambiente y la música por "Musica" y el resto por "Efectos".
+## Si existe res://audio/musica.ogg (o .wav) suena en bucle por el bus "Musica".
 
 const MEZCLA := 22050
 const NOMBRES := ["arrullo", "aleteo", "picoteo", "grito_nene", "silbato",
 	"chillido_halcon", "ambiente", "recoger", "victoria", "bocina"]
 const CANALES := 10
+const BUS_VOCES := ["arrullo", "grito_nene", "chillido_halcon"]
 
 var _sonidos := {}
 var _pool: Array[AudioStreamPlayer] = []
 var _ambiente: AudioStreamPlayer
+var _musica: AudioStreamPlayer
 var _rng := RandomNumberGenerator.new()
 
 
@@ -28,12 +33,22 @@ func _ready() -> void:
 	_ambiente = AudioStreamPlayer.new()
 	_ambiente.stream = _sonidos["ambiente"]
 	_ambiente.volume_db = -16.0
+	_ambiente.bus = &"Musica"
 	add_child(_ambiente)
+	_musica = AudioStreamPlayer.new()
+	_musica.bus = &"Musica"
+	_musica.volume_db = -6.0
+	for ext: String in [".ogg", ".wav"]:
+		if ResourceLoader.exists("res://audio/musica" + ext):
+			_musica.stream = load("res://audio/musica" + ext) as AudioStream
+			break
+	add_child(_musica)
 
 
 func _exit_tree() -> void:
 	# Cortar todo al salir evita que queden reproducciones colgadas
 	_ambiente.stop()
+	_musica.stop()
 	for p in _pool:
 		p.stop()
 
@@ -50,6 +65,7 @@ func reproducir(nombre: String, volumen_db := 0.0, variar_tono := true) -> void:
 			elegido = p
 			break
 	elegido.stream = _sonidos[nombre]
+	elegido.bus = bus_de(nombre)
 	elegido.volume_db = volumen_db
 	elegido.pitch_scale = _rng.randf_range(0.92, 1.08) if variar_tono else 1.0
 	elegido.play()
@@ -63,6 +79,7 @@ func reproducir_en(nombre: String, posicion: Vector3, volumen_db := 0.0) -> void
 		return
 	var p := AudioStreamPlayer3D.new()
 	p.stream = _sonidos[nombre]
+	p.bus = bus_de(nombre)
 	p.volume_db = volumen_db
 	p.unit_size = 8.0
 	p.max_distance = 70.0
@@ -78,10 +95,20 @@ func iniciar_ambiente() -> void:
 		return  # En las pruebas automáticas no hace falta (y evita avisos al salir)
 	if not _ambiente.playing:
 		_ambiente.play()
+	if _musica.stream and not _musica.playing:
+		_musica.play()
 
 
 func detener_ambiente() -> void:
 	_ambiente.stop()
+	_musica.stop()
+
+
+## Bus de audio por el que sale cada sonido (lo regula Opciones > Audio).
+func bus_de(nombre: String) -> StringName:
+	if nombre == "ambiente":
+		return &"Musica"
+	return &"Voces" if nombre in BUS_VOCES else &"Efectos"
 
 
 # ---------------------------------------------------------------- Carga / síntesis

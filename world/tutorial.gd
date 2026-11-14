@@ -18,6 +18,7 @@ var _inicio := Vector3.ZERO
 var _t := 0.0
 var _t_paso := 0.0
 var _terminado := false
+var _espera_suelo := 0.0
 
 
 func _ready() -> void:
@@ -31,13 +32,27 @@ func _ready() -> void:
 	_cartel.no_depth_test = true
 	_cartel.render_priority = 5
 	add_child(_cartel)
-	_empezar.call_deferred()
+	_cartel.visible = false
 
 
-func _empezar() -> void:
-	_jugador = get_tree().get_first_node_in_group("jugador") as PalomaJugador
-	if _jugador:
-		_inicio = _jugador.global_position
+## Arranca cuando ya hay partida (con el menú principal en pantalla todavía no la hay) y, después
+## del saltito del menú, cuando la paloma vuelve a apoyarse (o a los 3 s).
+func _intentar_empezar(delta: float) -> void:
+	if not GameState.en_partida or GameState.menu_activo:
+		return
+	if GameState.tutorial_hecho:
+		_terminado = true
+		queue_free()   # Partida continuada: el tutorial ya se hizo
+		return
+	var j := get_tree().get_first_node_in_group("jugador") as PalomaJugador
+	if j == null:
+		return
+	_espera_suelo += delta
+	if j.estado != PalomaJugador.Estado.SUELO and _espera_suelo < 3.0:
+		return
+	_jugador = j
+	_inicio = j.global_position
+	_cartel.visible = true
 	_mostrar(0)
 
 
@@ -51,7 +66,10 @@ func _mostrar(n: int) -> void:
 
 
 func _process(delta: float) -> void:
-	if _terminado or _jugador == null:
+	if _terminado:
+		return
+	if _jugador == null:
+		_intentar_empezar(delta)
 		return
 	_t += delta
 	_t_paso += delta

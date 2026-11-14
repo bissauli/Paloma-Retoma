@@ -2,7 +2,7 @@ extends CanvasLayer
 ## Victoria: la cámara gira alrededor del balcón, la plaza se llena de palomas arrullando,
 ## aparece "¡LA PLAZA ES NUESTRA!" y después los créditos con nombres de palomas.
 
-const ESCENA_TITULO := "res://ui/titulo.tscn"
+const ESCENA_MENU := "res://main.tscn"
 const NOMBRES_FIJOS := ["Carlos", "La Tana", "El Ruso", "Coqui"]
 
 @export var radio_camara := 20.0
@@ -21,7 +21,7 @@ func _ready() -> void:
 	layer = 15
 	visible = false
 	GameState.victoria.connect(_al_ganar)
-	%VolverTitulo.pressed.connect(func() -> void: get_tree().change_scene_to_file(ESCENA_TITULO))
+	%VolverTitulo.pressed.connect(func() -> void: get_tree().change_scene_to_file(ESCENA_MENU))
 
 
 func _al_ganar() -> void:

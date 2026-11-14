@@ -148,6 +148,17 @@ func _al_terminar_animacion(nombre: StringName) -> void:
 		_reproducir_base(b, 1.0)
 
 
+## Agrega los gestos de paloma quieta (mirada, parpadeo, picoteo y arrullo ocasionales) que se
+## usan en el menú principal. "mirar_a" es la cámara a la que mira de vez en cuando.
+func agregar_gestos(mirar_a: Node3D) -> GestosPaloma:
+	var g := GestosPaloma.new()
+	g.name = "Gestos"
+	g.mirar_a = mirar_a
+	g.modelo = self
+	_skel.add_child(g)
+	return g
+
+
 func picotear() -> void:
 	_accion_unica("Peck", 1.8 if es_jugador else 1.0)
 

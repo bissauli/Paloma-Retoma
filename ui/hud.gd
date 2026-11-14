@@ -15,6 +15,7 @@ var _stamina: ProgressBar
 var _estilo_stamina: StyleBoxFlat
 var _fundido: ColorRect
 var _aviso_fundido: Label
+var _raiz: Control
 var _t_mensaje := 0.0
 var _pulso_bandada := 0.0
 
@@ -53,6 +54,7 @@ func _armar() -> void:
 	raiz.set_anchors_preset(Control.PRESET_FULL_RECT)
 	raiz.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(raiz)
+	_raiz = raiz
 
 	# --- Panel izquierdo: bandada, stamina, comida ---
 	var panel := PanelContainer.new()
@@ -143,6 +145,13 @@ func _process(delta: float) -> void:
 	if _pulso_bandada > 0.0:
 		_pulso_bandada = maxf(_pulso_bandada - delta * 3.0, 0.0)
 		_bandada.scale = Vector2.ONE * (1.0 + 0.25 * sin(_pulso_bandada * PI))
+
+
+## Aparece de a poco (al terminar la transición del menú principal al juego).
+func mostrar(segundos := 0.6) -> void:
+	visible = true
+	_raiz.modulate.a = 0.0
+	create_tween().tween_property(_raiz, "modulate:a", 1.0, segundos)
 
 
 func mostrar_mensaje(texto: String, duracion: float) -> void:

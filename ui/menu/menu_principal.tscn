@@ -1,0 +1,211 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/menu/menu_principal.gd" id="1_menu"]
+[ext_resource type="Theme" path="res://ui/tema/tema_paloma.tres" id="2_tema"]
+
+[sub_resource type="Gradient" id="Gradient_velo"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(0, 0.03, 0.06, 0, 0, 0.03, 0.06, 0.24, 0, 0.03, 0.06, 0.5)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_velo"]
+gradient = SubResource("Gradient_velo")
+width = 256
+height = 4
+
+[node name="MenuPrincipal" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_menu")
+
+[node name="Raiz" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme = ExtResource("2_tema")
+
+[node name="Velo" type="TextureRect" parent="Raiz"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.4
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 0
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_velo")
+expand_mode = 1
+
+[node name="Titulo" type="VBoxContainer" parent="Raiz"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -380.0
+offset_top = 30.0
+offset_right = -60.0
+offset_bottom = 290.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Nombre" type="Label" parent="Raiz/Titulo"]
+layout_mode = 2
+theme_type_variation = &"TituloJuego"
+text = "PALOMA
+RETOMA"
+horizontal_alignment = 2
+
+[node name="Raya" type="HSeparator" parent="Raiz/Titulo"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Botones" type="VBoxContainer" parent="Raiz"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -350.0
+offset_top = -354.0
+offset_bottom = -56.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 12
+alignment = 2
+
+[node name="FilaContinuar" type="Control" parent="Raiz/Botones"]
+custom_minimum_size = Vector2(350, 50)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Desliz" type="Control" parent="Raiz/Botones/FilaContinuar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Continuar" type="Button" parent="Raiz/Botones/FilaContinuar/Desliz"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"BotonMenu"
+text = "CONTINUAR"
+alignment = 2
+
+[node name="FilaNueva" type="Control" parent="Raiz/Botones"]
+custom_minimum_size = Vector2(350, 50)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Desliz" type="Control" parent="Raiz/Botones/FilaNueva"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="NuevaPartida" type="Button" parent="Raiz/Botones/FilaNueva/Desliz"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"BotonMenu"
+text = "NUEVA PARTIDA"
+alignment = 2
+
+[node name="FilaCargar" type="Control" parent="Raiz/Botones"]
+custom_minimum_size = Vector2(350, 50)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Desliz" type="Control" parent="Raiz/Botones/FilaCargar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="CargarPartida" type="Button" parent="Raiz/Botones/FilaCargar/Desliz"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"BotonMenu"
+text = "CARGAR PARTIDA"
+alignment = 2
+
+[node name="FilaOpciones" type="Control" parent="Raiz/Botones"]
+custom_minimum_size = Vector2(350, 50)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Desliz" type="Control" parent="Raiz/Botones/FilaOpciones"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Opciones" type="Button" parent="Raiz/Botones/FilaOpciones/Desliz"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"BotonMenu"
+text = "OPCIONES"
+alignment = 2
+
+[node name="FilaSalir" type="Control" parent="Raiz/Botones"]
+custom_minimum_size = Vector2(350, 50)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Desliz" type="Control" parent="Raiz/Botones/FilaSalir"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Salir" type="Button" parent="Raiz/Botones/FilaSalir/Desliz"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"BotonMenu"
+text = "SALIR"
+alignment = 2

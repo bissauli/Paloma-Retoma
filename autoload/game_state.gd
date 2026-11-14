@@ -1,6 +1,11 @@
 extends Node
 ## Estado global de la partida (autoload "GameState").
 ## Nadie guarda referencias rígidas a otros nodos: todo pasa por estas señales.
+## También guarda la partida (un solo lugar, archivo_partida) cada AUTOGUARDADO segundos,
+## al salir al menú y al cerrar el juego. El menú principal la usa para CONTINUAR y CARGAR.
+
+const VERSION_PARTIDA := 1
+const AUTOGUARDADO := 20.0
 
 # --- Señales de estado ---
 signal bandada_cambio(cantidad: int)
@@ -36,6 +41,11 @@ var migas_comidas := 0
 var posicion_nido := Vector3(0, 0.5, 0)
 var _umbrales := {}
 var invulnerable := 0.0         ## Segundos de gracia después de que te atrapan
+var menu_activo := false        ## El menú principal (o su transición a la partida) está en pantalla
+var saltar_menu := false        ## Al recargar la escena (Reiniciar) se arranca directo a jugar
+var guardado_habilitado := false ## Sólo la partida "de verdad" guarda (las pruebas automáticas no)
+var archivo_partida := "user://partida.cfg"   ## Las pruebas usan otro archivo
+var _t_guardado := 0.0
 
 
 func _process(delta: float) -> void:
@@ -43,6 +53,9 @@ func _process(delta: float) -> void:
 	if not en_partida or partida_terminada or get_tree().paused:
 		return
 	tiempo_jugado += delta
+	_t_guardado += delta
+	if _t_guardado >= AUTOGUARDADO:
+		guardar_partida()
 	# El día avanza con el tiempo, pero también con el progreso de la bandada
 	var por_tiempo := tiempo_jugado / Config.DURACION_PARTIDA
 	var por_bandada := float(bandada) / float(Config.UMBRAL_BALCON)
@@ -53,27 +66,80 @@ func _process(delta: float) -> void:
 
 
 ## Deja todo como al principio. Se llama al empezar cada partida.
-func reiniciar() -> void:
+## "datos" (de datos_guardados()) continúa una partida guardada: la bandada no se cuenta acá,
+## la vuelve a armar la escena con Bandada.restaurar().
+func reiniciar(datos: Dictionary = {}) -> void:
 	bandada = 0
-	comida = 0
+	comida = int(datos.get("comida", 0))
 	carga = ""
 	stamina = Config.STAMINA_MAX
-	progreso_dia = 0.0
-	tiempo_jugado = 0.0
+	progreso_dia = float(datos.get("progreso_dia", 0.0))
+	tiempo_jugado = float(datos.get("tiempo_jugado", 0.0))
 	partida_terminada = false
 	halcon_activo = false
-	tutorial_hecho = false
-	migas_comidas = 0
+	tutorial_hecho = bool(datos.get("tutorial_hecho", false))
+	migas_comidas = int(datos.get("migas_comidas", 0))
 	_umbrales.clear()
+	for u in datos.get("umbrales", []):
+		_umbrales[int(u)] = true   # Los avisos de 5, 15 y 30 palomas no se repiten
 	invulnerable = 0.0
+	_t_guardado = 0.0
 	en_partida = true
 	partida_iniciada.emit()
 	bandada_cambio.emit(bandada)
 	comida_cambio.emit(comida)
 	carga_cambio.emit(carga)
 	stamina_cambio.emit(stamina, Config.STAMINA_MAX)
-	fase_dia_cambio.emit(0.0)
+	if datos.is_empty():
+		fase_dia_cambio.emit(0.0)
 	actualizar_objetivo()
+
+
+# ---------------------------------------------------------------- Guardar y cargar
+
+func hay_partida_guardada() -> bool:
+	return not datos_guardados().is_empty()
+
+
+## Lo guardado, o {} si no hay partida (o el archivo no sirve).
+func datos_guardados() -> Dictionary:
+	var cfg := ConfigFile.new()
+	if cfg.load(archivo_partida) != OK:
+		return {}
+	if int(cfg.get_value("partida", "version", 0)) != VERSION_PARTIDA:
+		return {}
+	var d := {}
+	for k in cfg.get_section_keys("partida"):
+		d[k] = cfg.get_value("partida", k)
+	return d
+
+
+func guardar_partida() -> void:
+	_t_guardado = 0.0
+	if not en_partida or partida_terminada or not guardado_habilitado:
+		return
+	var cfg := ConfigFile.new()
+	cfg.set_value("partida", "version", VERSION_PARTIDA)
+	cfg.set_value("partida", "fecha", int(Time.get_unix_time_from_system()))
+	cfg.set_value("partida", "bandada", bandada)
+	cfg.set_value("partida", "comida", comida)
+	cfg.set_value("partida", "tiempo_jugado", tiempo_jugado)
+	cfg.set_value("partida", "progreso_dia", progreso_dia)
+	cfg.set_value("partida", "tutorial_hecho", tutorial_hecho)
+	cfg.set_value("partida", "migas_comidas", migas_comidas)
+	cfg.set_value("partida", "umbrales", _umbrales.keys())
+	cfg.save(archivo_partida)
+
+
+func borrar_partida() -> void:
+	if FileAccess.file_exists(archivo_partida):
+		DirAccess.remove_absolute(archivo_partida)
+
+
+func _notification(what: int) -> void:
+	# Al cerrar la ventana se guarda lo que haya
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and en_partida and not partida_terminada:
+		guardar_partida()
 
 
 # ---------------------------------------------------------------- Bandada
@@ -180,6 +246,8 @@ func ganar() -> void:
 		return
 	partida_terminada = true
 	en_partida = false
+	if guardado_habilitado:
+		borrar_partida()   # Ganada: ya no hay nada que continuar
 	victoria.emit()
 	actualizar_objetivo()
 

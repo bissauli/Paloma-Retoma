@@ -1,13 +1,18 @@
 extends Node
-## Opciones del jugador (autoload "Ajustes"): volumen, silencio, pantalla completa, mouse,
-## calidad gráfica (bajo / medio / alto), resolución y límite de FPS.
+## Opciones del jugador (autoload "Ajustes"): volumen general y por bus (música, voces, efectos),
+## silencio, brillo, pantalla completa, mouse, calidad gráfica (bajo / medio / alto), resolución y
+## límite de FPS.
 ## Se guardan en user://opciones.cfg y se aplican al arrancar.
 
 signal cambio
 
 const ARCHIVO := "user://opciones.cfg"
+## Buses de audio que regula el menú (default_bus_layout.tres). Si faltan, se crean al arrancar.
+const BUSES := [&"Musica", &"Voces", &"Efectos"]
+const BRILLO_MIN := 0.6
+const BRILLO_MAX := 1.4
 
-const CALIDADES := ["Bajo", "Medio", "Alto"]
+const CALIDADES := ["Baja", "Media", "Alta"]
 ## Por calidad: distancia de sombras (m), cortes de la sombra direccional (1, 2 o 4), tamaño del
 ## mapa de sombras, filtro suave (0..5) y MSAA. Las sombras son lo que más cuesta en esta escena.
 const PRESETS := [
@@ -22,8 +27,12 @@ const RESOLUCIONES := [Vector2i(0, 0), Vector2i(1280, 720), Vector2i(1600, 900),
 ## Con un número fijo se apaga el VSync para que el tope no lo pise la frecuencia del monitor.
 const LIMITES_FPS := [0, 30, 60, 75, 90, 120, 144, 165, 180, 200, 240, -1]
 
-var volumen := 0.8              ## 0..1, lineal
-var silencio := false
+var volumen := 0.8              ## 0..1, lineal (bus Master)
+var volumen_musica := 0.8       ## 0..1, bus Musica (ambiente y música)
+var volumen_voces := 1.0        ## 0..1, bus Voces (arrullos, gritos, chillidos)
+var volumen_efectos := 1.0      ## 0..1, bus Efectos (aleteo, picoteo, silbato...)
+var silencio := false           ## "Silenciar todo"
+var brillo := 1.0               ## Brillo de la imagen 3D (BRILLO_MIN..BRILLO_MAX)
 var pantalla_completa := false
 var sensibilidad := 1.0         ## Multiplica la sensibilidad de la cámara (0,25..2)
 var invertir_y := false
@@ -38,6 +47,7 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		calidad = 1
 	_cargar()
+	_asegurar_buses()
 	_aplicar_audio()
 	# En la web el navegador sólo deja pasar a pantalla completa después de un click
 	if pantalla_completa and not OS.has_feature("web"):
@@ -53,6 +63,46 @@ func set_volumen(v: float) -> void:
 	volumen = clampf(v, 0.0, 1.0)
 	_aplicar_audio()
 	_guardar()
+
+
+## Volumen de un bus (&"Musica", &"Voces" o &"Efectos"), 0..1.
+func set_volumen_bus(bus: StringName, v: float) -> void:
+	v = clampf(v, 0.0, 1.0)
+	match bus:
+		&"Musica":
+			volumen_musica = v
+		&"Voces":
+			volumen_voces = v
+		&"Efectos":
+			volumen_efectos = v
+	_aplicar_audio()
+	_guardar()
+
+
+func volumen_bus(bus: StringName) -> float:
+	match bus:
+		&"Musica":
+			return volumen_musica
+		&"Voces":
+			return volumen_voces
+		&"Efectos":
+			return volumen_efectos
+	return volumen
+
+
+func set_brillo(b: float) -> void:
+	brillo = clampf(b, BRILLO_MIN, BRILLO_MAX)
+	for n in get_tree().get_nodes_in_group("entorno"):
+		aplicar_brillo((n as WorldEnvironment).environment)
+	_guardar()
+
+
+## Brillo de la imagen 3D (la interfaz no cambia). La llama world/plaza.gd al crear el entorno.
+func aplicar_brillo(env: Environment) -> void:
+	if env == null:
+		return
+	env.adjustment_enabled = not is_equal_approx(brillo, 1.0)
+	env.adjustment_brightness = brillo
 
 
 func set_silencio(s: bool) -> void:
@@ -99,7 +149,7 @@ func set_limite_fps(f: int) -> void:
 func nombre_limite_fps(f: int) -> String:
 	match f:
 		0:
-			return "VSync (pantalla)"
+			return "VSync"
 		-1:
 			return "Sin límite"
 		_:
@@ -124,10 +174,27 @@ func resolucion_cambia_ventana() -> bool:
 
 # ---------------------------------------------------------------- Aplicar
 
+func _asegurar_buses() -> void:
+	for nombre: StringName in BUSES:
+		if AudioServer.get_bus_index(nombre) == -1:
+			AudioServer.add_bus()
+			var i := AudioServer.bus_count - 1
+			AudioServer.set_bus_name(i, nombre)
+			AudioServer.set_bus_send(i, &"Master")
+
+
 func _aplicar_audio() -> void:
-	var bus := AudioServer.get_bus_index("Master")
-	AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(volumen, 0.0001)))
-	AudioServer.set_bus_mute(bus, silencio or volumen <= 0.0)
+	_volumen_de_bus(&"Master", volumen, silencio)
+	for nombre: StringName in BUSES:
+		_volumen_de_bus(nombre, volumen_bus(nombre), false)
+
+
+func _volumen_de_bus(nombre: StringName, v: float, mudo: bool) -> void:
+	var bus := AudioServer.get_bus_index(nombre)
+	if bus == -1:
+		return
+	AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(v, 0.0001)))
+	AudioServer.set_bus_mute(bus, mudo or v <= 0.0)
 
 
 func _aplicar_pantalla() -> void:
@@ -204,7 +271,11 @@ func _cargar() -> void:
 	if cfg.load(ARCHIVO) != OK:
 		return
 	volumen = cfg.get_value("audio", "volumen", volumen)
+	volumen_musica = cfg.get_value("audio", "musica", volumen_musica)
+	volumen_voces = cfg.get_value("audio", "voces", volumen_voces)
+	volumen_efectos = cfg.get_value("audio", "efectos", volumen_efectos)
 	silencio = cfg.get_value("audio", "silencio", silencio)
+	brillo = clampf(cfg.get_value("video", "brillo", brillo), BRILLO_MIN, BRILLO_MAX)
 	pantalla_completa = cfg.get_value("video", "pantalla_completa", pantalla_completa)
 	calidad = clampi(cfg.get_value("video", "calidad", calidad), 0, PRESETS.size() - 1)
 	resolucion = cfg.get_value("video", "resolucion", resolucion)
@@ -218,7 +289,11 @@ func _cargar() -> void:
 func _guardar() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("audio", "volumen", volumen)
+	cfg.set_value("audio", "musica", volumen_musica)
+	cfg.set_value("audio", "voces", volumen_voces)
+	cfg.set_value("audio", "efectos", volumen_efectos)
 	cfg.set_value("audio", "silencio", silencio)
+	cfg.set_value("video", "brillo", brillo)
 	cfg.set_value("video", "pantalla_completa", pantalla_completa)
 	cfg.set_value("video", "calidad", calidad)
 	cfg.set_value("video", "resolucion", resolucion)

@@ -51,9 +51,10 @@ var _enfriamiento_picoteo := 0.0
 var _rumbo := 0.0           ## Hacia dónde mira la paloma (yaw)
 var _alabeo := 0.0
 var _velocidad_previa := Vector3.ZERO
+var _aleteo_auto := 0.0     ## Segundos de aleteo animado sin input (el salto del menú)
 
 @onready var modelo: ModeloPaloma = $Modelo
-@onready var camara: Node3D = $CamaraOrbital
+@onready var camara: CamaraOrbital = $CamaraOrbital
 
 
 func _ready() -> void:
@@ -124,6 +125,25 @@ func despegar() -> void:
 	velocity.y = impulso_despegue * (0.8 if GameState.carga != "" else 1.0)
 	velocity += adelante * empuje_despegue
 	GameState.set_stamina(GameState.stamina - Config.STAMINA_DESPEGUE)
+	AudioManager.reproducir("aleteo")
+	despego.emit()
+
+
+## Hacia dónde mira la paloma (yaw; 0 = hacia -Z).
+func rumbo() -> float:
+	return _rumbo
+
+
+## Saltito con aleteo al empezar la partida desde el menú principal (no gasta stamina).
+## La cámara del menú se desengancha mientras tanto y pasa a seguirla (ver ui/menu/camara_menu.gd).
+func saltar_inicio() -> void:
+	estado = Estado.AIRE
+	_tiempo_en_aire = 0.0
+	_coyote = 0.0
+	floor_snap_length = 0.0
+	_aleteo_auto = 0.55
+	var adelante := Vector3(-sin(_rumbo), 0, -cos(_rumbo))
+	velocity = adelante * 1.4 + Vector3.UP * 4.4
 	AudioManager.reproducir("aleteo")
 	despego.emit()
 
@@ -225,10 +245,11 @@ func _orientar(delta: float) -> void:
 
 func _animar(delta: float) -> void:
 	var modo := 0
+	_aleteo_auto = maxf(_aleteo_auto - delta, 0.0)
 	if estado == Estado.AIRE:
 		if en_picada:
 			modo = 3
-		elif aleteando or _tiempo_en_aire < 0.35:
+		elif aleteando or _tiempo_en_aire < 0.35 or _aleteo_auto > 0.0:
 			modo = 1
 		else:
 			modo = 2

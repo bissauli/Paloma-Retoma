@@ -1,7 +1,9 @@
 extends CanvasLayer
-## Menú de pausa (Esc): Continuar, Reiniciar, Opciones (las mismas del título) y Salir al título.
+## Menú de pausa (Esc): Continuar, Reiniciar, Opciones (las mismas del menú principal) y
+## Salir al menú (guarda la partida para poder continuarla).
 
-const ESCENA_TITULO := "res://ui/titulo.tscn"
+const ESCENA_MENU := "res://main.tscn"
+const TEMA := preload("res://ui/tema/tema_paloma.tres")
 
 var _opciones: OpcionesMenu
 
@@ -10,6 +12,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 20
 	visible = false
+	($Centro as Control).theme = TEMA
 	%Continuar.pressed.connect(continuar)
 	%Reiniciar.pressed.connect(_reiniciar)
 	%Salir.pressed.connect(_salir)
@@ -20,7 +23,7 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("pausa") and not GameState.partida_terminada:
+	if event.is_action_pressed("pausa") and not GameState.partida_terminada and not GameState.menu_activo:
 		if visible:
 			continuar()
 		else:
@@ -44,13 +47,15 @@ func continuar() -> void:
 
 func _reiniciar() -> void:
 	get_tree().paused = false
+	GameState.saltar_menu = true   # Reiniciar arranca directo a jugar, sin el menú principal
 	get_tree().reload_current_scene()
 
 
 func _salir() -> void:
+	GameState.guardar_partida()
 	get_tree().paused = false
 	GameState.en_partida = false
-	get_tree().change_scene_to_file(ESCENA_TITULO)
+	get_tree().change_scene_to_file(ESCENA_MENU)
 
 
 func _abrir_opciones() -> void:

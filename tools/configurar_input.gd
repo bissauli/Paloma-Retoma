@@ -23,7 +23,7 @@ const BOTONES := {
 static func aplicar() -> String:
 	var ps := ProjectSettings
 	ps.set_setting("application/config/name", "Paloma Retoma")
-	ps.set_setting("application/run/main_scene", "res://ui/titulo.tscn")
+	ps.set_setting("application/run/main_scene", "res://main.tscn")
 	ps.set_setting("autoload/GameState", "*res://autoload/game_state.gd")
 	ps.set_setting("autoload/AudioManager", "*res://autoload/audio_manager.gd")
 	ps.set_setting("autoload/Ajustes", "*res://autoload/ajustes.gd")

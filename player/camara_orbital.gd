@@ -1,3 +1,4 @@
+class_name CamaraOrbital
 extends Node3D
 ## Cámara orbital en tercera persona controlada con el mouse.
 ## Sigue al padre (la paloma) de forma suave y ajusta distancia y FOV según el vuelo.

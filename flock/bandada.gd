@@ -25,6 +25,9 @@ const ESCENA_PALOMA := preload("res://flock/paloma_npc.tscn")
 @export var intervalo_llegada := 6.0
 
 var seguidoras: Array[PalomaNPC] = []
+## Pasillo sin palomas [desde, hasta, radio] (en el plano XZ). Lo usa el menú principal para que
+## ninguna se cruce entre la cámara y la paloma de la jugadora. Vacío = sin pasillo.
+var zona_libre: Array = []
 var _zonas: Array[Marker3D] = []
 var _jugador: PalomaJugador
 var _frame := 0
@@ -94,6 +97,32 @@ func _al_arrullar(pos: Vector3, radio: float) -> void:
 		AudioManager.reproducir("arrullo", -4.0)
 		if reclutadas > 1:
 			GameState.mensaje.emit("¡Se sumaron %d palomas a la bandada!" % reclutadas, 2.0)
+
+
+## Al continuar una partida guardada: suma "cantidad" palomas a la bandada sin gastar comida.
+## Vienen las sueltas más cercanas y, si no alcanzan, llegan volando desde los bordes del mapa.
+func restaurar(cantidad: int) -> void:
+	if _jugador == null:
+		_jugador = get_tree().get_first_node_in_group("jugador") as PalomaJugador
+	var desde := _jugador.global_position if _jugador else Vector3.ZERO
+	var sueltas: Array[PalomaNPC] = []
+	for n in get_children():
+		var p := n as PalomaNPC
+		if p and p.modo == PalomaNPC.Modo.SUELTA:
+			sueltas.append(p)
+	sueltas.sort_custom(func(a: PalomaNPC, b: PalomaNPC) -> bool:
+		return a.global_position.distance_squared_to(desde) < b.global_position.distance_squared_to(desde))
+	for i in mini(cantidad, Config.BANDADA_MAX):
+		var p: PalomaNPC
+		if i < sueltas.size():
+			p = sueltas[i]
+		else:
+			p = ESCENA_PALOMA.instantiate() as PalomaNPC
+			p.randomizar_colores()
+			add_child(p)
+			p.global_position = Vector3(randf_range(-55, 55), 18.0, -38.0 if randf() < 0.5 else 38.0)
+		p.reclutar()
+		seguidoras.append(p)
 
 
 ## Suelta "cantidad" palomas de la bandada (las más cercanas al peligro).
@@ -249,11 +278,37 @@ func _resolver_choques() -> void:
 					var empuje := h * (radio - l)
 					corr[k] += Vector3(empuje.x, 0, empuje.y)
 
+	if zona_libre.size() == 3:
+		_despejar_pasillo(pos, corr)
+
 	# Las correcciones también se chequean contra las paredes: si la bandada se aprieta contra
 	# un edificio, ninguna queda empujada adentro.
 	for i in cant:
 		if corr[i].length_squared() > 0.0000001:
 			palomas[i].mover_con_choques(corr[i])
+
+
+## Corre hacia afuera las palomas (en el piso) que estén dentro del pasillo libre.
+func _despejar_pasillo(pos: PackedVector3Array, corr: PackedVector3Array) -> void:
+	var a: Vector3 = zona_libre[0]
+	var b: Vector3 = zona_libre[1]
+	var radio: float = zona_libre[2] + radio_cuerpo
+	var a2 := Vector2(a.x, a.z)
+	var ab := Vector2(b.x, b.z) - a2
+	var largo2 := maxf(ab.length_squared(), 0.0001)
+	for k in pos.size():
+		var p := pos[k] + corr[k]
+		if p.y > a.y + 1.5:
+			continue
+		var p2 := Vector2(p.x, p.z)
+		var t := clampf((p2 - a2).dot(ab) / largo2, 0.0, 1.0)
+		var h := p2 - (a2 + ab * t)
+		var l := h.length()
+		if l >= radio:
+			continue
+		h = h / l if l > 0.001 else ab.orthogonal().normalized()
+		var empuje := h * minf(radio - l, 0.08)   # De a poco: se van caminando, no saltan
+		corr[k] += Vector3(empuje.x, 0, empuje.y)
 
 
 func _mover_seguidoras(delta: float) -> void:
