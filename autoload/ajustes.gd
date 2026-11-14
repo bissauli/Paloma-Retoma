@@ -6,7 +6,8 @@ extends Node
 
 signal cambio
 
-const ARCHIVO := "user://opciones.cfg"
+## La versión para teléfonos guarda aparte: en la web las dos comparten el mismo user://.
+var ARCHIVO := "user://opciones_movil.cfg" if OS.has_feature("movil") else "user://opciones.cfg"
 ## Buses de audio que regula el menú (default_bus_layout.tres). Si faltan, se crean al arrancar.
 const BUSES := [&"Musica", &"Voces", &"Efectos"]
 const BRILLO_MIN := 0.6
@@ -40,12 +41,21 @@ var calidad := 2                ## 0 bajo, 1 medio, 2 alto
 var resolucion := Vector2i.ZERO ## (0, 0) = nativa
 var limite_fps := 0             ## Ver LIMITES_FPS
 
+## Versión para teléfonos (preset de exportación "Web Android", feature "movil"): controles táctiles,
+## sin captura del mouse y gráficos livianos. En la versión de PC es siempre false.
+var movil := OS.has_feature("movil")
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	# En la web arranca en "Medio": el navegador tiene menos margen
 	if OS.has_feature("web"):
 		calidad = 1
+	# En el teléfono: calidad baja y el 3D dibujado a 720p (la pantalla tiene muchos píxeles)
+	if movil:
+		calidad = 0
+		resolucion = Vector2i(1280, 720)
+		_preparar_movil()
 	_cargar()
 	_asegurar_buses()
 	_aplicar_audio()
@@ -170,6 +180,24 @@ func resoluciones_disponibles() -> Array[Vector2i]:
 ## ahí la resolución elegida sólo baja la resolución con la que se dibuja el 3D).
 func resolucion_cambia_ventana() -> bool:
 	return not OS.has_feature("web") and DisplayServer.window_get_mode() < DisplayServer.WINDOW_MODE_FULLSCREEN
+
+
+## En la PC el juego captura el mouse; en el teléfono nunca (no hay puntero que capturar).
+func capturar_mouse(si: bool) -> void:
+	if movil:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	else:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if si else Input.MOUSE_MODE_VISIBLE
+
+
+## Godot convierte el primer dedo en un click del mouse (así andan los botones de los menús).
+## Para que tocar la pantalla no picotee ni arrulle, esas acciones pierden sus clicks:
+## en el teléfono se disparan sólo con los botones táctiles (ui/controles_tactiles.gd).
+func _preparar_movil() -> void:
+	for accion: StringName in [&"picotear", &"arrullar"]:
+		for e in InputMap.action_get_events(accion):
+			if e is InputEventMouseButton:
+				InputMap.action_erase_event(accion, e)
 
 
 # ---------------------------------------------------------------- Aplicar

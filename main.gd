@@ -25,6 +25,12 @@ func _ready() -> void:
 	get_tree().paused = false
 	_jugador = $Paloma as PalomaJugador
 	AudioManager.iniciar_ambiente()
+	# Versión para teléfonos: joystick, botones y deslizar para mirar (se ocultan con el menú)
+	if Ajustes.movil:
+		var tactiles := ControlesTactiles.new()
+		tactiles.name = "ControlesTactiles"
+		tactiles.pausa = $Pausa
+		add_child(tactiles)
 	_buscar_balcon.call_deferred()
 	# El menú sólo aparece cuando esta es la escena que se está jugando: las pruebas automáticas
 	# instancian main.tscn adentro de otra escena y arrancan directo a jugar.
@@ -47,7 +53,7 @@ func _buscar_balcon() -> void:
 func _jugar_ya() -> void:
 	GameState.menu_activo = false
 	GameState.reiniciar()
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	Ajustes.capturar_mouse(true)
 
 
 # ---------------------------------------------------------------- Menú principal
@@ -58,7 +64,7 @@ func _abrir_menu() -> void:
 	GameState.partida_terminada = false
 	GameState.invulnerable = 1.0e9   # Mientras está el menú nadie molesta a la paloma
 	GameState.fase_dia_cambio.emit(0.0)
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Ajustes.capturar_mouse(false)
 	_jugador.controlable = false
 	_jugador.camara.bloqueada = true
 	hud.visible = false
@@ -86,7 +92,7 @@ func _empezar(datos: Dictionary) -> void:
 	_jugador.saltar_inicio()
 	_jugador.camara.bloqueada = false
 	_jugador.camara.reubicar()
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	Ajustes.capturar_mouse(true)
 	camara_menu.transicionar_a(_jugador.camara.camara)
 	# El control vuelve un poco antes de que la cámara termine de acomodarse
 	get_tree().create_timer(camara_menu.duracion * 0.7).timeout.connect(func() -> void:

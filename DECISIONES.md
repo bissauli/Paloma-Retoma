@@ -118,3 +118,11 @@ Elegí siempre la opción más simple y divertida cuando algo era ambiguo. Las a
 - Para que la calle quede libre, los dos edificios que la tapaban en las puntas (detrás del Cabildo y junto a la Casa Rosada) se movieron al sur de la avenida, alineados con los cafés.
 - Sólo la carrocería y la cabina de los autos proyectan sombra: con 16 autos y 4 cortes de sombra, cada pieza chica sumaba decenas de dibujos por cuadro.
 - Pruebas nuevas: `tests/captura_arreglos.tscn` (capturas de cada arreglo y una prueba de que las palomas NPC no atraviesan paredes) y `tests/bench_fps.tscn` (FPS con cámara fija, sin vsync).
+
+## Versión para teléfonos (Android, en el navegador)
+- Es otra exportación web (preset **"Web Android"**, en `docs/android/`) con la feature `movil`. Todo lo táctil depende de `Ajustes.movil`, así la versión de PC no cambia en nada.
+- **Joystick flotante** en la mitad izquierda: aparece donde apoyás el dedo. **Deslizar en la mitad derecha** mueve la cámara. Los botones van abajo a la derecha, en arco alrededor del pulgar: DESPEGAR/ALETEAR (el más grande; mantener), PICADA (mantener; se ve apagado en el piso), PICOTEAR y ARRULLAR. La pausa, arriba a la derecha.
+- Los controles táctiles aprietan las mismas acciones del Input Map que el teclado, así la paloma no se entera de con qué la manejan. Picotear y arrullar pierden sus clicks de mouse en el teléfono, porque Godot convierte el primer dedo en click.
+- **Volando, la cámara se acomoda sola detrás de la paloma** si no la estás moviendo con el dedo: inclinar el joystick a un costado es doblar.
+- Arranca en calidad Baja con el 3D a 720p (los teléfonos tienen muchos píxeles). Guarda sus opciones en un archivo aparte (`opciones_movil.cfg`).
+- En vertical aparece un cartel de "girá el teléfono", y al primer toque pide pantalla completa y bloquea la orientación horizontal (si el navegador lo permite).

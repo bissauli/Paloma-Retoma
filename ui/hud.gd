@@ -123,6 +123,7 @@ func _armar() -> void:
 	ayuda.offset_right = 500
 	ayuda.offset_top = -34
 	ayuda.text = "WASD caminar · Espacio volar · Shift picada · Click izq. picotear · Click der. arrullar · Esc pausa"
+	ayuda.visible = not Ajustes.movil   # en el teléfono están los botones en pantalla
 
 	# --- Fundido al ser atrapada ---
 	_fundido = ColorRect.new()

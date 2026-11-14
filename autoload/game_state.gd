@@ -224,12 +224,14 @@ func actualizar_objetivo() -> void:
 	elif carga != "":
 		t = "Llevá la %s al nido (Pirámide de Mayo)" % carga
 	elif not tutorial_hecho and bandada == 0 and comida < 3:
-		t = "Picoteá migas en el Cabildo (click izquierdo) — %d/3" % migas_comidas
+		t = "Picoteá migas en el Cabildo (%s) — %d/3" % [
+			"botón PICOTEAR" if Ajustes.movil else "click izquierdo", migas_comidas]
 	elif bandada < Config.UMBRAL_CHORIPAN:
 		if comida < 1:
 			t = "Conseguí comida: migas, medialunas de los cafés o facturas del subte"
 		else:
-			t = "Reclutá 5 palomas en la Catedral (click derecho) — %d/5" % bandada
+			t = "Reclutá 5 palomas en la Catedral (%s) — %d/5" % [
+				"botón ARRULLAR" if Ajustes.movil else "click derecho", bandada]
 	elif bandada < Config.UMBRAL_TURISTAS:
 		t = "Levantá el choripán de la avenida y llegá a 15 palomas — %d/15" % bandada
 	elif bandada < Config.UMBRAL_BALCON:

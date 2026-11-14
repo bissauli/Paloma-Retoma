@@ -261,7 +261,7 @@ func _animar(delta: float) -> void:
 func _acciones(delta: float) -> void:
 	_enfriamiento_arrullo = maxf(_enfriamiento_arrullo - delta, 0.0)
 	_enfriamiento_picoteo = maxf(_enfriamiento_picoteo - delta, 0.0)
-	if not controlable or Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+	if not controlable or (not Ajustes.movil and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED):
 		return
 	if Input.is_action_just_pressed("picotear") and _enfriamiento_picoteo <= 0.0:
 		_enfriamiento_picoteo = 0.28

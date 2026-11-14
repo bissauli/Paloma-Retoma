@@ -10,6 +10,15 @@ const PASOS := [
 	"CLICK DERECHO cerca de otras palomas para arrullar\nCada paloma que se suma cuesta 1 de comida",
 	"¡Bien! Ahora andá a la Catedral (al norte)\na reclutar más palomas",
 ]
+## Los mismos pasos en la versión para teléfonos (controles táctiles)
+const PASOS_MOVIL := [
+	"¡Hola, paloma flaca!\nCaminá con el joystick (izquierda)\ny deslizá a la derecha para mirar",
+	"Tocá PICOTEAR cerca de las migas\n(te dan stamina y comida)",
+	"Tocá DESPEGAR para volar\nMantené ALETEAR apretado para subir",
+	"En el aire, mantené PICADA para tirarte en picada\n¡Soltala y salís disparada para arriba!",
+	"Tocá ARRULLAR cerca de otras palomas\nCada paloma que se suma cuesta 1 de comida",
+	"¡Bien! Ahora andá a la Catedral (al norte)\na reclutar más palomas",
+]
 
 var paso := 0
 var _cartel: Label3D
@@ -59,7 +68,7 @@ func _intentar_empezar(delta: float) -> void:
 func _mostrar(n: int) -> void:
 	paso = n
 	_t_paso = 0.0
-	_cartel.text = PASOS[n]
+	_cartel.text = (PASOS_MOVIL if Ajustes.movil else PASOS)[n]
 	_cartel.scale = Vector3.ONE * 0.2
 	create_tween().tween_property(_cartel, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	AudioManager.reproducir("recoger", -10.0, false)
