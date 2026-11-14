@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Palomas de Mayo"
+config/name="Paloma Retoma"
 run/main_scene="res://ui/titulo.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 BeckettRuntime="*uid://do68dqybesb7r"
 GameState="*res://autoload/game_state.gd"
 AudioManager="*res://autoload/audio_manager.gd"
+Ajustes="*uid://c5a2qcktrxadx"
 
 [beckett]
 

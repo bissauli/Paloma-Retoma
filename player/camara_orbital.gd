@@ -29,6 +29,9 @@ var _objetivo: Node3D
 
 func _ready() -> void:
 	_objetivo = get_parent() as Node3D
+	# Lo que eligió el jugador en Opciones
+	sensibilidad *= Ajustes.sensibilidad
+	invertir_y = invertir_y != Ajustes.invertir_y
 	top_level = true
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	if _objetivo is CollisionObject3D:

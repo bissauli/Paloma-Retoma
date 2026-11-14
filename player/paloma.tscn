@@ -22,7 +22,6 @@ shape = SubResource("Forma")
 [node name="Modelo" type="Node3D" parent="."]
 script = ExtResource("2")
 es_jugador = true
-color_cuello = Color(0.48, 0.36, 0.62, 1)
 
 [node name="CamaraOrbital" type="Node3D" parent="."]
 script = ExtResource("3")

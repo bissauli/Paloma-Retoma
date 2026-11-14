@@ -41,24 +41,11 @@ func _ready() -> void:
 	desplazamiento.y = randf_range(0.2, 1.8)
 
 
-## Colores al azar (llamar antes de agregarla al árbol).
+## Variante de color al azar: gris, blanca, marrón, oscura, canela o manchada
+## (llamar antes de agregarla al árbol).
 func randomizar_colores() -> void:
 	var m := get_node("Modelo") as ModeloPaloma
-	var r := randf()
-	if r < 0.12:
-		m.color_cuerpo = Color("e9e6e0")   # Paloma blanca
-		m.color_cabeza = Color("dcd8d0")
-		m.color_alas = Color("f2f0ea")
-	elif r < 0.25:
-		m.color_cuerpo = Color("8a6a55")   # Paloma marrón
-		m.color_cabeza = Color("6e5444")
-		m.color_alas = Color("9c7c66")
-	else:
-		var g := randf_range(-0.08, 0.08)
-		m.color_cuerpo = Color("8b90a3").lightened(g)
-		m.color_cabeza = Color("6f748a").lightened(g)
-		m.color_alas = Color("9da2b3").lightened(g)
-	m.color_cuello = Color("4f9a72") if randf() < 0.6 else Color("7a5c96")
+	m.variante = ModeloPaloma.variante_al_azar()
 
 
 func configurar_zona(centro: Vector3, radio: float) -> void:

@@ -22,10 +22,11 @@ const BOTONES := {
 
 static func aplicar() -> String:
 	var ps := ProjectSettings
-	ps.set_setting("application/config/name", "Palomas de Mayo")
+	ps.set_setting("application/config/name", "Paloma Retoma")
 	ps.set_setting("application/run/main_scene", "res://ui/titulo.tscn")
 	ps.set_setting("autoload/GameState", "*res://autoload/game_state.gd")
 	ps.set_setting("autoload/AudioManager", "*res://autoload/audio_manager.gd")
+	ps.set_setting("autoload/Ajustes", "*res://autoload/ajustes.gd")
 	ps.set_setting("display/window/size/viewport_width", 1280)
 	ps.set_setting("display/window/size/viewport_height", 720)
 	ps.set_setting("physics/common/physics_interpolation", true)
@@ -51,3 +52,21 @@ static func aplicar() -> String:
 
 	var err := ps.save()
 	return "configuración guardada" if err == OK else "error al guardar: %d" % err
+
+
+## Da de alta un autoload en el editor ya abierto (sin reiniciarlo), para que los scripts
+## lo reconozcan enseguida. Uso vía MCP: call_method registrar_autoload ["Ajustes", "res://autoload/ajustes.gd"]
+static func registrar_autoload(nombre: String, ruta: String) -> String:
+	var clave := "autoload/" + nombre
+	if ProjectSettings.has_setting(clave):
+		ProjectSettings.clear(clave)
+	var plugin := EditorPlugin.new()
+	plugin.add_autoload_singleton(nombre, ruta)
+	plugin.free()
+	return "autoload %s = %s" % [nombre, ProjectSettings.get_setting(clave, "(no quedó)")]
+
+
+## Reimporta archivos en el editor abierto (por ejemplo después de tocar un .import a mano).
+static func reimportar(rutas: PackedStringArray) -> String:
+	EditorInterface.get_resource_filesystem().reimport_files(rutas)
+	return "reimportados: %d" % rutas.size()

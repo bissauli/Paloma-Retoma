@@ -1,4 +1,4 @@
-# Decisiones de diseño — Palomas de Mayo
+# Decisiones de diseño — Paloma Retoma
 
 Elegí siempre la opción más simple y divertida cuando algo era ambiguo. Las anoto acá.
 
@@ -17,7 +17,7 @@ Elegí siempre la opción más simple y divertida cuando algo era ambiguo. Las a
 - **Caerse de una cornisa** pasa a planeo automáticamente, sin gastar el despegue.
 - **Aterrizaje automático** al tocar cualquier superficie transitable (piso, techos, cornisas, balcón). Las paredes sólo te frenan.
 - La stamina se recarga **lento caminando** y **rápido comiendo migas**, para que las migas importen.
-- La protagonista es un poco más flaca que las demás, tiene un mechón despeinado y el cuello violeta. Las NPC lo tienen verde.
+- La protagonista usa la paloma "Original" (gris lavanda). Las NPC usan las otras variantes de color, así se la distingue en la bandada (ver "Modelo de paloma").
 
 ## Mapa (fase 3)
 - El mapa se arma en `world/plaza.gd` (cielo, piso, límites, zonas) y `world/edificios.gd` (cada edificio). Coordenadas: X = este, Z = sur. El mapa mide 120 x 80 m.
@@ -39,9 +39,9 @@ Elegí siempre la opción más simple y divertida cuando algo era ambiguo. Las a
 - **Reclutar cuesta 1 de comida por paloma.** Un arrullo recluta a todas las palomas sueltas que haya en 7 m, de la más cercana a la más lejana, mientras tengas comida. Cada una muestra un corazón.
 - Hay unas 48 palomas sueltas al empezar, repartidas en seis zonas (la Catedral es la que más tiene). Si quedan menos de 14 sueltas, llegan palomas nuevas volando desde los bordes del mapa.
 - Cada paloma de la bandada tiene un "lugar" propio alrededor tuyo y se queda un poco atrás cuando vas rápido. Si aterrizás, aterrizan a tu alrededor y caminan.
-- **Boids**: separación, alineación, cohesión y seguir a la jugadora. Las que están a más de 25 m se actualizan 1 de cada 3 frames. Las NPC no usan física: miden el piso con un rayo cada 0,3-0,6 s. De lejos no se dibujan los detalles chicos (ojos, patas, pico).
+- **Boids**: separación, alineación, cohesión y seguir a la jugadora. Las que están a más de 25 m se actualizan 1 de cada 3 frames. Las NPC no usan física: miden el piso con un rayo cada 0,3-0,6 s.
 - Cuando perdés palomas se dispersan las más cercanas al peligro. Vuelan lejos, eligen una zona al azar y aterrizan ahí, y las podés volver a reclutar.
-- Hay palomas blancas y marrones además de las grises, y cada una tiene un nombre (Carlos, La Tana, El Ruso, Coqui...) para los créditos.
+- Las palomas NPC salen en seis colores al azar (gris, oscura, marrón, canela, manchada y blanca), y cada una tiene un nombre (Carlos, La Tana, El Ruso, Coqui...) para los créditos.
 
 ## Humanos y enemigos (fase 6)
 - Todos comparten `enemies/modelo_humano.gd`: cápsula de color, cabeza sin cara, brazos que se balancean y un rebote al caminar. Los accesorios (gorra, sombrero, morrión con penacho, moño y bandeja de mozo) se hacen con primitivas.
@@ -68,3 +68,25 @@ Elegí siempre la opción más simple y divertida cuando algo era ambiguo. Las a
 - Arreglado el z-fighting de los canteros: pasto y borde ya no tienen la tapa a la misma altura.
 - Pruebas automáticas en `tests/` (`test_vuelo`, `test_bandada`, `test_enemigos`, y `captura_final` como prueba de punta a punta de la victoria). Se corren headless.
 - `tools/configurar_input.gd` vuelve a aplicar el Input Map y los autoloads desde el editor, por si alguna vez se pisa `project.godot`.
+
+## Modelo de paloma (Blender)
+- Todas las palomas usan el mismo modelo blocky hecho en Blender: una malla con textura pixel-art de 128x128, un esqueleto de 8 huesos (`root`, `body`, `head`, `wing_L`, `wing_R`, `tail`, `leg_L`, `leg_R`) y 7 animaciones: `Idle`, `Walk`, `Fly`, `Glide`, `Dive` (en bucle), y `Peck` y `Coo` (una sola vez). Godot pone en bucle solo las que en Blender terminan en `_loop` y les saca ese sufijo al importar.
+- Las variantes de color son el mismo modelo con otra paleta en la textura: cada color original se cambia 1 a 1, así la malla, los huesos y las animaciones son idénticos. Hay un GLB por variante en `modelos/paloma/`: `Paloma.glb` (la de la jugadora) y `Paloma_Gris`, `Paloma_Blanca`, `Paloma_Marron`, `Paloma_Oscura`, `Paloma_Canela` y `Paloma_Manchada`.
+- `player/modelo_paloma.gd` instancia el GLB de la variante, lo gira 180° (el GLB mira a +Z y el juego espera -Z) y elige la animación según el modo: suelo (`Idle` o `Walk`, más rápida cuanto más camina), aleteo (`Fly`), planeo (`Glide`) y picada (`Dive`). Picotear y arrullar son animaciones de un uso, y en el aire no se reproducen. La comida que se lleva cuelga de un `BoneAttachment3D` en el hueso de la cabeza.
+- Las probabilidades de cada color para las NPC están en `ModeloPaloma.PESOS_NPC`.
+- Las texturas se importan sin pérdida (`compress/mode=0`) y con filtro "nearest", para que el pixel-art no se vea borroso ni cambie de color.
+- Con 110 palomas rinde igual que el modelo anterior de primitivas (unos 7,4 ms por cuadro contra 7,9 ms en una RX 5500 XT). Lo que más cuesta son las sombras.
+- Los archivos fuente (`Paloma.blend`, las texturas y las vistas previas) están fuera del repo, en la carpeta "Paloma 3D" del escritorio.
+
+## Menú principal pixel-art
+- **El juego pasa a llamarse "Paloma Retoma"** (nombre de la ventana y de la pestaña del navegador), igual que el cartel del menú.
+- El menú usa piezas recortadas del diseño original (1376x768): cartel con el subtítulo, los cuatro botones, la barra de controles y los botones de Sonido y "?". Están en `ui/menu/` como PNG con transparencia. A JUGAR se le borró la paloma dibujada, porque ahora es una paloma animada.
+- La escena del título agrupa las piezas en cuatro controles (`Arriba`, `Abajo`, `ArribaIzq`, `AbajoDer`) del tamaño del diseño y escalados a 1280x720 (x0,93). Así cada pieza conserva sus coordenadas del diseño y, si la ventana no es 16:9, cada grupo queda pegado a su borde.
+- El fondo sigue siendo la plaza en 3D con la cámara girando. El velo violeta quedó más suave (10 %) para que se parezca al diseño.
+- **Palomas del menú** (`ui/menu/palomas_menu.gd` y `paloma_menu.gd`): cada 2 a 5,5 s cruza una paloma (a veces una bandadita de 2 a 4) de izquierda a derecha, con aleteo y ratitos de planeo. Casi la mitad pasan chiquitas y por detrás del cartel; el resto, más grandes y por delante.
+- **La paloma de JUGAR**: llega volando al empezar, se posa donde estaba la del diseño, parpadea y mira para los costados, y a los 5-8 s se va volando hacia arriba a la derecha. Vuelve otra a los 6-12 s. Si pasás el mouse por JUGAR mientras está posada, se espanta y se va.
+- Los frames de la paloma (6 de vuelo y 4 quieta) comparten un lienzo de 127x160 alineado por la punta del pico, así al aterrizar la cabeza no salta. Las animaciones están en `ui/menu/paloma_frames.tres`. Se importan con mipmaps porque se dibujan bastante más chicas.
+- Los botones se agrandan un 6 % con el mouse encima o con foco (se puede navegar con teclado).
+- **CARGAR** muestra un cartelito "Próximamente". **OPCIONES** abre un menú básico: volumen, sonido, pantalla completa, sensibilidad del mouse e invertir el eje vertical de la cámara. **Sonido** (arriba a la izquierda) silencia o activa todo y cambia el ícono. **"?"** muestra cómo se juega. La flecha y el globito de chat del diseño no se usaron.
+- Las opciones viven en el autoload `Ajustes` (`autoload/ajustes.gd`) y se guardan en `user://opciones.cfg`. La cámara del juego lee la sensibilidad y el eje invertido al arrancar. En la web la pantalla completa no se activa sola al abrir (el navegador lo exige después de un click).
+- `tests/captura_menu.tscn` saca capturas del menú con el aviso, Opciones, Ayuda y el sonido silenciado (en `user://capturas/`).

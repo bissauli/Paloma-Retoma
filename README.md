@@ -1,4 +1,4 @@
-# Paloma-Retoma — Palomas de Mayo
+# Paloma Retoma
 
 Juego 3D low-poly hecho en Godot 4.7: sos una paloma en la plaza, juntás migas y armás tu bandada.
 
