@@ -3,11 +3,11 @@ extends Node
 ## Si existe res://audio/<nombre>.wav (o .ogg) se usa ese archivo.
 ## Si no, el sonido se sintetiza por código al arrancar (placeholder).
 ## Nombres previstos: arrullo, aleteo, picoteo, grito_nene, silbato,
-## chillido_halcon, ambiente, recoger, victoria.
+## chillido_halcon, ambiente, recoger, victoria, bocina.
 
 const MEZCLA := 22050
 const NOMBRES := ["arrullo", "aleteo", "picoteo", "grito_nene", "silbato",
-	"chillido_halcon", "ambiente", "recoger", "victoria"]
+	"chillido_halcon", "ambiente", "recoger", "victoria", "bocina"]
 const CANALES := 10
 
 var _sonidos := {}
@@ -103,6 +103,7 @@ func _cargar_o_generar(nombre: String) -> AudioStream:
 		"ambiente": return _gen_ambiente()
 		"recoger": return _gen_recoger()
 		"victoria": return _gen_victoria()
+		"bocina": return _gen_bocina()
 	return _a_wav(PackedFloat32Array([0.0]))
 
 
@@ -205,6 +206,21 @@ func _gen_silbato() -> AudioStreamWAV:
 		var trino := 0.6 + 0.4 * sin(TAU * 38.0 * t)
 		var f := 2900.0 + sin(TAU * 38.0 * t) * 120.0
 		m[i] = sin(TAU * f * t) * trino * 0.28 * _env(t, dur, 0.02)
+	return _a_wav(m)
+
+
+func _gen_bocina() -> AudioStreamWAV:
+	# Bocina de auto: dos tonos medios con armónicos (onda casi cuadrada), corta.
+	var dur := 0.45
+	var m := _muestras(dur)
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		var v := 0.0
+		for f: float in [392.0, 494.0]:
+			var x := sin(TAU * f * t)
+			v += clampf(x * 3.0, -1.0, 1.0)
+		var env := minf(minf(t / 0.015, 1.0), clampf((dur - t) / 0.08, 0.0, 1.0))
+		m[i] = v * 0.16 * env
 	return _a_wav(m)
 
 

@@ -4,8 +4,12 @@ extends Node3D
 ## - turista/escolar: pasea por su zona y tira migas; con 15+ palomas se asusta y suelta comida.
 ## - senora: sentada en un banco, tira migas cada tanto (zona segura).
 ## - oficinista: sale del subte, camina hasta el borde del mapa y a veces se le cae una factura.
+## - comensal: llega por la vereda de los cafés, se sienta a una mesa, come un rato (se le caen
+##   migas) y se va. Los maneja enemies/gente.gd, que reparte las sillas.
 
-@export_enum("turista", "escolar", "senora", "oficinista") var tipo := "turista"
+signal se_levanto
+
+@export_enum("turista", "escolar", "senora", "oficinista", "comensal") var tipo := "turista"
 @export var velocidad := 1.1
 @export var intervalo_migas := 6.0
 
@@ -23,6 +27,15 @@ var _rumbo := 0.0
 var _vel := Vector3.ZERO
 var _soltar_factura_en := -1.0
 var _altura := 0.0
+
+# Comensales
+var ruta: Array[Vector3] = []       ## Puntos por los que camina (el último es la silla o la salida)
+var asiento := Vector3.ZERO
+var lado := 1.0                     ## De qué lado de la mesa está la silla (-1 oeste, +1 este)
+var salida := Vector3.ZERO
+var tiempo_comida := 30.0
+var _comiendo := false
+var _timer_bocado := 2.0
 
 @onready var modelo: ModeloHumano = $Modelo
 
@@ -64,6 +77,13 @@ func preparar_aspecto() -> void:
 		"oficinista":
 			m.color_ropa = [Color("2f3540"), Color("4a4f5a"), Color("596b80")][randi() % 3]
 			m.color_piernas = Color("22252b")
+		"comensal":
+			m.alto = randf_range(1.6, 1.85)
+			m.color_ropa = (paleta + [Color("7a4b6b"), Color("2f3540"), Color("c9b48a")])[randi() % 9]
+			m.color_piernas = [Color("3a3f4a"), Color("2d3a5c"), Color("5a4a3a")][randi() % 3]
+			if randf() < 0.25:
+				m.accesorio = "sombrero"
+				m.color_accesorio = Color("f2e6c9")
 	m.color_piel = m.color_piel.darkened(randf_range(-0.1, 0.35))
 
 
@@ -77,6 +97,13 @@ func _physics_process(delta: float) -> void:
 			return
 		"oficinista":
 			_paso_oficinista(delta)
+		"comensal":
+			if _comiendo:
+				_paso_comer(delta)
+				modelo.rotation.y = _rumbo
+				modelo.animar(delta, 0.0)
+				return
+			_paso_ruta(delta)
 		_:
 			_revisar_susto()
 			_pasear(delta)
@@ -160,3 +187,68 @@ func _paso_oficinista(delta: float) -> void:
 			c.vida = 40.0
 			get_parent().add_child(c)
 			c.global_position = Vector3(global_position.x, 0.02, global_position.z)
+
+
+# ---------------------------------------------------------------- Comensales
+
+## Camina por la ruta; al llegar a la silla se sienta, y al llegar a la salida desaparece.
+func _paso_ruta(delta: float) -> void:
+	if ruta.is_empty():
+		queue_free()
+		return
+	var hacia := ruta[0] - global_position
+	hacia.y = 0
+	if hacia.length() < 0.15:
+		ruta.pop_front()
+		if ruta.is_empty():
+			if tiempo_comida > 0.0:
+				_sentarse()
+			else:
+				queue_free()
+		return
+	var v := hacia.normalized() * velocidad
+	if hacia.length() < 0.6:
+		v *= maxf(hacia.length() / 0.6, 0.35)
+	_vel = _vel.lerp(v, minf(delta * 5.0, 1.0))
+
+
+## Se sienta mirando la mesa (la silla está a "lado" de la mesa).
+func comenzar_sentado() -> void:
+	global_position = asiento
+	_sentarse()
+
+
+func _sentarse() -> void:
+	_comiendo = true
+	_vel = Vector3.ZERO
+	global_position = asiento
+	_rumbo = lado * PI / 2.0
+	modelo.cambiar_postura(true)
+	_timer_bocado = randf_range(1.0, 3.0)
+
+
+func _paso_comer(delta: float) -> void:
+	tiempo_comida -= delta
+	_timer_bocado -= delta
+	if _timer_bocado <= 0.0 and tiempo_comida > 1.0:
+		_timer_bocado = randf_range(2.5, 5.5)
+		modelo.gesto_comer()
+		# A veces se le cae una miga al piso (las palomas lo saben...)
+		if randf() < 0.3:
+			var c := Comida.new()
+			c.tipo = "miga"
+			c.reaparece = false
+			c.vida = 45.0
+			get_parent().add_child(c)
+			c.global_position = Vector3(asiento.x - lado * randf_range(0.2, 0.5), asiento.y + 0.01,
+				asiento.z + randf_range(-0.45, 0.45))
+	if tiempo_comida <= 0.0:
+		_levantarse()
+
+
+func _levantarse() -> void:
+	_comiendo = false
+	tiempo_comida = 0.0
+	modelo.cambiar_postura(false)
+	ruta = [Vector3(asiento.x, asiento.y, salida.z), salida]
+	se_levanto.emit()

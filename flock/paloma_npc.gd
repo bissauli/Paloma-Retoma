@@ -3,12 +3,17 @@ extends Node3D
 ## Una paloma no jugable. Puede estar suelta (paseando en su zona), siguiendo
 ## a la bandada (la mueve flock/bandada.gd), huyendo o festejando.
 ## No usa física: se mueve a mano y consulta la altura del piso con rayos de vez en cuando.
+## Para no atravesar paredes, cada movimiento se chequea con un rayo contra el mundo (capa 1)
+## y si choca se desliza a lo largo de la pared (ver mover_con_choques).
 
 enum Modo { SUELTA, SIGUIENDO, HUYENDO, FESTEJANDO }
 
 const NOMBRES := ["Carlos", "La Tana", "El Ruso", "Coqui", "Pocha", "Tito", "Mirta", "El Flaco",
 	"Chiche", "La Negra", "Cacho", "Beba", "Pipo", "Nené", "Lalo", "Toto", "Chola", "Fito",
 	"Marta", "El Tano", "Rulo", "Pupi", "Quique", "Nilda", "Cholo", "Kuki", "Tita", "Panchi"]
+
+const ALTURA_RAYO := 0.3    ## Altura del rayo de choque: los escalones y cordones más bajos se suben
+const RADIO_CHOQUE := 0.2   ## Distancia mínima a las paredes
 
 var modo: Modo = Modo.SUELTA
 var velocidad := Vector3.ZERO
@@ -135,7 +140,8 @@ func _paso_suelta(delta: float) -> void:
 	if hacia.length() > 0.3:
 		v = hacia.normalized() * 0.8
 	velocidad = velocidad.lerp(v, minf(delta * 4.0, 1.0))
-	global_position += velocidad * delta
+	if velocidad.length_squared() > 0.0025:
+		mover_con_choques(velocidad * delta)
 	_actualizar_suelo(delta, 0.6)
 	global_position.y = lerpf(global_position.y, altura_suelo, minf(delta * 10.0, 1.0))
 	en_suelo = true
@@ -168,7 +174,7 @@ func _paso_huida(delta: float) -> void:
 			global_position.y = altura_suelo
 	else:
 		velocidad.y = lerpf(velocidad.y, clampf(objetivo_y - global_position.y, -2.0, 5.0), delta * 2.0)
-	global_position += velocidad * delta
+	mover_con_choques(velocidad * delta)
 	global_position.y = maxf(global_position.y, altura_suelo)
 	modo_anim = 1 if velocidad.y > 0.3 else 2
 	_mirar(velocidad, delta, 5.0)
@@ -213,6 +219,59 @@ func medir_suelo(p: Vector3) -> float:
 	return (r["position"] as Vector3).y
 
 
+## Mueve la paloma sin atravesar el mundo: un rayo desde el cuerpo hasta un poco más allá
+## del destino. Si pega contra una pared (o el techo de algo), se queda del lado de afuera y
+## se desliza a lo largo; si pega contra algo transitable (techo, rampa, cornisa) se apoya encima.
+func mover_con_choques(desp: Vector3) -> void:
+	var desde := global_position + Vector3.UP * ALTURA_RAYO
+	var horiz := Vector3(desp.x, 0.0, desp.z)
+	var largo_h := horiz.length()
+	var hasta := desde + desp
+	if largo_h > 0.0001:
+		hasta += horiz / largo_h * RADIO_CHOQUE
+	var q := PhysicsRayQueryParameters3D.create(desde, hasta, 1)
+	var r := get_world_3d().direct_space_state.intersect_ray(q)
+	if r.is_empty():
+		global_position += desp
+		return
+	var n: Vector3 = r["normal"]
+	var punto: Vector3 = r["position"]
+	if n.y > 0.6:
+		# Piso: avanza y queda arriba de la superficie
+		global_position += desp
+		if global_position.y < punto.y:
+			global_position.y = punto.y
+			velocidad.y = maxf(velocidad.y, 0.0)
+		altura_suelo = maxf(altura_suelo, punto.y)
+		return
+	# Pared o techo: saca la parte del movimiento que va hacia adentro y se desliza
+	var hacia_adentro := desp.dot(n)
+	if hacia_adentro < 0.0:
+		desp -= n * hacia_adentro
+	var vel_adentro := velocidad.dot(n)
+	if vel_adentro < 0.0:
+		velocidad -= n * vel_adentro
+	# El deslizamiento también se chequea (por ejemplo en una esquina)
+	var q2 := PhysicsRayQueryParameters3D.create(desde, desde + desp + n * 0.01, 1)
+	if get_world_3d().direct_space_state.intersect_ray(q2).is_empty():
+		global_position += desp
+	# Si quedó demasiado pegada, la separa un poquito de la pared
+	var hn := Vector3(n.x, 0.0, n.z)
+	var dist := (desde - punto).dot(n)
+	if hn.length() > 0.5 and dist < RADIO_CHOQUE:
+		global_position += hn.normalized() * minf(RADIO_CHOQUE - dist, 0.05)
+
+
+## Un auto que pasa la asusta: sale volando un poquito y vuelve a su zona.
+func espantar(desde: Vector3) -> void:
+	if modo != Modo.SUELTA:
+		return
+	soltar(desde)
+	velocidad *= 0.7
+	_timer_huida = randf_range(0.8, 1.4)
+	ir_a_zona(zona_centro, zona_radio)
+
+
 ## Orienta el modelo hacia la dirección de movimiento.
 func _mirar(v: Vector3, delta: float, rapidez: float) -> void:
 	var h := Vector2(v.x, v.z)
@@ -227,7 +286,7 @@ func _mirar(v: Vector3, delta: float, rapidez: float) -> void:
 ## Lo llama la bandada para mover a las seguidoras.
 func mover_como_seguidora(delta: float, nueva_vel: Vector3, anim: int) -> void:
 	velocidad = nueva_vel
-	global_position += velocidad * delta
+	mover_con_choques(velocidad * delta)
 	modo_anim = anim
 	_actualizar_suelo(delta, 0.35)
 	if global_position.y < altura_suelo:

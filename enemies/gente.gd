@@ -14,8 +14,16 @@ const ESC_HALCON := preload("res://enemies/halcon.tscn")
 const SALIDAS := [Vector3(58, 0, -30), Vector3(40, 0, -39), Vector3(-15, 0, -39),
 	Vector3(58, 0, 22), Vector3(-58, 0, -30)]
 
+## Comensales de los cafés: se sientan en las sillas de las mesas de la vereda.
+const Z_VEREDA_PASO := 37.0          ## Por dónde caminan (entre las mesas y las vidrieras)
+const X_ENTRADAS := [-60.0, 58.0]
+@export var max_comensales := 10
+@export var intervalo_comensal := Vector2(4.0, 9.0)
+
 var _timer_oleada := 6.0
 var _subte := Vector3(34, 0, -22)
+var _asientos: Array[Dictionary] = []   ## {pos, lado, ocupado}
+var _timer_comensal := 2.0
 
 
 func _ready() -> void:
@@ -61,7 +69,7 @@ func _poblar() -> void:
 	# El mozo patrulla la vereda de los cafés
 	var mozo := ESC_MOZO.instantiate() as Mozo
 	add_child(mozo)
-	mozo.global_position = _punto("cafes", Vector3(0, 0.16, 33.5))
+	mozo.global_position = _punto("cafes", Vector3(0, 0.16, 35.7))
 	# Dos granaderos frente a la Casa Rosada
 	var p_gra := _punto("granaderos", Vector3(40.5, 0, 0))
 	for z in [-8.0, 8.0]:
@@ -70,6 +78,15 @@ func _poblar() -> void:
 		g.global_position = p_gra + Vector3(0, 0, z)
 	# El halcón (se activa solo cuando la bandada llega a 15)
 	add_child(ESC_HALCON.instantiate())
+	# Sillas de los cafés: dos por mesa, y algunas ya ocupadas al empezar
+	for n in get_tree().get_nodes_in_group("mesa_cafe"):
+		var m := (n as Node3D).global_position
+		for l: float in [-1.0, 1.0]:
+			_asientos.append({"pos": m + Vector3(0.8 * l, 0, 0), "lado": l, "ocupado": false})
+	for i in mini(5, _asientos.size()):
+		var idx := _asiento_libre()
+		if idx >= 0:
+			_comensal(idx, true)
 
 
 func _humano(tipo: String, centro: Vector3, radio: float, gen: GeneradorMigas, intervalo: float) -> Humano:
@@ -86,8 +103,18 @@ func _humano(tipo: String, centro: Vector3, radio: float, gen: GeneradorMigas, i
 	return h
 
 
-## Oleadas de oficinistas que salen del subte con facturas.
+## Oleadas de oficinistas que salen del subte con facturas, y comensales que llegan a los cafés.
 func _process(delta: float) -> void:
+	_timer_comensal -= delta
+	if _timer_comensal <= 0.0 and not _asientos.is_empty():
+		_timer_comensal = randf_range(intervalo_comensal.x, intervalo_comensal.y)
+		var ocupados := 0
+		for a in _asientos:
+			if a["ocupado"]:
+				ocupados += 1
+		var idx := _asiento_libre()
+		if ocupados < max_comensales and idx >= 0:
+			_comensal(idx, false)
 	_timer_oleada -= delta
 	if _timer_oleada > 0.0:
 		return
@@ -104,3 +131,40 @@ func _salir_oficinista() -> void:
 	h.destino_final = SALIDAS[randi() % SALIDAS.size()] + Vector3(randf_range(-4, 4), 0, 0)
 	add_child(h)
 	h.global_position = _subte + Vector3(randf_range(-0.8, 0.8), 0, 2.5)
+
+
+
+func _asiento_libre() -> int:
+	var libres: Array[int] = []
+	for i in _asientos.size():
+		if not _asientos[i]["ocupado"]:
+			libres.append(i)
+	return -1 if libres.is_empty() else libres[randi() % libres.size()]
+
+
+## Un comensal: llega caminando desde una punta de la vereda (o ya sentado, al empezar),
+## come entre 25 y 55 s y se va por la punta más cercana.
+func _comensal(idx: int, ya_sentado: bool) -> void:
+	var a: Dictionary = _asientos[idx]
+	a["ocupado"] = true
+	var pos: Vector3 = a["pos"]
+	var h := ESC_HUMANO.instantiate() as Humano
+	h.tipo = "comensal"
+	h.preparar_aspecto()
+	h.velocidad = randf_range(1.1, 1.5)
+	h.asiento = pos
+	h.lado = a["lado"]
+	h.tiempo_comida = randf_range(25.0, 55.0) * (randf_range(0.2, 1.0) if ya_sentado else 1.0)
+	var x_salida: float = X_ENTRADAS[0] if pos.x < 0.0 else X_ENTRADAS[1]
+	h.salida = Vector3(x_salida, pos.y, Z_VEREDA_PASO)
+	h.se_levanto.connect(func() -> void: a["ocupado"] = false)
+	# La posición va antes de add_child: en _ready el humano toma su altura (la vereda está a 16 cm)
+	if ya_sentado:
+		h.position = pos
+		add_child(h)
+		h.comenzar_sentado()
+		return
+	var x_entrada: float = X_ENTRADAS[randi() % 2]
+	h.ruta = [Vector3(pos.x, pos.y, Z_VEREDA_PASO), pos]
+	h.position = Vector3(x_entrada, pos.y, Z_VEREDA_PASO + randf_range(-0.3, 0.3))
+	add_child(h)

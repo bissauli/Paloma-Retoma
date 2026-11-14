@@ -175,6 +175,27 @@ func animar(delta: float, velocidad: float, agitado := false) -> void:
 	brazo_der.rotation = Vector3(-balanceo - arriba * 0.3, 0, arriba * 0.9)
 
 
+## Pasa de parado a sentado (o al revés) rearmando el cuerpo y su cápsula física.
+func cambiar_postura(sentar: bool) -> void:
+	if sentar == sentado:
+		return
+	sentado = sentar
+	for n: Node in [cuerpo, get_node_or_null("CuerpoFisico")]:
+		if n:
+			remove_child(n)
+			n.queue_free()
+	_armar()
+	_crear_cuerpo_fisico()
+
+
+## Gesto de llevarse comida a la boca con el brazo derecho.
+func gesto_comer() -> void:
+	var tw := create_tween()
+	tw.tween_property(brazo_der, "rotation", Vector3(-2.2, 0, 0.5), 0.25)
+	tw.tween_interval(0.35)
+	tw.tween_property(brazo_der, "rotation", Vector3.ZERO, 0.3)
+
+
 ## Gesto de tirar algo (migas) con el brazo derecho.
 func gesto_tirar() -> void:
 	var tw := create_tween()

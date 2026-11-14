@@ -167,3 +167,24 @@ static func cartel(padre: Node, pos: Vector3, texto: String, color_texto := Colo
 	padre.add_child(l)
 	l.position = pos
 	return l
+
+
+## Letrero: texto sobre una tabla de color. "pos" es el frente de la tabla (la cara con el texto),
+## que mira hacia +Z girado "rot_y". La tabla queda detrás, apoyada en la pared.
+static func letrero(padre: Node, pos: Vector3, texto: String, color_texto: Color, color_tabla: Color,
+		tam := 48, tam_tabla := Vector2(4, 0.6), rot_y := 0.0) -> Node3D:
+	var n := Node3D.new()
+	padre.add_child(n)
+	n.position = pos
+	n.rotation.y = rot_y
+	var bm := BoxMesh.new()
+	bm.size = Vector3(tam_tabla.x, tam_tabla.y, 0.1)
+	_malla(n, bm, Vector3(0, 0, -0.05), material(color_tabla))
+	# Marco claro arriba y abajo
+	var mm := BoxMesh.new()
+	mm.size = Vector3(tam_tabla.x + 0.08, 0.05, 0.12)
+	for y in [-1.0, 1.0]:
+		_malla(n, mm, Vector3(0, y * tam_tabla.y / 2.0, -0.05), material(color_tabla.lightened(0.45)))
+	var l := cartel(n, Vector3(0, 0, 0.012), texto, color_texto, tam)
+	l.outline_size = 6
+	return n

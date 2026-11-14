@@ -64,6 +64,11 @@ func _ready() -> void:
 	floor_max_angle = deg_to_rad(50.0)
 	GameState.carga_cambio.connect(modelo.mostrar_carga)
 	GameState.jugador_atrapado.connect(_al_ser_atrapada)
+	# Líneas de viento al volar rápido (van pegadas a la cámara)
+	var viento := VientoVuelo.new()
+	viento.name = "Viento"
+	viento.jugador = self
+	(camara.get_node("Brazo/Camara") as Node3D).add_child(viento)
 
 
 func _physics_process(delta: float) -> void:

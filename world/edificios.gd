@@ -149,14 +149,15 @@ static func cabildo(padre: Node3D) -> void:
 	# Torre central con cúpula y reloj
 	Construir.caja(padre, Vector3(-46.5, 13.0, 0), Vector3(4, 7.6, 4), C_BLANCO)
 	Construir.caja(padre, Vector3(-46.5, 16.95, 0), Vector3(4.6, 0.3, 4.6), C_BLANCO)
-	_rot(Construir.cilindro(padre, Vector3(-46.5, 13.8, 0), 1.0, 0.1, Color("fdfbf0"), false, 16), "z", PI / 2.0)
-	Construir.caja(padre, Vector3(-44.45, 13.8, 0), Vector3(0.12, 0.9, 0.08), Color("2a2a2a"), false)
+	_rot(Construir.cilindro(padre, Vector3(-44.47, 13.9, 0), 1.0, 0.1, Color("fdfbf0"), false, 16), "z", PI / 2.0)
+	Construir.caja(padre, Vector3(-44.39, 14.15, 0), Vector3(0.06, 0.6, 0.08), Color("2a2a2a"), false)
 	var cupula := Construir.esfera(padre, Vector3(-46.5, 17.1, 0), 1.6, C_TEJAS.lightened(0.15), Vector3(1, 0.9, 1), 10)
 	cupula.scale = Vector3(1, 0.9, 1)
 	var forma := SphereShape3D.new()
 	forma.radius = 1.5
 	Construir.colision(padre, Vector3(-46.5, 17.0, 0), forma)
-	_rot(Construir.cartel(padre, Vector3(-44.3, 10.1, 0), "CABILDO", Color("6b5a40"), 64), "y", PI / 2.0)
+	# El nombre va pintado en el frente de la torre, debajo del reloj
+	_rot(Construir.cartel(padre, Vector3(-44.44, 11.2, 0), "CABILDO", Color("6b5a40"), 56), "y", PI / 2.0)
 	# Fondo cerrado para que no se vea el vacío
 	Construir.caja(padre, Vector3(x_fondo - 1.0, 5, 0), Vector3(2, 10, 30), C_CREMA)
 
@@ -182,13 +183,33 @@ static func catedral(padre: Node3D) -> void:
 	Construir.prisma(padre, Vector3(0, 14.1, -28.5), Vector3(32.4, 3.0, 5.0), C_CREMA, Vector3.ZERO, true)
 	# Puerta
 	Construir.caja(padre, Vector3(0, 4.5, -30.95), Vector3(4, 5, 0.1), Color("5a3b26"), false)
-	# Escalinata: escalones visuales + rampa invisible para poder subir caminando
-	for e in 5:
-		var z := -21.4 - e * 0.8
-		Construir.caja(padre, Vector3(0, 0.2 + e * 0.4, z), Vector3(30, 0.4, 0.8), Color("ece6da").darkened(e * 0.02), false)
+	# Escalinata: 10 escalones macizos (apoyados en el piso, sin huecos) que llegan hasta la
+	# plataforma. Para subirla caminando hay una rampa invisible que pasa por la mitad de cada
+	# contrahuella; la colisión de cada escalón queda 10 cm por debajo de la rampa, así de costado
+	# también es sólida pero al caminar sólo se pisa la rampa.
+	const PELDANOS := 10
+	const ALZADA := 0.2
+	const HUELLA := 0.5
+	const Z_PIE := -21.0
+	for e in PELDANOS:
+		var alto := ALZADA * (e + 1)
+		var z := Z_PIE - HUELLA * (e + 0.5)
+		Construir.caja(padre, Vector3(0, alto / 2.0, z), Vector3(30, alto, HUELLA),
+			Color("ece6da").darkened((e % 2) * 0.035), false)
+		var alto_col := alto if e == PELDANOS - 1 else alto - ALZADA * 0.5
+		var forma_esc := BoxShape3D.new()
+		forma_esc.size = Vector3(30, alto_col, HUELLA)
+		Construir.colision(padre, Vector3(0, alto_col / 2.0, z), forma_esc)
+	# Rampa: de (z = pie + media huella, y = 0) hasta (z = arriba, y = 2.0)
+	var z0 := Z_PIE + HUELLA * 0.5
+	var z1 := z0 - HUELLA * PELDANOS
+	var alto_total := ALZADA * PELDANOS
+	var largo := Vector2(z0 - z1, alto_total).length()
+	var ang := atan2(alto_total, z0 - z1)
+	var normal := Vector3(0, z0 - z1, alto_total) / largo
 	var rampa := BoxShape3D.new()
-	rampa.size = Vector3(30, 0.2, 4.47)
-	Construir.colision(padre, Vector3(0, 0.95, -23.0), rampa, Vector3(deg_to_rad(-26.6), 0, 0))
+	rampa.size = Vector3(30, 0.2, largo)
+	Construir.colision(padre, Vector3(0, alto_total / 2.0, (z0 + z1) / 2.0) - normal * 0.1, rampa, Vector3(ang, 0, 0))
 	Construir.cartel(padre, Vector3(0, 11.8, -25.85), "CATEDRAL", Color("6b5a40"), 64)
 
 
@@ -213,7 +234,9 @@ static func cafes(padre: Node3D) -> Array[Vector3]:
 		for f in 3:
 			_rot(Construir.caja(padre, Vector3(x - (ancho - 1.0) / 2.0 + (f * 2 + 1) * (ancho - 1.0) / 6.0, 3.42, 36.6),
 				Vector3((ancho - 1.0) / 6.0, 0.13, 2.82), Color.WHITE, false), "x", -0.25)
-		_rot(Construir.cartel(padre, Vector3(x, 2.75, 35.2), n["nombre"], Color.WHITE, 64), "y", PI)
+		# Letrero sobre una tabla pegada a la fachada, justo encima del toldo
+		Construir.letrero(padre, Vector3(x, 4.08, 37.8), n["nombre"], Color.WHITE,
+			(n["toldo"] as Color).darkened(0.35), 40, Vector2(ancho - 3.0, 0.5), PI)
 		# Mesas en la vereda (no frente al banco)
 		if not str(n["nombre"]).begins_with("Banco"):
 			for m in 3:
@@ -293,13 +316,14 @@ static func alrededores(padre: Node3D) -> void:
 	edificio(padre, Vector3(-44, 0, -35), Vector3(14, 10, 10), Color("c9b9a4"), Vector3(0, 0, 1))
 	edificio(padre, Vector3(26, 0, -36), Vector3(16, 13, 8), Color("e0cdb4"), Vector3(0, 0, 1))
 	edificio(padre, Vector3(46, 0, -35), Vector3(16, 11, 10), Color("bfb5a8"), Vector3(0, 0, 1))
-	# Detrás del Cabildo (sur)
-	edificio(padre, Vector3(-52, 0, 26), Vector3(12, 9, 14), Color("e4d3b8"), Vector3(1, 0, 0))
-	# Esquina sureste, junto a la Casa Rosada
-	edificio(padre, Vector3(50, 0, 30), Vector3(18, 12, 12), Color("d6c7b3"), Vector3(-1, 0, 0))
-	# Carteles de comercios inventados
-	Construir.cartel(padre, Vector3(-27, 5.0, -31.9), "Librería El Palomar", Color.WHITE, 56)
-	Construir.cartel(padre, Vector3(26, 5.0, -31.9), "Seguros La Cornisa", Color.WHITE, 56)
+	# Al sur de la avenida, en las dos puntas (dejan la calle libre para los autos)
+	edificio(padre, Vector3(-52, 0, 43), Vector3(12, 9, 12), Color("e4d3b8"), Vector3(0, 0, -1))
+	edificio(padre, Vector3(50, 0, 43), Vector3(18, 12, 10), Color("d6c7b3"), Vector3(0, 0, -1))
+	# Carteles de comercios inventados, sobre una tabla pegada a la pared
+	Construir.letrero(padre, Vector3(-27, 4.85, -31.8), "Librería El Palomar", Color.WHITE, Color("5b3b2a"), 48,
+		Vector2(6.4, 0.6))
+	Construir.letrero(padre, Vector3(26, 5.0, -31.8), "Seguros La Cornisa", Color.WHITE, Color("2b4a6b"), 48,
+		Vector2(6.0, 0.6))
 
 
 ## Rota un nodo recién creado sobre un eje ("x", "y" o "z").

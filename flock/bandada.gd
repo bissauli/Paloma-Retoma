@@ -223,6 +223,10 @@ func _resolver_choques() -> void:
 		var m := n as ModeloHumano
 		if m and m.is_visible_in_tree():
 			obstaculos.append([m.global_position, m.radio_colision(), m.alto_colision()])
+	# Los autos: dos círculos cada uno (adelante y atrás)
+	for n in get_tree().get_nodes_in_group("autos"):
+		if n.has_method("circulos"):
+			obstaculos.append_array(n.circulos())
 	for o: Array in obstaculos:
 		var centro: Vector3 = o[0]
 		var radio: float = o[1] + radio_cuerpo
@@ -245,9 +249,11 @@ func _resolver_choques() -> void:
 					var empuje := h * (radio - l)
 					corr[k] += Vector3(empuje.x, 0, empuje.y)
 
+	# Las correcciones también se chequean contra las paredes: si la bandada se aprieta contra
+	# un edificio, ninguna queda empujada adentro.
 	for i in cant:
-		if corr[i] != Vector3.ZERO:
-			palomas[i].global_position = pos[i] + corr[i]
+		if corr[i].length_squared() > 0.0000001:
+			palomas[i].mover_con_choques(corr[i])
 
 
 func _mover_seguidoras(delta: float) -> void:

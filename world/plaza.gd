@@ -56,9 +56,11 @@ func _crear_ambiente() -> void:
 	sol = DirectionalLight3D.new()
 	sol.name = "Sol"
 	sol.shadow_enabled = true
-	sol.directional_shadow_max_distance = 90.0
 	sol.light_energy = 0.65
+	sol.add_to_group("sol")
 	add_child(sol)
+	# Distancia y calidad de las sombras según el preset gráfico (Opciones > Gráficos)
+	Ajustes.aplicar_sombras(sol)
 
 
 ## Ciclo de día: t = 0 mañana, t = 1 atardecer.
@@ -139,6 +141,7 @@ func _crear_zonas() -> void:
 	Edificios.subte(edif, Vector3(34, 0, -22))
 	posicion_balcon = Edificios.casa_rosada(edif)
 	var mesas := Edificios.cafes(edif)
+	add_child(Transito.new())
 
 	_crear_jardines()
 	_crear_nido()
@@ -204,8 +207,12 @@ func _crear_comida(mesas: Array[Vector3]) -> void:
 	var c := Node3D.new()
 	c.name = "Comida"
 	add_child(c)
-	# Medialunas y papas en las mesas de los cafés
+	# Medialunas y papas en las mesas de los cafés (y un marcador por mesa para los comensales)
 	for i in mesas.size():
+		var marca := Marker3D.new()
+		marca.add_to_group("mesa_cafe")
+		c.add_child(marca)
+		marca.position = mesas[i] - Vector3(0, 0.78, 0)
 		var com := Comida.new()
 		com.tipo = "medialuna" if i % 3 != 2 else "papa"
 		com.tiempo_reaparicion = 40.0
@@ -284,7 +291,7 @@ func _crear_puntos() -> void:
 		"PuntoTuristas": Vector3(-39, 0, -9),
 		"PuntoEscolares": Vector3(-34, 0, 12),
 		"PuntoSenoras": Vector3(0, 0, -18),
-		"PuntoCafes": Vector3(0, 0.16, 33.5),
+		"PuntoCafes": Vector3(0, 0.16, 35.7),   # Entre las mesas y las vidrieras
 		"PuntoSubte": Vector3(34, 0, -22),
 		"PuntoGranaderos": Vector3(40.5, 0, 0),
 	}

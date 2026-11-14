@@ -29,9 +29,6 @@ var _objetivo: Node3D
 
 func _ready() -> void:
 	_objetivo = get_parent() as Node3D
-	# Lo que eligió el jugador en Opciones
-	sensibilidad *= Ajustes.sensibilidad
-	invertir_y = invertir_y != Ajustes.invertir_y
 	top_level = true
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	if _objetivo is CollisionObject3D:
@@ -45,8 +42,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var m := event as InputEventMouseMotion
-		yaw -= m.relative.x * sensibilidad
-		var dy := m.relative.y * sensibilidad * (-1.0 if invertir_y else 1.0)
+		# Lo que eligió el jugador en Opciones (se lee siempre: se puede cambiar desde la pausa)
+		var sens := sensibilidad * Ajustes.sensibilidad
+		var invertir := invertir_y != Ajustes.invertir_y
+		yaw -= m.relative.x * sens
+		var dy := m.relative.y * sens * (-1.0 if invertir else 1.0)
 		pitch = clampf(pitch - dy, -1.25, 0.55)
 	elif event is InputEventMouseButton and event.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		if not get_tree().paused:

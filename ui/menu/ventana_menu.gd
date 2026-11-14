@@ -139,10 +139,24 @@ static func crear_tema() -> Theme:
 		th.set_color("font_focus_color", tipo, BORDO)
 		th.set_color("font_hover_pressed_color", tipo, BORDO)
 		th.set_stylebox("focus", tipo, foco)
-	th.set_stylebox("normal", "Button", normal)
-	th.set_stylebox("hover", "Button", hover)
-	th.set_stylebox("pressed", "Button", apretado)
-	th.set_stylebox("hover_pressed", "Button", apretado)
+	for tipo in ["Button", "OptionButton"]:
+		th.set_stylebox("normal", tipo, normal)
+		th.set_stylebox("hover", tipo, hover)
+		th.set_stylebox("pressed", tipo, apretado)
+		th.set_stylebox("hover_pressed", tipo, apretado)
+	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		th.set_color(c, "OptionButton", BORDO)
+	th.set_stylebox("focus", "OptionButton", foco)
+	th.set_font_size("font_size", "OptionButton", 22)
+	# Lista desplegable con el mismo pergamino
+	var lista := _caja(PERGAMINO, BORDO, 3)
+	lista.content_margin_top = 8
+	lista.content_margin_bottom = 8
+	th.set_stylebox("panel", "PopupMenu", lista)
+	th.set_stylebox("hover", "PopupMenu", _caja(NARANJA, BORDO, 0))
+	th.set_color("font_color", "PopupMenu", BORDO)
+	th.set_color("font_hover_color", "PopupMenu", BORDO)
+	th.set_font_size("font_size", "PopupMenu", 22)
 	# Las casillas sin fondo: sólo texto + interruptor
 	var vacio := StyleBoxEmpty.new()
 	for estado in ["normal", "hover", "pressed", "hover_pressed"]:

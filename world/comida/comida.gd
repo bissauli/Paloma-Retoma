@@ -20,8 +20,16 @@ const VALORES := {
 @export var tiempo_reaparicion := 35.0
 @export var vida := 0.0                     ## > 0: desaparece sola (migas tiradas al piso)
 
+## Las migas brillan suavecito cuando la paloma anda cerca (para avisar que se comen).
+const DESTELLO_LEJOS := 6.0
+const DESTELLO_CERCA := 2.5
+
+static var _paloma_jugadora: Node3D
+
 var activa := true
 var _visual: Node3D
+var _destello: Label3D
+var _destello_alfa := 0.0
 var _t := 0.0
 var _avisado := 0.0
 
@@ -39,6 +47,8 @@ func _process(delta: float) -> void:
 	_avisado = maxf(_avisado - delta, 0.0)
 	if not activa:
 		return
+	if _destello:
+		_animar_destello(delta)
 	# La comida "pesada" flota y gira un poquito para que se note que se puede agarrar
 	if tipo != "miga":
 		_visual.position.y = 0.05 + sin(_t * 3.0) * 0.04
@@ -103,6 +113,25 @@ func _reaparecer() -> void:
 
 # ---------------------------------------------------------------- Visual
 
+## Destello de la miga: aparece de a poco al acercarse, titila y gira despacio. Lejos no se ve.
+func _animar_destello(delta: float) -> void:
+	if _paloma_jugadora == null or not is_instance_valid(_paloma_jugadora):
+		_paloma_jugadora = get_tree().get_first_node_in_group("jugador") as Node3D
+	var objetivo := 0.0
+	if _paloma_jugadora:
+		var d := _paloma_jugadora.global_position.distance_to(global_position)
+		objetivo = clampf((DESTELLO_LEJOS - d) / (DESTELLO_LEJOS - DESTELLO_CERCA), 0.0, 1.0)
+	_destello_alfa = move_toward(_destello_alfa, objetivo, delta * 2.5)
+	_destello.visible = _destello_alfa > 0.01
+	if not _destello.visible:
+		return
+	var titileo := 0.55 + 0.45 * sin(_t * 4.2)
+	_destello.modulate.a = _destello_alfa * titileo * 0.85
+	_destello.position.y = 0.16 + sin(_t * 2.0) * 0.025
+	var esc := 0.8 + 0.3 * titileo
+	_destello.scale = Vector3(esc, esc, esc)
+
+
 func _armar() -> void:
 	match tipo:
 		"miga":
@@ -133,6 +162,21 @@ func _armar() -> void:
 			Construir.esfera(_visual, Vector3(0, 0.12, 0), 0.18, Color("e0b26a"), Vector3(0.9, 0.6, 2.2), 8)
 			Construir.esfera(_visual, Vector3(0, 0.2, 0), 0.1, Color("8f3a22"), Vector3(1.0, 0.9, 3.6), 8)
 			Construir.esfera(_visual, Vector3(0, 0.27, 0), 0.04, Color("3e7d2a"), Vector3(2.5, 0.5, 6.0), 6)
+	# Las migas: un destello chiquito que sólo aparece si la paloma está cerca
+	if tipo == "miga":
+		_destello = Label3D.new()
+		_destello.text = "✦"
+		_destello.font_size = 48
+		_destello.modulate = Color(1, 0.97, 0.75, 0.0)
+		_destello.outline_modulate = Color(1, 0.85, 0.4, 0.0)
+		_destello.outline_size = 0
+		_destello.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_destello.pixel_size = 0.0028
+		_destello.shaded = false
+		_destello.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_destello.position = Vector3(0, 0.16, 0)
+		_destello.visible = false
+		_visual.add_child(_destello)
 	# Brillito para que se vea de lejos (no para las migas, que son muchas)
 	if tipo != "miga":
 		var brillo := Label3D.new()

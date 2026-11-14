@@ -16,7 +16,7 @@ const STAMINA_MAX := 100.0
 const STAMINA_DESPEGUE := 8.0      ## Costo de despegar
 const STAMINA_ALETEO := 14.0       ## Costo por segundo manteniendo Espacio en el aire
 const STAMINA_PLANEO := 1.5        ## Costo por segundo sólo por estar en el aire
-const STAMINA_RECARGA_SUELO := 4.0 ## Recarga por segundo caminando (lenta, a propósito)
+const STAMINA_RECARGA_SUELO := 7.0 ## Recarga por segundo en el suelo (las migas siguen siendo lo más rápido)
 const STAMINA_MIGA := 18.0         ## Recarga al comer una miga
 
 # --- Comida (unidades de "comida acumulada") ---
