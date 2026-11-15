@@ -12,8 +12,7 @@ signal bandada_cambio(cantidad: int)
 signal comida_cambio(cantidad: int)
 signal carga_cambio(tipo: String)              ## Lo que la paloma lleva en el pico ("" = nada)
 signal stamina_cambio(valor: float, maximo: float)
-signal objetivo_cambio(texto: String)
-signal mensaje(texto: String, duracion: float) ## Cartel temporal en el HUD
+signal objetivo_cambio(texto: String, actual: int, meta: int) ## meta 0: sin contador
 signal fase_dia_cambio(t: float)               ## 0 = mañana, 1 = atardecer
 signal umbral_alcanzado(cantidad: int)
 
@@ -166,7 +165,6 @@ func _revisar_umbrales() -> void:
 		if bandada >= u and not _umbrales.has(u):
 			_umbrales[u] = true
 			umbral_alcanzado.emit(u)
-			mensaje.emit(textos[u], 4.5)
 	if bandada >= Config.UMBRAL_HALCON and not halcon_activo:
 		halcon_activo = true
 		halcon_activado.emit()
@@ -216,29 +214,37 @@ func comio_miga() -> void:
 
 # ---------------------------------------------------------------- Objetivos
 
-## Arma el texto del objetivo actual según cómo viene la partida.
+## Arma el objetivo actual según cómo viene la partida: el texto y, si tiene, el avance (actual/meta).
 func actualizar_objetivo() -> void:
 	var t := ""
+	var actual := 0
+	var meta := 0
 	if partida_terminada:
 		t = "¡La plaza es nuestra!"
 	elif carga != "":
-		t = "Llevá la %s al nido (Pirámide de Mayo)" % carga
+		t = "Llevá la %s al nido, en la Pirámide de Mayo" % carga
 	elif not tutorial_hecho and bandada == 0 and comida < 3:
-		t = "Picoteá migas en el Cabildo (%s) — %d/3" % [
-			"botón PICOTEAR" if Ajustes.movil else "click izquierdo", migas_comidas]
+		t = "Comé las migas de Doña Rosa, en el Cabildo"
+		actual = migas_comidas
+		meta = 3
 	elif bandada < Config.UMBRAL_CHORIPAN:
 		if comida < 1:
 			t = "Conseguí comida: migas, medialunas de los cafés o facturas del subte"
 		else:
-			t = "Reclutá 5 palomas en la Catedral (%s) — %d/5" % [
-				"botón ARRULLAR" if Ajustes.movil else "click derecho", bandada]
+			t = "Reclutá palomas en la Catedral"
+			actual = bandada
+			meta = Config.UMBRAL_CHORIPAN
 	elif bandada < Config.UMBRAL_TURISTAS:
-		t = "Levantá el choripán de la avenida y llegá a 15 palomas — %d/15" % bandada
+		t = "Levantá el choripán de la avenida y juntá más palomas"
+		actual = bandada
+		meta = Config.UMBRAL_TURISTAS
 	elif bandada < Config.UMBRAL_BALCON:
-		t = "¡Ojo con el halcón! Juntá 30 palomas — %d/30" % bandada
+		t = "Cuidado con el halcón y seguí juntando palomas"
+		actual = bandada
+		meta = Config.UMBRAL_BALCON
 	else:
-		t = "¡Tomá el balcón de la Casa Rosada con tu bandada!"
-	objetivo_cambio.emit(t)
+		t = "Tomá el balcón de la Casa Rosada con tu bandada"
+	objetivo_cambio.emit(t, actual, meta)
 
 
 # ---------------------------------------------------------------- Fin

@@ -2,7 +2,9 @@ extends Node
 ## Prueba automática del menú principal (correr headless):
 ## godot --headless --path . res://tests/test_menu.tscn
 ## 1) El menú está encima del mundo: la paloma ya está en escena, quieta y sin control.
-## 2) NUEVA PARTIDA: la paloma salta, la cámara pasa sin cortes a la del juego y vuelve el control.
+## 2) NUEVA PARTIDA: la paloma salta del banco, la cámara pasa sin cortes a la del juego, arranca la
+##    cinemática de Doña Rosa (sin control), se saltea y vuelven el control y el HUD. Después la
+##    cinemática del objetivo, también salteada.
 ## 3) CONTINUAR: con una partida guardada de prueba, vuelven la bandada y la comida.
 ## También revisa los buses de audio y el brillo de Opciones.
 ## Usa un archivo de partida aparte: no toca la partida guardada de verdad.
@@ -36,6 +38,7 @@ func _nueva_partida() -> void:
 		and menu.botones[2].text == "CARGAR PARTIDA" and menu.botones[3].text == "OPCIONES")
 	# Que la paloma mire a la cámara cada tanto: el modificador de la cabeza existe
 	_check("la paloma tiene gestos (mirada y parpadeo)", j.modelo.find_children("*", "GestosPaloma", true, false).size() == 1)
+	_check("la paloma arranca sentada en el banco", j.global_position.y > 0.4 and j.is_on_floor())
 
 	var y0 := j.global_position.y
 	var pos_cam := cam.global_position
@@ -56,15 +59,55 @@ func _nueva_partida() -> void:
 		cuadros += 1
 	print("  transición: %d cuadros, mayor salto de cámara %.3f m" % [cuadros, max_salto])
 	_check("la transición es continua", max_salto < 0.6)
-	await _frames(5)
+	_check("el menú se fue", not menu.visible)
+	_check("hay partida en curso", GameState.en_partida and not GameState.menu_activo)
+
+	# Cinemática de Doña Rosa: arranca cuando la paloma llega al piso
+	var tutorial: Node = main.get_node("Tutorial")
+	var espera := 0
+	while not tutorial._en_cinematica and espera < 300:
+		await get_tree().process_frame
+		espera += 1
+	_check("arranca la cinemática de Doña Rosa", tutorial._en_cinematica)
+	_check("la paloma bajó del banco al piso", j.global_position.y < 0.2)
+	_check("existe Doña Rosa", get_tree().get_first_node_in_group("dona_rosa") != null)
+	await _segundos(1.0)
+	_check("durante la cinemática no hay control", not j.controlable)
+	_check("durante la cinemática manda la cámara de cine", get_viewport().get_camera_3d() is CamaraCinematica)
+	_check("durante la cinemática no se ve el HUD", not main.hud.visible)
+	await _saltear(tutorial)
 	var cam_juego: Camera3D = j.camara.camara
 	_check("al final manda la cámara del juego", cam_juego.current)
 	_check("la jugadora tiene el control", j.controlable)
-	_check("hay partida en curso", GameState.en_partida and not GameState.menu_activo)
 	_check("el HUD aparece", main.hud.visible)
-	_check("el menú se fue", not menu.visible)
+	_check("el tutorial sigue con el primer paso", tutorial.paso == 0)
+
+	# Cinemática del objetivo (en el juego llega después de la picada)
+	tutorial._objetivo()
+	await _segundos(1.0)
+	_check("la cinemática del objetivo toma la cámara", tutorial._en_cinematica and not j.controlable)
+	await _saltear(tutorial)
+	_check("después del objetivo vuelve el control", j.controlable and cam_juego.current)
+	_check("el último paso manda a la Catedral", tutorial.paso == 6)
 	main.queue_free()
 	await _frames(5)
+
+
+## Aprieta una tecla durante la cinemática y espera a que la cámara vuelva a la del juego.
+func _saltear(tutorial: Node) -> void:
+	var tecla := InputEventKey.new()
+	tecla.keycode = KEY_SPACE
+	tecla.physical_keycode = KEY_SPACE
+	tecla.pressed = true
+	tutorial._input(tecla)
+	var limite := Time.get_ticks_msec() + 5000   # Las cinemáticas duran en segundos, no en cuadros
+	while tutorial._en_cinematica and Time.get_ticks_msec() < limite:
+		await get_tree().process_frame
+	await _frames(3)
+
+
+func _segundos(s: float) -> void:
+	await get_tree().create_timer(s).timeout
 
 
 func _continuar() -> void:

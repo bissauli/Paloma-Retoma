@@ -69,5 +69,4 @@ func _physics_process(_delta: float) -> void:
 		var valor: int = Comida.VALORES.get(tipo, 2)
 		GameState.set_carga("")
 		GameState.sumar_comida(valor)
-		GameState.mensaje.emit("¡Entregaste la %s al nido! +%d de comida" % [tipo, valor], 2.5)
 		AudioManager.reproducir("victoria", -8.0)

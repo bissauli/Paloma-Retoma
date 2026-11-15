@@ -65,11 +65,3 @@ layout_mode = 2
 size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 20
 text = "SALIR AL MENÚ"
-
-[node name="Ayuda" type="Label" parent="Centro"]
-layout_mode = 2
-theme_type_variation = &"TextoChico"
-text = "WASD caminar · Espacio despegar/aletear · Shift picada
-Click izq. picotear · Click der. arrullar (recluta con comida)
-Llevá medialunas y papas al nido · Juntá 30 palomas · ¡Tomá el balcón!"
-horizontal_alignment = 1

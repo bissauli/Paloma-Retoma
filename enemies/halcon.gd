@@ -59,7 +59,6 @@ func _physics_process(delta: float) -> void:
 				estado = Estado.ALERTA
 				_t = tiempo_alerta
 				AudioManager.reproducir("chillido_halcon", 2.0)
-				GameState.mensaje.emit("¡HALCÓN! Bajá o escondete bajo un árbol o un techo", 2.5)
 		Estado.ALERTA:
 			_circular(delta)
 			_t -= delta
@@ -122,8 +121,7 @@ func _abortar(cd: float) -> void:
 
 func _atrapar(j: PalomaJugador) -> void:
 	AudioManager.reproducir("chillido_halcon", 4.0)
-	if GameState.atrapar("halcon", Config.PERDIDA_HALCON, j.global_position, true):
-		GameState.mensaje.emit("¡El halcón te agarró! Perdiste %d palomas y volviste al nido" % Config.PERDIDA_HALCON, 3.5)
+	GameState.atrapar("halcon", Config.PERDIDA_HALCON, j.global_position, true)
 	_abortar(enfriamiento + 4.0)
 
 

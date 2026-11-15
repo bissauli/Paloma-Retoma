@@ -56,7 +56,6 @@ func _physics_process(delta: float) -> void:
 				estado = Estado.PERSIGUE
 				_t = 5.0
 				AudioManager.reproducir_en("silbato", global_position, -6.0)
-				GameState.mensaje.emit("¡El mozo te vio! ¡Rajá!", 1.8)
 		Estado.PERSIGUE:
 			if j == null or _t <= 0.0 or j.global_position.y > 3.0 or j.global_position.z < 26.0:
 				_volver()
@@ -102,9 +101,6 @@ func _espantar(j: Node3D) -> void:
 		GameState.invulnerable = 1.5
 		if GameState.carga != "":
 			GameState.set_carga("")
-			GameState.mensaje.emit("¡El mozo te espantó y se te cayó la comida!", 2.5)
-		else:
-			GameState.mensaje.emit("¡Fuera, paloma! ¡Fuera!", 2.0)
 		modelo.gesto_tirar()
 		if j.has_method("empujar"):
 			var lejos := j.global_position - global_position

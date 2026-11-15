@@ -116,7 +116,6 @@ func _fisica_suelo(delta: float, dir: Vector3) -> void:
 
 func despegar() -> void:
 	if GameState.stamina < 2.0:
-		GameState.mensaje.emit("¡Sin aire! Comé migas para recuperar stamina", 2.0)
 		return
 	estado = Estado.AIRE
 	_tiempo_en_aire = 0.0
@@ -134,8 +133,9 @@ func rumbo() -> float:
 	return _rumbo
 
 
-## Saltito con aleteo al empezar la partida desde el menú principal (no gasta stamina).
-## La cámara del menú se desengancha mientras tanto y pasa a seguirla (ver ui/menu/camara_menu.gd).
+## Salto con aleteo del banco al piso al empezar la partida desde el menú principal (no gasta
+## stamina). La cámara del menú se desengancha mientras tanto y pasa a seguirla
+## (ver ui/menu/camara_menu.gd).
 func saltar_inicio() -> void:
 	estado = Estado.AIRE
 	_tiempo_en_aire = 0.0
@@ -143,7 +143,7 @@ func saltar_inicio() -> void:
 	floor_snap_length = 0.0
 	_aleteo_auto = 0.55
 	var adelante := Vector3(-sin(_rumbo), 0, -cos(_rumbo))
-	velocity = adelante * 1.4 + Vector3.UP * 4.4
+	velocity = adelante * 2.0 + Vector3.UP * 4.4   # Cae un par de metros delante del banco
 	AudioManager.reproducir("aleteo")
 	despego.emit()
 

@@ -101,7 +101,6 @@ func _gritar() -> void:
 func _atrapar(j: Node3D) -> void:
 	var perdidas := maxi(int(ceil(GameState.bandada * Config.PERDIDA_NENE)), 0)
 	if GameState.atrapar("nene", perdidas, global_position, false):
-		GameState.mensaje.emit("¡Un nene te corrió y espantó a la bandada!", 3.0)
 		if j.has_method("empujar"):
 			j.empujar(j.global_position - global_position, 6.0)
 	estado = Estado.CANSADO

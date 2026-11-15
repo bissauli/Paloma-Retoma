@@ -10,9 +10,8 @@ Controles: WASD caminar · Espacio despegar/aletear · Shift picada · Click izq
 
 ## Versión Android
 
-📱 **https://bissauli.github.io/Paloma-Retoma/android/**
-
-Se juega desde el navegador del teléfono, igual que la de PC (con el teléfono acostado).
+📱 Es el mismo link: abierto desde el navegador de un teléfono Android o iPhone, el juego pasa solo a la
+versión táctil (con el teléfono acostado). El link viejo `/android/` redirige ahí.
 Controles táctiles: joystick a la izquierda para caminar y volar · deslizá el dedo a la derecha para mirar ·
 botones DESPEGAR/ALETEAR (mantener), PICADA (mantener), PICOTEAR y ARRULLAR · II pausa.
 
@@ -22,9 +21,9 @@ botones DESPEGAR/ALETEAR (mantener), PICADA (mantener), PICOTEAR y ARRULLAR · I
 - Build web en `docs/` (exportado con el preset "Web", sin threads para que funcione en GitHub Pages).
 - Para regenerarla: Godot → Proyecto → Exportar → Web, o
   `godot --headless --export-release "Web" docs/index.html`.
-- Build para teléfonos en `docs/android/` (preset "Web Android", con la feature `movil` que activa los
-  controles táctiles de `ui/controles_tactiles.gd`; la versión de PC no los carga):
-  `godot --headless --export-release "Web Android" docs/android/index.html`.
+- Una sola build para PC y teléfonos: en la web `Ajustes.movil` se activa con las features `web_android` /
+  `web_ios` (controles táctiles de `ui/controles_tactiles.gd`; la versión de PC no los carga). Así el motor
+  (`index.wasm`, lo que más pesa) se descarga y se cachea una sola vez.
 - Pruebas automáticas en `tests/` (headless): `godot --headless --path . res://tests/test_vuelo.tscn`
   (también `test_bandada` y `test_enemigos`; con `-- movil` corren con la física del teléfono).
 - Rendimiento: `godot --path . res://tests/bench_rendimiento.tscn --disable-vsync` (con `-- movil` emula

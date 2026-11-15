@@ -1,9 +1,11 @@
 extends Node3D
 ## Escena principal (es la que abre el juego). El mundo y la paloma de la jugadora ya están
-## cargados detrás del menú principal: la cámara del menú muestra a la paloma en primer plano.
-## Al elegir NUEVA PARTIDA o CONTINUAR, la paloma salta, el menú se va y la cámara se desengancha y
-## vuela sin cortes hasta quedar detrás de la paloma (ver ui/menu/camara_menu.gd). Sin cambio de
-## escena ni fundido a negro.
+## cargados detrás del menú principal: la cámara del menú muestra a la paloma en primer plano,
+## sentada en un banco del Cabildo.
+## Al elegir NUEVA PARTIDA o CONTINUAR, la paloma salta del banco al piso, el menú se va y la cámara
+## se desengancha y vuela sin cortes hasta quedar detrás de la paloma (ver ui/menu/camara_menu.gd).
+## Sin cambio de escena ni fundido a negro. En una partida nueva sigue el tutorial, que arranca con
+## una cinemática (world/tutorial.gd): el control y el HUD vuelven cuando termina.
 ## También detecta la victoria (posarse en el balcón de la Casa Rosada con 30 palomas o más).
 
 const RADIO_BALCON := 3.4
@@ -13,8 +15,8 @@ const RADIO_BALCON := 3.4
 
 var _jugador: PalomaJugador
 var _balcon: Node3D
-var _aviso_balcon := 0.0
 var _gestos: GestosPaloma
+var _tutorial: Node
 
 @onready var menu: MenuPrincipal = $MenuPrincipal
 @onready var camara_menu: CamaraMenu = $CamaraMenu
@@ -24,6 +26,7 @@ var _gestos: GestosPaloma
 func _ready() -> void:
 	get_tree().paused = false
 	_jugador = $Paloma as PalomaJugador
+	_tutorial = get_node_or_null("Tutorial")
 	AudioManager.iniciar_ambiente()
 	# Versión para teléfonos: joystick, botones y deslizar para mirar (se ocultan con el menú)
 	if Ajustes.movil:
@@ -36,6 +39,9 @@ func _ready() -> void:
 	# instancian main.tscn adentro de otra escena y arrancan directo a jugar.
 	var es_el_juego := get_tree().current_scene == self
 	GameState.guardado_habilitado = es_el_juego
+	# Las cinemáticas del tutorial, sólo en el juego de verdad (las pruebas manejan la cámara)
+	if _tutorial:
+		_tutorial.con_cinematicas = es_el_juego or forzar_menu
 	if (es_el_juego or forzar_menu) and not GameState.saltar_menu:
 		_abrir_menu()
 	else:
@@ -77,6 +83,13 @@ func _abrir_menu() -> void:
 		camara_menu.global_position + frente.normalized() * 0.6, 1.4]
 	menu.nueva_partida.connect(_empezar.bind({}))
 	menu.continuar.connect(_empezar)
+	# Antes de mostrar el menú se compilan los shaders de toda la plaza (unos pocos cuadros), así
+	# la transición al juego no se traba cuando la cámara se aleja y aparece el mundo entero
+	var precalentar := PrecalentarShaders.new()
+	add_child(precalentar)
+	_jugador.camara.reubicar()
+	precalentar.precalentar(_jugador, _jugador.camara.camara)
+	await precalentar.terminado
 	menu.mostrar()
 
 
@@ -89,17 +102,23 @@ func _empezar(datos: Dictionary) -> void:
 	GameState.invulnerable = camara_menu.duracion   # Que nada la atrape durante la transición
 	if not datos.is_empty():
 		_restaurar(datos)
+	# Con cinemática de entrada, el control y el HUD los devuelve el tutorial cuando termina
+	var con_intro: bool = _tutorial != null and _tutorial.va_a_haber_intro()
 	_jugador.saltar_inicio()
 	_jugador.camara.bloqueada = false
+	# La cámara del juego arranca un poco más alta: desde atrás del banco, el respaldo tapaba a la paloma
+	_jugador.camara.pitch = -0.45
 	_jugador.camara.reubicar()
 	Ajustes.capturar_mouse(true)
 	camara_menu.transicionar_a(_jugador.camara.camara)
 	# El control vuelve un poco antes de que la cámara termine de acomodarse
-	get_tree().create_timer(camara_menu.duracion * 0.7).timeout.connect(func() -> void:
-		_jugador.controlable = true)
+	if not con_intro:
+		get_tree().create_timer(camara_menu.duracion * 0.7).timeout.connect(func() -> void:
+			_jugador.controlable = true)
 	await camara_menu.transicion_terminada
 	GameState.menu_activo = false
-	hud.mostrar()
+	if not con_intro:
+		hud.mostrar()
 	camara_menu.queue_free()
 
 
@@ -116,7 +135,6 @@ func _restaurar(datos: Dictionary) -> void:
 # ---------------------------------------------------------------- Victoria
 
 func _physics_process(delta: float) -> void:
-	_aviso_balcon = maxf(_aviso_balcon - delta, 0.0)
 	if GameState.partida_terminada or _balcon == null or _jugador == null:
 		return
 	if _jugador.estado != PalomaJugador.Estado.SUELO:
@@ -126,7 +144,3 @@ func _physics_process(delta: float) -> void:
 		return
 	if GameState.bandada >= Config.UMBRAL_BALCON:
 		GameState.ganar()
-	elif _aviso_balcon <= 0.0:
-		_aviso_balcon = 3.0
-		GameState.mensaje.emit("Con %d palomas no alcanza... ¡necesitás %d para tomar el balcón!" % [
-			GameState.bandada, Config.UMBRAL_BALCON], 3.0)

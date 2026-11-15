@@ -138,9 +138,16 @@ func _tirar_migas(delta: float) -> void:
 		return
 	_timer_migas -= delta
 	if _timer_migas <= 0.0:
-		_timer_migas = intervalo_migas * randf_range(0.6, 1.4)
-		modelo.gesto_tirar()
-		generador.tirar(modelo.posicion_mano())
+		tirar_migas_ya()
+
+
+## Tira un puñado ahora mismo (el tutorial lo usa para que se vea en la cinemática).
+func tirar_migas_ya() -> void:
+	if generador == null:
+		return
+	_timer_migas = intervalo_migas * randf_range(0.6, 1.4)
+	modelo.gesto_tirar()
+	generador.tirar(modelo.posicion_mano())
 
 
 ## Con una bandada de 15 o más, los turistas (y escolares) salen corriendo y sueltan comida.
@@ -159,7 +166,6 @@ func _revisar_susto() -> void:
 		c.vida = 45.0
 		get_parent().add_child(c)
 		c.global_position = Vector3(global_position.x, 0.02, global_position.z)
-	GameState.mensaje.emit("¡Los turistas huyen de tu bandada y se les cae la comida!", 2.5)
 
 
 func asustar(desde: Vector3) -> void:

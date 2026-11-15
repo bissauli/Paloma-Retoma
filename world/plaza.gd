@@ -176,10 +176,12 @@ func _crear_jardines() -> void:
 	]
 	for i in arboles.size():
 		Edificios.jacaranda(j, arboles[i], 0.9 + (i % 3) * 0.12)
-	# Bancos: frente a la Catedral (las señoras), en el Cabildo y alrededor de la Pirámide
+	# Bancos: frente a la Catedral (las señoras), en el Cabildo (el de Doña Rosa, al norte) y
+	# alrededor de la Pirámide. En el del medio del Cabildo arranca el juego: la paloma está sentada
+	# mirando a la plaza (el respaldo queda del lado del Cabildo; la posición está en main.tscn).
 	var bancos := [
 		[Vector3(-7, 0, -18), PI], [Vector3(-3, 0, -18), PI], [Vector3(3, 0, -18), PI], [Vector3(7, 0, -18), PI],
-		[Vector3(-36, 0, -8), PI / 2.0], [Vector3(-36, 0, 8), PI / 2.0],
+		[Vector3(-36, 0, -8), PI / 2.0], [Vector3(-36, 0, 8), PI / 2.0], [Vector3(-36, 0, 3), -PI / 2.0],
 		# Junto a la Pirámide: sobre el pasto de los canteros, mirando hacia el paso central
 		[Vector3(-11, 0.1, 7.3), 0.0], [Vector3(11, 0.1, -7.3), PI], [Vector3(28, 0, -20), 0.0],
 	]
@@ -233,6 +235,8 @@ func _crear_comida(mesas: Array[Vector3]) -> void:
 		f.position = p
 	# Generadores de migas
 	_generador(c, "MigasCabildo", Vector3(-38, 0.02, 0), 5.0, 8, 2.0)
+	# Las de Doña Rosa caen delante de su banco (ella tira además, ver enemies/gente.gd)
+	_generador(c, "MigasDonaRosa", Vector3(-38.2, 0.02, -8), 1.6, 6, 4.0)
 	_generador(c, "MigasCatedral", Vector3(0, 0.02, -15), 6.0, 7, 3.0)
 	_generador(c, "MigasSubte", Vector3(33, 0.02, -15), 4.0, 4, 5.0)
 	_generador(c, "MigasCentro", Vector3(0, 0.02, 8), 8.0, 4, 6.0)
@@ -272,7 +276,8 @@ func _carrito_choripan(padre: Node3D, pos: Vector3) -> void:
 ## Zonas donde viven palomas sueltas para reclutar.
 func _crear_zonas_palomas() -> void:
 	var zonas := [
-		["Cabildo", Vector3(-36, 0, 0), 6.0, 5],
+		["Cabildo", Vector3(-38, 0, 0), 5.0, 3],
+		["DonaRosa", Vector3(-38.4, 0, -8), 2.2, 6],   # Las que come de la mano de Doña Rosa
 		["Catedral", Vector3(0, 0, -14), 9.0, 14],
 		["Centro", Vector3(0, 0, 9), 8.0, 8],
 		["Cafes", Vector3(0, 0, 23), 12.0, 8],
@@ -292,7 +297,8 @@ func _crear_zonas_palomas() -> void:
 ## Puntos de referencia para enemigos y humanos (los usa la escena principal).
 func _crear_puntos() -> void:
 	var puntos := {
-		"PuntoTuristas": Vector3(-39, 0, -9),
+		"PuntoTuristas": Vector3(-40, 0, -14),
+		"PuntoDonaRosa": Vector3(-35.95, 0, -8),   # Sentada en el banco del Cabildo, mirando al oeste
 		"PuntoEscolares": Vector3(-34, 0, 12),
 		"PuntoSenoras": Vector3(0, 0, -18),
 		"PuntoCafes": Vector3(0, 0.16, 35.7),   # Entre las mesas y las vidrieras

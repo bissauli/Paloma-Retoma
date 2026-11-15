@@ -7,7 +7,7 @@ extends Node
 signal cambio
 
 ## La versión para teléfonos guarda aparte: en la web las dos comparten el mismo user://.
-var ARCHIVO := "user://opciones_movil.cfg" if OS.has_feature("movil") else "user://opciones.cfg"
+var ARCHIVO := "user://opciones_movil.cfg" if _es_movil() else "user://opciones.cfg"
 ## Buses de audio que regula el menú (default_bus_layout.tres). Si faltan, se crean al arrancar.
 const BUSES := [&"Musica", &"Voces", &"Efectos"]
 const BRILLO_MIN := 0.6
@@ -45,9 +45,14 @@ var calidad := 2                ## 0 bajo, 1 medio, 2 alto
 var resolucion := Vector2i.ZERO ## (0, 0) = nativa
 var limite_fps := 0             ## Ver LIMITES_FPS
 
-## Versión para teléfonos (preset de exportación "Web Android", feature "movil"): controles táctiles,
-## sin captura del mouse y gráficos livianos. En la versión de PC es siempre false.
-var movil := OS.has_feature("movil")
+## Versión para teléfonos: controles táctiles, sin captura del mouse y gráficos livianos.
+## Una sola build web sirve para PC y teléfono: se activa sola al abrirla desde Android o iOS
+## (features "web_android" / "web_ios"). La feature "movil" la fuerza (tests, bench).
+var movil := _es_movil()
+
+
+static func _es_movil() -> bool:
+	return OS.has_feature("movil") or OS.has_feature("web_android") or OS.has_feature("web_ios")
 
 
 func _ready() -> void:

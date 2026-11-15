@@ -35,7 +35,6 @@ var _visual: Node3D
 var _destello: Label3D
 var _destello_alfa := 0.0
 var _t := 0.0
-var _avisado := 0.0
 
 
 func _ready() -> void:
@@ -48,7 +47,6 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	_avisado = maxf(_avisado - delta, 0.0)
 	if not activa:
 		return
 	if _destello:
@@ -77,21 +75,13 @@ func picoteada(_jugador: Node3D) -> void:
 		"choripan":
 			if GameState.bandada >= Config.UMBRAL_CHORIPAN:
 				GameState.sumar_comida(VALORES["choripan"])
-				GameState.mensaje.emit("¡La bandada levantó el choripán! +%d de comida" % VALORES["choripan"], 3.5)
 				AudioManager.reproducir("victoria", -6.0)
 				AudioManager.reproducir("arrullo")
 				_consumir()
-			elif _avisado <= 0.0:
-				_avisado = 2.0
-				GameState.mensaje.emit("Es muy pesado... necesitás %d palomas para levantarlo" % Config.UMBRAL_CHORIPAN, 3.0)
 		_:
 			if GameState.carga != "":
-				if _avisado <= 0.0:
-					_avisado = 2.0
-					GameState.mensaje.emit("Ya tenés el pico ocupado: llevá la comida al nido", 2.5)
 				return
 			GameState.set_carga(tipo)
-			GameState.mensaje.emit("¡Robaste una %s! Llevala al nido (Pirámide)" % tipo, 2.5)
 			AudioManager.reproducir("recoger")
 			_consumir()
 

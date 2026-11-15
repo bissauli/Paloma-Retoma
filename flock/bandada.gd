@@ -92,21 +92,14 @@ func _al_arrullar(pos: Vector3, radio: float) -> void:
 	var reclutadas := 0
 	for p in candidatas:
 		if not GameState.hay_lugar_en_bandada():
-			GameState.mensaje.emit("¡La bandada está llena! (%d palomas)" % Config.BANDADA_MAX, 2.5)
 			break
 		if not GameState.gastar_comida(Config.COSTO_RECLUTAR):
-			if reclutadas == 0:
-				GameState.mensaje.emit("Las palomas te miran... pero quieren comida. ¡Conseguí migas o medialunas!", 3.0)
-			else:
-				GameState.mensaje.emit("Se te acabó la comida para seguir reclutando", 2.5)
 			break
 		p.reclutar()
 		seguidoras.append(p)
 		reclutadas += 1
 	if reclutadas > 0:
 		AudioManager.reproducir("arrullo", -4.0)
-		if reclutadas > 1:
-			GameState.mensaje.emit("¡Se sumaron %d palomas a la bandada!" % reclutadas, 2.0)
 
 
 ## Al continuar una partida guardada: suma "cantidad" palomas a la bandada sin gastar comida.
@@ -146,8 +139,6 @@ func _al_perder(cantidad: int, desde: Vector3) -> void:
 		var z := _zona_al_azar()
 		if z:
 			p.ir_a_zona(z.global_position, z.get_meta("radio", 5.0))
-	if n > 0:
-		GameState.mensaje.emit("¡Se te dispersaron %d palomas!" % n, 2.5)
 
 
 ## Victoria: la bandada se reparte entre el balcón y la plaza frente a la Casa Rosada,

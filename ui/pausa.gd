@@ -20,10 +20,6 @@ func _ready() -> void:
 	_opciones = OpcionesMenu.new()
 	add_child(_opciones)
 	_opciones.cerrada.connect(func() -> void: %Opciones.grab_focus())
-	if Ajustes.movil:
-		($Centro/Ayuda as Label).text = "Joystick caminar · Deslizá para mirar · DESPEGAR / ALETEAR · PICADA\n\
-PICOTEAR · ARRULLAR (recluta con comida)\n\
-Llevá medialunas y papas al nido · Juntá 30 palomas · ¡Tomá el balcón!"
 
 
 func _unhandled_input(event: InputEvent) -> void:

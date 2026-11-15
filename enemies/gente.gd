@@ -41,10 +41,24 @@ func _generador(nombre: String) -> GeneradorMigas:
 
 func _poblar() -> void:
 	_subte = _punto("subte", _subte)
-	# Turistas en el Cabildo
-	var p_tur := _punto("turistas", Vector3(-38, 0, 0))
+	# Doña Rosa: sentada en el banco del Cabildo, les tira migas a las palomas (la muestra el tutorial)
+	var dona_rosa := ESC_HUMANO.instantiate() as Humano
+	dona_rosa.tipo = "senora"
+	dona_rosa.preparar_aspecto()
+	var mr := dona_rosa.get_node("Modelo") as ModeloHumano
+	mr.color_ropa = Color("b0577a")
+	mr.accesorio = "sombrero"
+	mr.color_accesorio = Color("f2e6c9")
+	dona_rosa.generador = _generador("MigasDonaRosa")
+	dona_rosa.intervalo_migas = 2.6
+	dona_rosa.rotation.y = PI / 2.0   # Mira al oeste, hacia el Cabildo
+	dona_rosa.add_to_group("dona_rosa")
+	add_child(dona_rosa)
+	dona_rosa.global_position = _punto("donarosa", Vector3(-35.95, 0, -8))
+	# Turistas en el Cabildo (sus migas también caen delante del banco de Doña Rosa)
+	var p_tur := _punto("turistas", Vector3(-40, 0, -14))
 	for i in 4:
-		_humano("turista", p_tur, 4.0, _generador("MigasCabildo"), 7.0)
+		_humano("turista", p_tur, 3.5, _generador("MigasDonaRosa"), 9.0)
 	# Grupo escolar con su maestra
 	var p_esc := _punto("escolares", Vector3(-34, 0, 12))
 	for i in 5:

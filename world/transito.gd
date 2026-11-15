@@ -221,7 +221,6 @@ func _revisar_jugador(a: Auto, j: Node3D, _delta: float) -> void:
 		var costado := signf(lateral) if absf(lateral) > 0.05 else 1.0
 		j.empujar(Vector3(a.sentido * 0.8, 0, costado), 6.5)
 		AudioManager.reproducir_en("bocina", a.global_position, 0.0)
-		GameState.mensaje.emit("¡Cuidado con los autos! Cruzá volando o por la senda", 2.5)
 
 
 ## Las palomas sueltas que están en el camino de un auto vuelan un poquito y vuelven.

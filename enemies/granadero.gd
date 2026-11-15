@@ -125,5 +125,4 @@ func _ve(j: Node3D) -> bool:
 func _atrapar() -> void:
 	_visto = 0.0
 	AudioManager.reproducir_en("silbato", global_position, 4.0)
-	if GameState.atrapar("granadero", Config.PERDIDA_GRANADERO, global_position, true):
-		GameState.mensaje.emit("¡PRRRIIIT! Un granadero te vio. Necesitás %d palomas para acercarte." % Config.UMBRAL_BALCON, 3.5)
+	GameState.atrapar("granadero", Config.PERDIDA_GRANADERO, global_position, true)
