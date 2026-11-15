@@ -684,7 +684,7 @@ if HACER_EXPORT:
         carpeta = DIR_PIEZAS if n in PROPS else DIR_LOSETAS
         bpy.ops.export_scene.gltf(filepath=os.path.join(carpeta, n + ".glb"), export_format="GLB",
                                   use_selection=True, export_apply=True, export_yup=True,
-                                  export_materials="EXPORT", export_cameras=False, export_lights=False)
+                                  export_materials="NONE", export_cameras=False, export_lights=False)
 
 # ================================================================= vitrina / renders
 def srgb2lin(c):
