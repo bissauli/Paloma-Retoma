@@ -76,6 +76,39 @@ func _poblar() -> void:
 		s.rotation.y = PI
 		add_child(s)
 		s.global_position = Vector3(x, 0.0, -18.05)
+	# La ciudad (world/ciudad.gd) marca más señoras en bancos y zonas donde pasea gente
+	for m in get_tree().get_nodes_in_group("senora_extra"):
+		var p := m as Node3D
+		var s := ESC_HUMANO.instantiate() as Humano
+		s.tipo = "senora"
+		s.preparar_aspecto()
+		s.generador = _generador(String(p.get_meta("migas", "")))
+		s.intervalo_migas = randf_range(2.5, 4.0)
+		s.rotation.y = float(p.get_meta("rumbo", 0.0))
+		s.position = p.global_position   # antes de add_child: en _ready toma su altura
+		add_child(s)
+	for m in get_tree().get_nodes_in_group("zona_paseo"):
+		var p := m as Node3D
+		var tam: Vector2 = p.get_meta("tam", Vector2(10, 10))
+		var nombre_migas := String(p.get_meta("migas", ""))
+		for i in int(p.get_meta("cantidad", 3)):
+			var h := ESC_HUMANO.instantiate() as Humano
+			h.tipo = String(p.get_meta("tipo", "turista"))
+			if h.tipo == "oficinista":
+				h.tipo = "turista"   # los oficinistas "de verdad" salen del subte y se van
+				h.preparar_aspecto()
+				var mo := h.get_node("Modelo") as ModeloHumano
+				mo.color_ropa = [Color("2f3540"), Color("4a4f5a"), Color("596b80")][randi() % 3]
+				mo.color_piernas = Color("22252b")
+				mo.accesorio = "ninguno"
+			else:
+				h.preparar_aspecto()
+			h.zona_centro = p.global_position
+			h.zona_tam = tam
+			h.generador = _generador(nombre_migas) if nombre_migas != "" else null
+			h.intervalo_migas = randf_range(8.0, 14.0)
+			h.position = p.global_position + Vector3(randf_range(-0.5, 0.5) * tam.x, 0, randf_range(-0.5, 0.5) * tam.y)
+			add_child(h)
 	# El nene corretea por el centro de la plaza
 	var nene := ESC_NENE.instantiate() as Nene
 	add_child(nene)

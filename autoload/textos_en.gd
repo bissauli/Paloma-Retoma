@@ -159,4 +159,11 @@ const MAPA := {
 	"La paloma flaca": "The skinny pigeon",
 	"Hecho con Godot para una game jam\nNinguna medialuna fue desperdiciada":
 		"Made with Godot for a game jam\nNot a single croissant was wasted",
+
+	# Carteles de la ciudad (mapa V2). Los nombres de calles y negocios no se traducen.
+	"DIARIOS Y REVISTAS": "NEWSPAPERS",
+	"Plaza de juegos": "Playground",
+	"Parque de perros": "Dog park",
+	"PROHIBIDO\nPALOMAS": "NO\nPIGEONS",
+	"A LAS PALOMAS\nDE LA PLAZA": "TO THE PIGEONS\nOF THE SQUARE",
 }

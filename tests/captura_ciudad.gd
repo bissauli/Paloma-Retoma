@@ -1,0 +1,60 @@
+extends Node
+## Capturas de la ciudad (mapa V2) desde varios puntos de vista (NO headless):
+## godot --path . res://tests/captura_ciudad.tscn -- <carpeta_salida> [vista1,vista2...]
+
+const VISTAS := {
+	"aerea": [Vector3(0, 150, 215), Vector3(0, 0, -15)],
+	"cenital": [Vector3(0, 330, 0.1), Vector3(0, 0, 0)],
+	"plaza": [Vector3(0, 70, 75), Vector3(0, 0, 0)],
+	"parque_aereo": [Vector3(-95, 65, 5), Vector3(-140, 0, -61)],
+	"zona_palomas": [Vector3(-168, 5, -79), Vector3(-179, 2.5, -94)],
+	"juegos": [Vector3(-88, 7, -70), Vector3(-101, 1, -91)],
+	"rombo": [Vector3(-124, 6, -44), Vector3(-140, 1, -61)],
+	"perros": [Vector3(-140, 6, -12), Vector3(-168, 0, -30)],
+	"bolt": [Vector3(-185.2, 1.6, -59.5), Vector3(-190.5, 0.4, -61)],
+	"bolivar": [Vector3(-68, 1.6, 18), Vector3(-69, 2.5, -60)],
+	"rivadavia": [Vector3(55, 1.8, -48), Vector3(-20, 3, -48)],
+	"av_de_mayo": [Vector3(-80, 2.2, -2), Vector3(-170, 3, -2)],
+	"peatonal": [Vector3(-80, 1.8, 58), Vector3(-150, 2, 58)],
+	"pasaje": [Vector3(-55, 1.6, 51), Vector3(10, 2.5, 51)],
+	"comercial": [Vector3(-55, 28, 25), Vector3(-137, 5, 58)],
+	"barrio": [Vector3(100, 24, 22), Vector3(140, 0, 75)],
+	"potrero": [Vector3(110, 3.5, 66), Vector3(140, 0.5, 68)],
+	"paseo_colon": [Vector3(69, 1.8, -15), Vector3(70, 3, -100)],
+	"reconquista": [Vector3(80, 1.8, -6), Vector3(180, 3, -6)],
+	"sur": [Vector3(0, 32, 38), Vector3(0, 5, 85)],
+	"esquina": [Vector3(-66.5, 1.7, -39), Vector3(-48, 7, -60)],
+	"techos": [Vector3(30, 40, -60), Vector3(120, 10, -80)],
+}
+
+var salida := "user://"
+
+
+func _ready() -> void:
+	var args := OS.get_cmdline_user_args()
+	if args.size() > 0:
+		salida = args[0]
+	var solo: PackedStringArray = args[1].split(",") if args.size() > 1 else PackedStringArray()
+	var main: Node = load("res://main.tscn").instantiate()
+	add_child(main)
+	var cam := Camera3D.new()
+	cam.far = 600.0
+	add_child(cam)
+	await _frames(30)
+	cam.current = true
+	for nombre: String in VISTAS:
+		if not solo.is_empty() and not solo.has(nombre):
+			continue
+		var v: Array = VISTAS[nombre]
+		cam.global_position = v[0]
+		cam.look_at(v[1])
+		cam.fov = 40.0 if nombre == "cenital" else 70.0
+		await _frames(10)
+		get_viewport().get_texture().get_image().save_png(salida.path_join(nombre + ".png"))
+		print("captura: ", nombre, " dibujos=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
+	get_tree().quit()
+
+
+func _frames(n: int) -> void:
+	for i in n:
+		await get_tree().process_frame

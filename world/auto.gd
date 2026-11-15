@@ -9,7 +9,8 @@ const COLORES := [Color("c8372d"), Color("2b4f8a"), Color("e8e4dc"), Color("8c91
 	Color("2a2a2e"), Color("d9a24a"), Color("6b8fb8")]
 
 var tipo := "auto"
-var sentido := 1.0            ## +1 va hacia el este (+X), -1 hacia el oeste
+var sentido := 1.0            ## Ruta: +1 cruza la avenida hacia el este, -1 hacia el oeste
+var s := 0.0                  ## Metros recorridos sobre su ruta (los maneja world/transito.gd)
 var largo := 4.2
 var ancho := 1.8
 var alto := 1.45
@@ -70,17 +71,17 @@ func _process(delta: float) -> void:
 		w.rotate_object_local(Vector3.UP, -giro)
 
 
+## Hacia dónde apunta la trompa (el modelo mira a +X local; en las esquinas dobla).
+func adelante() -> Vector3:
+	return global_transform.basis.x.normalized()
+
+
 ## Dos círculos (adelante y atrás) que las palomas NPC no pueden pisar: [centro, radio, alto].
 func circulos() -> Array:
-	var adelante := Vector3(sentido, 0, 0)
+	var a := adelante()
 	var r := ancho * 0.55
 	var off := largo / 2.0 - r
-	return [[global_position + adelante * off, r, alto], [global_position - adelante * off, r, alto]]
-
-
-## Punto de la trompa (para frenar y para espantar palomas).
-func trompa() -> float:
-	return global_position.x + sentido * largo / 2.0
+	return [[global_position + a * off, r, alto], [global_position - a * off, r, alto]]
 
 
 # ---------------------------------------------------------------- Armado
