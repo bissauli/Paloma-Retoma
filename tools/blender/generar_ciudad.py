@@ -42,67 +42,18 @@ for d in (DIR_FUENTE, DIR_PREVIAS):
 bpy.ops.wm.read_factory_settings(use_empty=True)
 SCENE = bpy.context.scene
 
-# ---------------------------------------------------------------- paleta (8x8 celdas con degradé)
-PAL = [  # nombre, arriba, abajo (sRGB)
-    ("pasto", "3fa865", "277a4a"), ("hoja", "5cd068", "238a45"), ("hoja_osc", "45b85c", "1d7340"),
-    ("tronco", "c4683f", "8a3f28"), ("piedra", "d5dde3", "9aa5ae"), ("piedra_osc", "aeb8c0", "7d8790"),
-    ("agua", "8fdcff", "3a9be0"), ("madera", "e9844a", "b0522e"),
-    ("metal", "4b5359", "23282c"), ("luz", "fff4b8", "ffcf5c"), ("tierra", "9a6a44", "6a452b"),
-    ("flor_rosa", "ff9ec4", "e0628f"), ("flor_amarilla", "ffe46b", "f2b53a"), ("jacaranda", "c3a6ff", "7f5ad1"),
-    ("arena", "f7cf98", "dda066"), ("blanco", "ffffff", "dde2e8"),
-    ("fachada_crema", "f6e7c8", "d8c096"), ("fachada_terracota", "eda07a", "bd6a4b"),
-    ("fachada_rosa", "f5bdb4", "cf8b86"), ("fachada_celeste", "bfe2f3", "84b2d3"),
-    ("fachada_verde", "c4e8cd", "8bbe9d"), ("fachada_amarilla", "f9de8e", "deb258"),
-    ("fachada_gris", "dcdcd6", "a6a7a2"), ("fachada_lila", "ddcbee", "a996c7"),
-    ("ladrillo", "d07a55", "974a30"), ("fachada_beige", "ecdcc0", "c3aa86"), ("medianera", "c8bba8", "928574"),
-    ("vidrio", "a6d8f5", "3f6f9e"), ("vidrio_osc", "6a8ba6", "26384b"), ("marco", "fbf9f4", "cdc8be"),
-    ("persiana", "dfe3e6", "a3a9ae"), ("hierro", "454b51", "1b1e21"),
-    ("toldo_rojo", "ec5e4f", "b2392f"), ("toldo_verde", "54b47f", "2c7a53"), ("toldo_azul", "5590d8", "2e599c"),
-    ("toldo_amarillo", "ffcd52", "de9628"), ("toldo_naranja", "ffa058", "d6672a"),
-    ("asfalto", "5f6268", "3c3e43"), ("vereda", "dcd5c6", "b6ad9c"), ("cordon", "eae7e0", "b9b5ad"),
-    ("pizarra", "75849a", "48526a"), ("cupula", "93c4b8", "5b8d84"), ("tejas", "dc784c", "a5472b"),
-    ("chapa", "bac3c9", "7a838a"), ("oxido", "cc8148", "86482a"), ("tanque", "4a5056", "1f2327"),
-    ("plastico_rojo", "ff6255", "cc3328"), ("plastico_azul", "56aaff", "2c6bd0"),
-    ("plastico_amarillo", "ffdc55", "eea52c"), ("plastico_verde", "74e070", "37a648"),
-    ("azotea", "c99079", "93604b"), ("goma_azul", "6596d8", "3f629c"),
-    ("perro_blanco", "fcfcf8", "d6d3cb"), ("perro_marron", "d0925a", "8c5832"), ("perro_negro", "54504d", "262220"),
-    ("gato_naranja", "f5a656", "bf6a28"), ("grafiti_rosa", "ff66b8", "cf2f7d"), ("grafiti_cian", "55e6e6", "21a6b6"),
-    ("grafiti_lima", "cdf460", "8cbe2c"), ("contenedor", "56a462", "2d683a"), ("buzon", "e8503f", "a5291f"),
-    ("sombra", "50545d", "2a2c32"), ("naranja", "ff9145", "dd5a1d"), ("kiosco", "3a7d58", "1c4a33"),
-]
-assert len(PAL) == 64, len(PAL)
-PIDX = {p[0]: i for i, p in enumerate(PAL)}
-CELLS = 8
-TEX = 512
-CS = TEX // CELLS
-MARGEN = 6.0 / CS   # los degradés no llegan al borde de la celda (no se mezclan colores vecinos)
+# ---------------------------------------------------------------- paleta (compartida, ver paleta.py)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paleta  # noqa: E402
 
+PAL = paleta.PAL
+PIDX = paleta.PIDX
+CELLS = paleta.CELLS
+FILAS = paleta.FILAS
+MARGEN = paleta.MARGEN
 
-def hex_rgb(h):
-    return np.array([int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)], dtype=np.float32)
-
-
-def imagen_paleta(nombre, solo=None):
-    arr = np.zeros((TEX, TEX, 4), dtype=np.float32)
-    arr[..., 3] = 1
-    for i, (n, top, bot) in enumerate(PAL):
-        if solo and n not in solo:
-            continue
-        cx, cy = i % CELLS, i // CELLS
-        a, b = hex_rgb(bot), hex_rgb(top)
-        for r in range(CS):
-            t = min(max((r / (CS - 1) - MARGEN) / (1 - 2 * MARGEN), 0.0), 1.0)
-            arr[cy * CS + r, cx * CS:(cx + 1) * CS, :3] = a + (b - a) * t
-    img = bpy.data.images.new(nombre, TEX, TEX, alpha=False)
-    img.pixels.foreach_set(arr.ravel())
-    img.filepath_raw = os.path.join(DIR_FUENTE, nombre + ".png")
-    img.file_format = "PNG"
-    img.save()
-    return img
-
-
-IMG = imagen_paleta("ciudad_paleta")
-IMG_EM = imagen_paleta("ciudad_emision", solo={"luz"})
+IMG = paleta.imagen(bpy, "ciudad_paleta", DIR_FUENTE)
+IMG_EM = paleta.imagen(bpy, "ciudad_emision", DIR_FUENTE, solo=set(paleta.EMISION))
 
 
 def material():
@@ -300,18 +251,14 @@ def circulo(r, seg=32, cx=0, cy=0):
 def P(bm, color, z0=None, z1=None):
     """Pinta un elemento con el degradé de su color, de abajo (oscuro) hacia arriba (claro).
     El degradé usa la altura propia del elemento, o z0..z1 si se pasan."""
-    i = PIDX[color]
     uvl = bm.loops.layers.uv.get("UVMap") or bm.loops.layers.uv.new("UVMap")
     zs = [v.co.z for v in bm.verts]
     lo = min(zs) if z0 is None else z0
     hi = max(zs) if z1 is None else z1
     span = max(hi - lo, 1e-4)
-    cx, cy = i % CELLS, i // CELLS
-    u = (cx + 0.5) / CELLS
     for f in bm.faces:
         for l in f.loops:
-            t = min(max((l.vert.co.z - lo) / span, 0.0), 1.0)
-            l[uvl].uv = (u, (cy + MARGEN + t * (1 - 2 * MARGEN)) / CELLS)
+            l[uvl].uv = paleta.uv(color, (l.vert.co.z - lo) / span)
     return bm
 
 
@@ -475,6 +422,12 @@ PB = 4.2        # alto de la planta baja
 PISO = 3.0      # alto de cada piso
 PRETIL = 1.0    # pretil de la azotea
 
+# Estilo del edificio que se está armando (mapa V3): color del remate (tapa del pretil en todo el borde,
+# banda sobre la planta baja y cornisa), color de la azotea, tipo de cartel del local (Godot le pone el
+# texto según el tipo) y el ícono del cartel. Lo fijan edificio() y esquina() antes de armar las partes.
+ESTILO = {"remate": "piedra", "techo": "techo", "cartel": "local", "icono": None}
+TAPA = 0.32     # alto de la tapa de color del pretil
+
 
 def ventana(F, u, z, w, h, rng, persiana=0.75, marco="marco", alfeizar=True):
     out = [P(F.caja(u, z - 0.08, w + 0.16, h + 0.16, 0.05), marco),
@@ -605,7 +558,7 @@ def plantas_azotea(x0, x1, y0, y1, z, rng):
     return est, det
 
 
-def azotea(x0, x1, y0, y1, H, rng, pisos, verde=0.35):
+def azotea(x0, x1, y0, y1, H, rng, pisos, verde=0.35, ocupado_extra=()):
     """Lo que hay arriba de la azotea: sala de máquinas, tanques, antenas, plantas o tendederos."""
     est, det = [], []
     ancho = x1 - x0
@@ -620,12 +573,119 @@ def azotea(x0, x1, y0, y1, H, rng, pisos, verde=0.35):
     if rng.random() < 0.55:
         det += antena(rng.uniform(x0 + 0.6, x1 - 0.6), rng.uniform(y0 + 1, y1 - 4), H)
     r = rng.random()
+    ocupado = [(cx, cy, 1.7, 1.8)] + list(ocupado_extra)
     if r < verde:
-        e, d = plantas_azotea(x0 + 0.3, x1 - 0.3, y0 + 0.4, min(y1 - 4.5, y0 + 6), H, rng)
+        y_fin = min(y1 - 4.5, y0 + 6)
+        e, d = plantas_azotea(x0 + 0.3, x1 - 0.3, y0 + 0.4, y_fin, H, rng)
         est += e
         det += d
+        ocupado.append(((x0 + x1) / 2, (y0 + y_fin) / 2, (x1 - x0) / 2, (y_fin - y0) / 2 + 0.2))
     elif r < verde + 0.3 and ancho > 4:
         det += tendedero((x0 + x1) / 2, y0 + 2.5, H, min(ancho - 1.2, 4.0), rng)
+        ocupado.append(((x0 + x1) / 2, y0 + 2.5, min(ancho - 1.2, 4.0) / 2 + 0.2, 0.5))
+    e, d = equipos_azotea(x0 + 0.2, x1 - 0.2, y0 + 0.3, y1 - 0.3, H, rng, ocupado)
+    est += e
+    det += d
+    return est, det
+
+
+def aire_techo(x, y, z, rot):
+    """Condensadora de aire acondicionado de techo: caja con dos ventiladores arriba."""
+    R = Matrix.Translation((x, y, z)) @ Matrix.Rotation(rot, 4, "Z")
+    w, d, h = 1.6, 1.0, 0.75
+    est = [P(transformar(bm_box(w, d, h, 0, 0, 0.12), R), "aire_ac")]
+    det = [P(transformar(bm_box(w - 0.1, d - 0.1, 0.12, 0, 0, 0), R), "rejilla")]
+    for sx in (-0.38, 0.38):
+        det.append(P(transformar(bm_cyl((sx, 0, 0.12 + h), (sx, 0, 0.12 + h + 0.03), 0.33, 0.33, 12), R), "rejilla"))
+        det.append(P(transformar(bm_box(0.6, 0.05, 0.02, sx, 0, 0.12 + h + 0.03), R), "aire_ac"))
+        det.append(P(transformar(bm_box(0.05, 0.6, 0.02, sx, 0, 0.12 + h + 0.03), R), "aire_ac"))
+        det.append(P(transformar(bm_cyl((sx, 0, 0.12 + h + 0.03), (sx, 0, 0.12 + h + 0.07), 0.08, 0.08, 6), R), "aire_ac"))
+    col_caja(R @ Vector((0, 0, (0.12 + h) / 2)), (w, d, 0.12 + h), R.to_3x3())
+    return est, det
+
+
+def conducto_techo(x, y, z, largo, rot):
+    """Conducto de ventilación: tramo horizontal sobre patas y una subida con sombrerete."""
+    R = Matrix.Translation((x, y, z)) @ Matrix.Rotation(rot, 4, "Z")
+    a = 0.55
+    est = [P(transformar(bm_box(largo, a, a, 0, 0, 0.3), R), "aire_ac"),
+           P(transformar(bm_box(a, a, 1.0, largo / 2 - a / 2, 0, 0.3 + a), R), "aire_ac"),
+           P(transformar(bm_box(a + 0.18, a + 0.18, 0.12, largo / 2 - a / 2, 0, 1.85), R), "cano")]
+    det = [P(transformar(bm_box(a + 0.04, a + 0.04, 0.1, k, 0, 0.3 + a * 0.5 - 0.05), R), "cano")
+           for k in (-largo / 2 + 0.4, 0.0)]
+    det += [P(transformar(bm_box(0.08, 0.08, 0.3, k, 0, 0), R), "rejilla") for k in (-largo / 2 + 0.5, largo / 4)]
+    det.append(P(transformar(bm_box(a - 0.06, 0.02, 0.36, largo / 2 - a / 2, -a / 2 - 0.01, 1.42), R), "rejilla"))
+    col_caja(R @ Vector((0, 0, 0.3 + a / 2)), (largo, a, a), R.to_3x3())
+    return est, det
+
+
+def parabolica(x, y, z, rot):
+    """Antena parabólica sobre un caño corto, mirando hacia +Y girada 'rot'."""
+    R = Matrix.Translation((x, y, z)) @ Matrix.Rotation(rot, 4, "Z")
+    det = [P(transformar(bm_cyl((0, 0, 0), (0, 0, 0.95), 0.04, 0.04, 6), R), "cano"),
+           P(transformar(bm_box(0.3, 0.3, 0.06, 0, 0, 0), R), "rejilla")]
+    plato = bm_torno([(0.0, 0.0), (0.22, 0.03), (0.4, 0.1), (0.46, 0.15), (0.43, 0.16), (0.2, 0.06), (0.0, 0.03)], 14)
+    transformar(plato, Matrix.Rotation(math.radians(-60), 4, "X"))
+    transformar(plato, R @ Matrix.Translation((0, 0.05, 1.05)))
+    det.append(P(plato, "parabolica", z + 0.6, z + 1.5))
+    brazo = bm_cyl((0, 0.08, 1.05), (0, 0.5, 1.32), 0.015, 0.015, 4)
+    det.append(P(transformar(brazo, R), "cano"))
+    det.append(P(transformar(bm_box(0.08, 0.1, 0.08, 0, 0.52, 1.3), R), "rejilla"))
+    return [], det
+
+
+def ventilacion(x, y, z, r=0.14):
+    """Caño de ventilación con sombrerete."""
+    return [], [P(bm_cyl((x, y, z), (x, y, z + 0.55), r, r, 8), "cano"),
+                P(bm_torno([(r + 0.12, z + 0.55), (r * 0.5, z + 0.75), (0, z + 0.78)], 8, x, y), "cano")]
+
+
+def equipos_azotea(x0, x1, y0, y1, H, rng, ocupado, densidad=1.0):
+    """Aires acondicionados, conductos, parabólicas y ventilaciones repartidos sin chocarse entre sí ni
+    con lo que ya hay ("ocupado": [(cx, cy, medio ancho, medio fondo)])."""
+    est, det = [], []
+    ocup = list(ocupado)
+
+    def libre(cx, cy, rx, ry):
+        if cx - rx < x0 or cx + rx > x1 or cy - ry < y0 or cy + ry > y1:
+            return False
+        return all(abs(cx - ox) >= rx + orx + 0.35 or abs(cy - oy) >= ry + ory + 0.35 for ox, oy, orx, ory in ocup)
+
+    area = max(0.0, (x1 - x0) * (y1 - y0))
+    cosas = ["aire"] * min(4, int(area / 28 * densidad) + rng.randint(0, 1))
+    if rng.random() < 0.5 * densidad and x1 - x0 > 4.5:
+        cosas.insert(0, "conducto")
+    if rng.random() < 0.55:
+        cosas.append("parabolica")
+    cosas += ["ventilacion"] * rng.randint(1, 3)
+    for c in cosas:
+        for _ in range(30):
+            rot = rng.choice((0.0, math.pi / 2))
+            if c == "aire":
+                rx, ry = (0.85, 0.55) if rot == 0.0 else (0.55, 0.85)
+            elif c == "conducto":
+                largo = rng.uniform(2.6, min(4.2, x1 - x0 - 1.0))
+                rot = 0.0
+                rx, ry = largo / 2 + 0.1, 0.4
+            elif c == "parabolica":
+                rx = ry = 0.5
+            else:
+                rx = ry = 0.3
+            cx, cy = rng.uniform(x0 + rx, x1 - rx), rng.uniform(y0 + ry, y1 - ry)
+            if not libre(cx, cy, rx, ry):
+                continue
+            ocup.append((cx, cy, rx, ry))
+            if c == "aire":
+                e, d = aire_techo(cx, cy, H, rot)
+            elif c == "conducto":
+                e, d = conducto_techo(cx, cy, H, largo, rot + rng.choice((0.0, math.pi)))
+            elif c == "parabolica":
+                e, d = parabolica(cx, cy, H, rng.uniform(0, 2 * math.pi))
+            else:
+                e, d = ventilacion(cx, cy, H)
+            est += e
+            det += d
+            break
     return est, det
 
 
@@ -658,7 +718,11 @@ def planta_baja(F, tipo, fachada, rng, toldo_col=None, rayas=0, cartel_col=None)
         det.append(P(F.caja(0, 3.02, al + 0.2, 0.22, 0.13), "piedra"))
         cc = cartel_col or rng.choice(COLORES_TOLDO + ["kiosco", "hierro", "blanco"])
         est.append(P(F.caja(0, 3.24, W - 1.0, 0.72, 0.12), cc))
-        F.cartel(0, 3.6, W - 1.4, 0.55, 0.125, "local")
+        if ESTILO["icono"]:
+            det += icono(F, ESTILO["icono"], (W - 1.4) / 2 - 0.45, 3.6, 0.13)   # +u es la izquierda de quien mira
+            F.cartel(-0.45, 3.6, W - 2.3, 0.55, 0.125, ESTILO["cartel"])
+        else:
+            F.cartel(0, 3.6, W - 1.4, 0.55, 0.125, ESTILO["cartel"])
         if toldo_col:
             cols = [toldo_col, "blanco"] if rayas else [toldo_col]
             det += toldo(F, 0, al + 0.4, 3.12, 1.7, 0.65, cols, rayas or 1)
@@ -684,7 +748,7 @@ def planta_baja(F, tipo, fachada, rng, toldo_col=None, rayas=0, cartel_col=None)
             det.append(P(F.caja(-W / 2 + 0.6 + g / 2, 0.14 + j * 0.27, g, 0.02, 0.13), "piedra_osc"))
         det.append(P(F.caja(W / 2 - 1.2, 0, 1.1, 2.6, 0.12), "madera"))
     # banda entre la planta baja y el primer piso
-    est.append(P(F.caja(0, PB - 0.12, W + 0.08, 0.3, 0.2), "piedra"))
+    est.append(P(F.caja(0, PB - 0.2, W + 0.08, 0.42, 0.24), ESTILO["remate"]))
     return est, det
 
 
@@ -752,7 +816,7 @@ def pisos_fachada(F, pisos, estilo, fachada, rng, z_base=PB, opciones=None):
     return est, det
 
 
-def remate(F, H, estilo, fachada, rng, balaustrada=False):
+def remate_frente(F, H, estilo, fachada, rng, balaustrada=False):
     """Cornisa y pretil del frente."""
     W = F.w
     est, det = [], []
@@ -769,9 +833,9 @@ def remate(F, H, estilo, fachada, rng, balaustrada=False):
             F.col(0, H, W, 1.06, 0.4)
             return est, det
     elif estilo == "moderno":
-        est.append(P(F.caja(0, H - 0.1, W, 0.5, 0.22), "piedra"))
+        est.append(P(F.caja(0, H - 0.1, W, 0.5, 0.22), ESTILO["remate"]))
     else:
-        est.append(P(F.caja(0, H - 0.08, W + 0.2, 0.25, 0.28), "piedra"))
+        est.append(P(F.caja(0, H - 0.25, W + 0.2, 0.4, 0.3), ESTILO["remate"]))
     return est, det
 
 
@@ -794,7 +858,7 @@ def lejos(nombre, frentes, base, H, pisos, estilo, toldo_col=None):
         bms.append(P(F.caja(0, 0.1, W - 0.9, 3.0, 0.05), "vidrio_osc"))
         if toldo_col:
             bms.append(P(F.caja(0, 2.45, W - 0.9, 0.65, 1.3), toldo_col))
-        bms.append(P(F.caja(0, PB - 0.12, W + 0.08, 0.3, 0.2), "piedra"))
+        bms.append(P(F.caja(0, PB - 0.2, W + 0.08, 0.42, 0.24), ESTILO["remate"]))
         if estilo == "moderno":
             bms.append(P(F.caja(0, PB, W - 0.5, H - PB - 0.1, 0.08), "vidrio", PB, H))
             for f in range(pisos + 1):
@@ -813,7 +877,7 @@ def lejos(nombre, frentes, base, H, pisos, estilo, toldo_col=None):
                     alto = 2.35 if dep else (2.25 if estilo == "clasico" else 1.6)
                     zv = z0 + (0.2 if dep else (0.35 if estilo == "clasico" else 0.8))
                     bms.append(P(F.caja(u, zv, w, alto, 0.07), "vidrio"))
-        bms.append(P(F.caja(0, H - 0.08, W + 0.2, 0.3, 0.3), "piedra"))
+        bms.append(P(F.caja(0, H - 0.25, W + 0.2, 0.45, 0.3), ESTILO["remate"]))
     edif([obj(bms)], nombre + "_lejos")
     DATOS[nombre + "_lejos"]["tipo"] = "lejos"
 
@@ -825,10 +889,41 @@ def _techo_lejos(x, y, H, pisos):
     return [P(bm_box(1.5, 1.5, 0.45, x, y, H), "piedra_osc"), P(bm_cyl((x, y, H + 0.45), (x, y, H + 1.8), 0.6, 0.6, 8), "tanque")]
 
 
+def fijar_estilo(seed, remate, techo_col, cartel, icono):
+    ESTILO["remate"] = remate
+    ESTILO["techo"] = techo_col or random.Random(seed * 7 + 3).choice(("techo", "techo", "techo_osc", "azotea"))
+    ESTILO["cartel"] = cartel
+    ESTILO["icono"] = icono
+
+
+def tapas_pretil(lados, H):
+    """Tapa de color arriba del pretil. lados: [(Frente del lado, sale hacia afuera?)]."""
+    out = []
+    for F, afuera in lados:
+        out.append(P(F.caja(0, H + PRETIL, F.w, TAPA, 0.25 + (0.14 if afuera else 0.0), -0.25), ESTILO["remate"]))
+    return out
+
+
+def cano_desague(F, u, H, alto_extra=PRETIL):
+    """Caño de lluvia que baja por la fachada, con sus abrazaderas."""
+    out = [P(F.local(bm_cyl((u, 0.13, 0.15), (u, 0.13, H + alto_extra - 0.2), 0.07, 0.07, 6)), "cano"),
+           P(F.local(bm_cyl((u, 0.13, 0.15), (u, 0.3, 0.02), 0.075, 0.075, 6)), "cano")]
+    z = 1.2
+    while z < H:
+        out.append(P(F.caja(u, z, 0.2, 0.06, 0.2), "cano"))
+        z += 2.6
+    return out
+
+
 def edificio(nombre, W, D, pisos, estilo, fachada, seed, pb="local", toldo_col=None, rayas=0,
-             techo="plano", opciones=None, cartel_col=None):
-    """Edificio entre medianeras: fachada en y=0 mirando a -Y, de x=-W/2 a W/2, fondo hasta y=D."""
+             techo="plano", opciones=None, cartel_col=None, remate="piedra", techo_col=None, cartel="local",
+             icono=None, extra=None, cano=True, azotea_ocupada=()):
+    """Edificio entre medianeras: fachada en y=0 mirando a -Y, de x=-W/2 a W/2, fondo hasta y=D.
+    remate: color de la tapa del pretil, la banda de la planta baja y la cornisa. cartel/icono: tipo de
+    cartel del local (Godot elige el texto) y dibujo al costado. extra(F, H, rng) -> (est, det) suma
+    partes propias (edificios especiales)."""
     empezar()
+    fijar_estilo(seed, remate, techo_col, cartel, icono)
     rng = random.Random(seed)
     H = PB + pisos * PISO
     F = Frente((0, 0), (0, -1), W)
@@ -844,11 +939,11 @@ def edificio(nombre, W, D, pisos, estilo, fachada, seed, pb="local", toldo_col=N
     det += d
     con_mansarda = techo == "mansarda"
     bal = con_mansarda or (estilo == "clasico" and rng.random() < 0.5)
-    e, d = remate(F, H, estilo, fachada, rng, balaustrada=bal)
+    e, d = remate_frente(F, H, estilo, fachada, rng, balaustrada=bal)
     est += e
     det += d
     # Azotea: losa y pretil (el frente, si no hay balaustrada, del color de la fachada)
-    det.append(P(bm_box(W - 0.4, D - 0.4, 0.06, 0, D / 2, H), "azotea"))
+    det.append(P(bm_box(W - 0.4, D - 0.4, 0.06, 0, D / 2, H), ESTILO["techo"]))
     e0 = 0.25
     if not bal:
         est.append(P(bm_box(W, e0, PRETIL, 0, e0 / 2, H), fachada, 0, H + PRETIL))
@@ -858,13 +953,25 @@ def edificio(nombre, W, D, pisos, estilo, fachada, seed, pb="local", toldo_col=N
         est.append(P(bm_box(e0, D - 2 * e0, PRETIL, s * (W / 2 - e0 / 2), D / 2, H), "medianera"))
         col_caja((s * (W / 2 - e0 / 2), D / 2, H + PRETIL / 2), (e0, D - 2 * e0, PRETIL))
     col_caja((0, D - e0 / 2, H + PRETIL / 2), (W, e0, PRETIL))
+    # Tapas de color del pretil por todo el borde (se ven desde el aire, como en las referencias)
+    lados = [(Frente((0, D), (0, 1), W), False), (Frente((-W / 2, D / 2), (-1, 0), D - 0.5), False),
+             (Frente((W / 2, D / 2), (1, 0), D - 0.5), False)]
+    if not bal:
+        lados.append((F, True))
+    est += tapas_pretil(lados, H)
+    if cano and estilo != "moderno":
+        det += cano_desague(F, W / 2 - 0.3, H)
+    if extra:
+        e, d = extra(F, H, rng)
+        est += e
+        det += d
     if con_mansarda:
         e, d = mansarda(W, D, H, rng)
         est += e
         det += d
         e, d = azotea(-W / 2 + 0.6, W / 2 - 0.6, 6.0, D - 0.4, H, rng, 0, verde=0.0)
     else:
-        e, d = azotea(-W / 2 + 0.4, W / 2 - 0.4, 0.4, D - 0.4, H, rng, pisos)
+        e, d = azotea(-W / 2 + 0.4, W / 2 - 0.4, 0.4, D - 0.4, H, rng, pisos, ocupado_extra=azotea_ocupada)
     est += e
     det += d
     o1 = obj(est, bisel=0.05, seg=1)
@@ -872,10 +979,13 @@ def edificio(nombre, W, D, pisos, estilo, fachada, seed, pb="local", toldo_col=N
     edif([o1, o2], nombre)
     DATOS[nombre].update({"ancho": W, "fondo": D, "alto": H, "tipo": "medio"})
     base = [P(bm_box(W, 0.6, H, 0, 0.3, 0), fachada, 0, H), P(bm_box(W - 0.04, D - 0.6, H, 0, 0.6 + (D - 0.6) / 2, 0), "medianera", 0, H),
-            P(bm_box(W - 0.4, D - 0.4, 0.06, 0, D / 2, H), "azotea")]
+            P(bm_box(W - 0.4, D - 0.4, 0.06, 0, D / 2, H), ESTILO["techo"])]
     base = base + [P(bm_box(W, 0.25, PRETIL, 0, 0.125, H), fachada, 0, H + PRETIL),
                        P(bm_box(W, 0.25, PRETIL, 0, D - 0.125, H), "medianera")] + \
         [P(bm_box(0.25, D - 0.5, PRETIL, s * (W / 2 - 0.125), D / 2, H), "medianera") for s in (-1, 1)]
+    base += [P(bm_box(W, 0.39, TAPA, 0, 0.055, H + PRETIL), ESTILO["remate"]),
+             P(bm_box(W, 0.25, TAPA, 0, D - 0.125, H + PRETIL), ESTILO["remate"])] + \
+        [P(bm_box(0.25, D - 0.5, TAPA, s * (W / 2 - 0.125), D / 2, H + PRETIL), ESTILO["remate"]) for s in (-1, 1)]
     if con_mansarda:
         y0, y1, alto, entra = 0.7, D - 0.6, 3.2, 1.4
         base.append(P(bm_perfil_x([(y0, H), (y1, H), (y1 - entra, H + alto), (y0 + entra, H + alto)], -W / 2 + 0.3, W / 2 - 0.3), "pizarra"))
@@ -906,10 +1016,11 @@ def mansarda(W, D, H, rng):
 
 
 def esquina(nombre, C, ch, pisos, estilo, fachada, seed, pb="cafe", toldo_col=None, rayas=0, cupula=None,
-            opciones=None):
+            opciones=None, remate="piedra", techo_col=None, cartel="local", icono=None):
     """Edificio de esquina con ochava. Ocupa x∈[0,C], y∈[0,C]; fachadas en y=0 (hacia -Y),
     x=0 (hacia -X) y la ochava en diagonal entre (0,ch) y (ch,0)."""
     empezar()
+    fijar_estilo(seed, remate, techo_col, cartel, icono)
     rng = random.Random(seed)
     H = PB + pisos * PISO
     planta = [(ch, 0), (C, 0), (C, C), (0, C), (0, ch)]
@@ -925,17 +1036,17 @@ def esquina(nombre, C, ch, pisos, estilo, fachada, seed, pb="cafe", toldo_col=No
         else:
             e, d = [], [P(F.caja(0, 0, F.w - 0.6, 3.0, 0.06), "sombra"), P(F.caja(0, 0.05, 1.6, 2.6, 0.1), "vidrio_osc"),
                         P(F.caja(0, 2.65, 2.2, 0.35, 0.12), "piedra"), P(F.caja(0, 0, 0.08, 2.65, 0.14), "madera")]
-            e.append(P(F.caja(0, PB - 0.12, F.w + 0.08, 0.3, 0.2), "piedra"))
+            e.append(P(F.caja(0, PB - 0.2, F.w + 0.08, 0.42, 0.24), ESTILO["remate"]))
         est += e
         det += d
         e, d = pisos_fachada(F, pisos, estilo if (i < 2 or estilo != "departamentos") else "clasico", fachada, rng, PB,
                              opciones)
         est += e
         det += d
-        e, d = remate(F, H, estilo, fachada, rng)
+        e, d = remate_frente(F, H, estilo, fachada, rng)
         est += e
         det += d
-    det.append(P(bm_prisma(planta, H, H + 0.06), "azotea"))
+    det.append(P(bm_prisma(planta, H, H + 0.06), ESTILO["techo"]))
     e0 = 0.25
     # pretil por todo el borde
     for i, (a, b) in enumerate(zip(planta, planta[1:] + planta[:1])):
@@ -948,6 +1059,7 @@ def esquina(nombre, C, ch, pisos, estilo, fachada, seed, pb="cafe", toldo_col=No
         frente = i in (0, 3, 4)       # frente, costado y ochava; los otros dos lados son medianeras
         est.append(P(F.caja(0, H, L, PRETIL, e0, -e0), fachada if frente else "medianera", 0, H + PRETIL))
         F.col(0, H, L, PRETIL, e0, -e0)
+        est += tapas_pretil([(F, frente)], H)
     if cupula:
         cx = cy = ch / 2 + 2.2
         r = 2.3
@@ -970,12 +1082,13 @@ def esquina(nombre, C, ch, pisos, estilo, fachada, seed, pb="cafe", toldo_col=No
     o2 = obj(det)
     edif([o1, o2], nombre)
     DATOS[nombre].update({"ancho": C, "fondo": C, "alto": H, "tipo": "esquina", "ochava": ch})
-    base = [P(bm_prisma(planta, 0, H), fachada, 0, H), P(bm_prisma(planta, H, H + 0.06), "azotea")]
+    base = [P(bm_prisma(planta, 0, H), fachada, 0, H), P(bm_prisma(planta, H, H + 0.06), ESTILO["techo"])]
     for i, (a, b) in enumerate(zip(planta, planta[1:] + planta[:1])):
         a, b = Vector((a[0], a[1], 0)), Vector((b[0], b[1], 0))
         t = (b - a).normalized()
         F = Frente((a + b) / 2, Vector((t.y, -t.x, 0)), (b - a).length)
         base.append(P(F.caja(0, H, F.w, PRETIL, 0.25, -0.25), fachada if i in (0, 3, 4) else "medianera", 0, H + PRETIL))
+        base.append(P(F.caja(0, H + PRETIL, F.w, TAPA, 0.25, -0.25), ESTILO["remate"]))
     base += _techo_lejos(C - 4.0, C - 4.0, H, pisos)
     if cupula:
         cx = cy = ch / 2 + 2.2
@@ -1068,39 +1181,45 @@ def casa_barrio(nombre, W, D, pisos, fachada, seed, techo="chapa", ladrillo_arri
 
 def hacer_edificios():
     E = edificio
+    # Colores del mapa V3: fachadas pastel saturadas con remates de color (tapa del pretil, banda de la
+    # planta baja y cornisa), como en las referencias.
     # 6 m: PH angostos
-    E("ph_6_a", 6, 16, 2, "clasico", "fachada_rosa", 101, pb="entrada", techo="plano")
-    E("ph_6_b", 6, 16, 3, "ladrillo", "ladrillo", 102, pb="local", toldo_col="toldo_verde")
-    E("ph_6_c", 6, 16, 2, "clasico", "fachada_celeste", 103, pb="local", toldo_col="toldo_amarillo", rayas=4)
+    E("ph_6_a", 6, 16, 2, "clasico", "fachada_rosa", 101, pb="entrada", techo="plano", remate="blanco")
+    E("ph_6_b", 6, 16, 3, "ladrillo", "ladrillo", 102, pb="local", toldo_col="toldo_verde", remate="remate_crema")
+    E("ph_6_c", 6, 16, 2, "clasico", "fachada_cielo", 103, pb="local", toldo_col="toldo_amarillo", rayas=4, remate="blanco")
     # 8 m
-    E("casa_8_a", 8, 16, 2, "clasico", "fachada_crema", 111, pb="local", toldo_col="toldo_rojo", rayas=6)
-    E("dep_8_a", 8, 16, 7, "departamentos", "fachada_gris", 112, pb="entrada", opciones={"maciza": True})
-    E("clas_8_b", 8, 16, 4, "clasico", "fachada_celeste", 113, pb="local", toldo_col="toldo_azul", techo="mansarda")
-    E("ladr_8_a", 8, 16, 3, "ladrillo", "ladrillo", 114, pb="local", toldo_col="toldo_amarillo")
+    E("casa_8_a", 8, 16, 2, "clasico", "fachada_crema", 111, pb="local", toldo_col="toldo_rojo", rayas=6, remate="naranja")
+    E("dep_8_a", 8, 16, 7, "departamentos", "fachada_menta", 112, pb="entrada", opciones={"maciza": True}, remate="remate_verde")
+    E("clas_8_b", 8, 16, 4, "clasico", "fachada_celeste", 113, pb="local", toldo_col="toldo_azul", techo="mansarda", remate="blanco")
+    E("ladr_8_a", 8, 16, 3, "ladrillo", "ladrillo", 114, pb="local", toldo_col="toldo_amarillo", remate="remate_crema")
     # 10 m
-    E("dep_10_a", 10, 16, 8, "departamentos", "fachada_crema", 121, pb="local", toldo_col="toldo_verde")
-    E("clas_10_a", 10, 16, 5, "clasico", "fachada_beige", 122, pb="entrada", techo="mansarda")
-    E("mod_10_a", 10, 16, 9, "moderno", "fachada_gris", 123, pb="local", cartel_col="hierro")
-    E("dep_10_b", 10, 16, 6, "departamentos", "fachada_terracota", 124, pb="garaje", opciones={"maciza": False})
-    E("clas_10_c", 10, 16, 3, "clasico", "fachada_amarilla", 125, pb="local", toldo_col="toldo_rojo", rayas=8)
+    E("dep_10_a", 10, 16, 8, "departamentos", "fachada_mostaza", 121, pb="local", toldo_col="toldo_verde", remate="remate_marron")
+    E("clas_10_a", 10, 16, 5, "clasico", "fachada_beige", 122, pb="entrada", techo="mansarda", remate="blanco")
+    E("mod_10_a", 10, 16, 9, "moderno", "fachada_gris", 123, pb="local", cartel_col="hierro", remate="remate_azul")
+    E("dep_10_b", 10, 16, 6, "departamentos", "fachada_salmon", 124, pb="garaje", opciones={"maciza": False}, remate="blanco")
+    E("clas_10_c", 10, 16, 3, "clasico", "fachada_amarilla", 125, pb="local", toldo_col="toldo_rojo", rayas=8, remate="remate_marron")
     # 12 m
-    E("dep_12_a", 12, 16, 9, "departamentos", "fachada_beige", 131, pb="local", toldo_col="toldo_naranja",
-      opciones={"maciza": True, "pared_balcon": "blanco"})
-    E("clas_12_a", 12, 16, 4, "clasico", "fachada_amarilla", 132, pb="local", toldo_col="toldo_rojo", rayas=8)
-    E("mod_12_a", 12, 16, 10, "moderno", "fachada_beige", 133, pb="local", cartel_col="kiosco", opciones={"banda": "marco"})
-    E("ladr_12_a", 12, 16, 5, "ladrillo", "ladrillo", 134, pb="entrada")
+    E("dep_12_a", 12, 16, 9, "departamentos", "fachada_coral", 131, pb="local", toldo_col="toldo_naranja",
+      opciones={"maciza": True, "pared_balcon": "blanco"}, remate="blanco")
+    E("clas_12_a", 12, 16, 4, "clasico", "fachada_ocre", 132, pb="local", toldo_col="toldo_rojo", rayas=8, remate="remate_crema")
+    E("mod_12_a", 12, 16, 10, "moderno", "fachada_beige", 133, pb="local", cartel_col="kiosco", opciones={"banda": "marco"},
+      remate="remate_marron")
+    E("ladr_12_a", 12, 16, 5, "ladrillo", "ladrillo", 134, pb="entrada", remate="remate_crema")
     # 14 m
-    E("mod_14_a", 14, 16, 10, "moderno", "fachada_gris", 141, pb="local", cartel_col="toldo_azul")
+    E("mod_14_a", 14, 16, 10, "moderno", "fachada_gris", 141, pb="local", cartel_col="toldo_azul", remate="remate_azul")
     E("clas_14_a", 14, 16, 5, "clasico", "fachada_lila", 142, pb="local", toldo_col="toldo_verde", rayas=10,
-      techo="mansarda")
-    E("dep_14_a", 14, 16, 8, "departamentos", "fachada_verde", 143, pb="local", toldo_col="toldo_amarillo",
-      opciones={"maciza": False})
+      techo="mansarda", remate="blanco")
+    E("dep_14_a", 14, 16, 8, "departamentos", "fachada_menta", 143, pb="local", toldo_col="toldo_amarillo",
+      opciones={"maciza": False}, remate="remate_verde")
     # esquinas con ochava
-    esquina("esq_cupula_a", 16, 4, 5, "clasico", "fachada_beige", 201, toldo_col="toldo_verde", cupula="cupula")
-    esquina("esq_cupula_b", 16, 4, 4, "clasico", "fachada_rosa", 202, toldo_col="toldo_rojo", rayas=6, cupula="pizarra")
-    esquina("esq_dep_a", 16, 4, 8, "departamentos", "fachada_crema", 203, pb="local", toldo_col="toldo_azul")
-    esquina("esq_mod_a", 16, 4, 10, "moderno", "fachada_gris", 204, pb="local")
-    esquina("esq_ladr_a", 16, 4, 3, "ladrillo", "ladrillo", 205, pb="local", toldo_col="toldo_amarillo", rayas=6)
+    esquina("esq_cupula_a", 16, 4, 5, "clasico", "fachada_beige", 201, toldo_col="toldo_verde", cupula="cupula", remate="blanco")
+    esquina("esq_cupula_b", 16, 4, 4, "clasico", "fachada_rosa", 202, toldo_col="toldo_rojo", rayas=6, cupula="pizarra",
+            remate="blanco")
+    esquina("esq_dep_a", 16, 4, 8, "departamentos", "fachada_mostaza", 203, pb="local", toldo_col="toldo_azul",
+            remate="remate_marron")
+    esquina("esq_mod_a", 16, 4, 10, "moderno", "fachada_gris", 204, pb="local", remate="remate_azul")
+    esquina("esq_ladr_a", 16, 4, 3, "ladrillo", "ladrillo", 205, pb="local", toldo_col="toldo_amarillo", rayas=6,
+            remate="remate_crema")
     # barrio enemigo
     casa_barrio("barrio_6_a", 6, 12, 1, "fachada_verde", 301)
     casa_barrio("barrio_8_a", 8, 12, 1, "fachada_celeste", 302, techo="losa", ladrillo_arriba=True)
@@ -1662,12 +1781,17 @@ def hacer_pisos():
 
 
 # ================================================================= construir
+# Piezas del mapa V3 (vehículos, calle, parque, juegos y edificios especiales): mismo espacio de nombres
+_V3 = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ciudad_v3.py")
+exec(compile(open(_V3, encoding="utf-8").read(), _V3, "exec"))
+
 hacer_edificios()
 hacer_mobiliario()
 hacer_juegos()
 hacer_animales()
 hacer_barrio()
 hacer_pisos()
+hacer_v3()
 
 for o in list(COL_TRABAJO.objects):
     bpy.data.objects.remove(o)
@@ -1724,9 +1848,11 @@ for n in sorted(ASSETS):
     mx = Vector((max(p.x for p in bb), max(p.y for p in bb), max(p.z for p in bb)))
     e = {"carpeta": d["carpeta"], "sombra": d["sombra"], "rango": float(d["rango"]), "tris": stats[n],
          "min": g((mn.x, mx.y, mn.z)), "max": g((mx.x, mn.y, mx.z))}
-    for k in ("ancho", "fondo", "alto", "tipo", "ochava"):
+    for k in ("ancho", "fondo", "alto", "tipo", "ochava", "largo", "radio_rueda", "especial"):
         if k in d:
             e[k] = d[k]
+    if "ruedas" in d:
+        e["ruedas"] = [g(p) for p in d["ruedas"]]
     e["cajas"] = [g(c) + [round(x, 4) for x in s] + g(B.col[0]) + g(B.col[1]) + g(B.col[2]) for c, s, B in col.cajas]
     e["esferas"] = [g(c) + [round(r, 4)] for c, r in col.esferas]
     e["convexos"] = [[x for p in pts for x in g(p)] for pts in col.convexos]
@@ -1736,11 +1862,12 @@ for n in sorted(ASSETS):
 with open(ARCHIVO_DATOS, "w", encoding="utf-8") as f:
     f.write("class_name KitDatos\nextends RefCounted\n")
     f.write("## GENERADO por tools/blender/generar_ciudad.py (no editar a mano).\n")
-    f.write("## PALETA: [nombre, color de arriba, color de abajo] en celdas de 8x8 (la arma Kit en Godot).\n")
+    f.write("## PALETA: [nombre, color de arriba, color de abajo] en CELDAS columnas x FILAS filas (la arma Kit).\n")
     f.write("## PIEZAS: por pieza, su carpeta, si proyecta sombra, distancia de dibujo (0 = siempre) y en\n")
     f.write("## coordenadas de Godot: cajas [centro(3), tamaño(3), eje x(3), eje y(3), eje z(3)], esferas\n")
     f.write("## [centro(3), radio], convexos [puntos...] y carteles [posición(3), normal(3), ancho, alto, tipo].\n\n")
-    f.write("const CELDAS := %d\nconst MARGEN := %r\n" % (CELLS, MARGEN))
+    f.write("const CELDAS := %d\nconst FILAS := %d\nconst MARGEN := %r\n" % (CELLS, FILAS, MARGEN))
+    f.write("const EMISION := %s\n" % gd_val(list(paleta.EMISION)))
     f.write("const PALETA := %s\n\n" % gd_val([list(p) for p in PAL]))
     f.write("const PIEZAS := %s\n" % gd_val(piezas, 0))
 
@@ -1853,7 +1980,7 @@ if HACER_RENDER:
     COL_PIEZAS.hide_render = True
     COL_EDIF.hide_render = True
     vitrinas = {}
-    medios = [n for n in ASSETS if DATOS[n].get("tipo") == "medio"]
+    medios = [n for n in ASSETS if DATOS[n].get("tipo") == "medio" and n not in V3]
     col = coleccion("V_edificios")
     vitrinas["edificios"] = (col, fila(col, medios, 0, 1.5), -70, 18)
     col = coleccion("V_esquinas")
@@ -1861,7 +1988,8 @@ if HACER_RENDER:
     objs += fila(col, [n for n in ASSETS if DATOS[n].get("tipo") == "barrio"], 26, 1.5)
     vitrinas["esquinas_barrio"] = (col, objs, -55, 25)
     col = coleccion("V_props")
-    props = [n for n in ASSETS if DATOS[n]["carpeta"] == "piezas" and not n.startswith(("plaza_", "piso_", "calesita"))]
+    props = [n for n in ASSETS if DATOS[n]["carpeta"] == "piezas" and not n.startswith(("plaza_", "piso_", "calesita"))
+             and n not in V3]
     mitad = len(props) // 2
     objs = fila(col, props[:mitad], 0, 0.8) + fila(col, props[mitad:], -7, 0.8)
     vitrinas["props"] = (col, objs, -65, 28)
@@ -1899,6 +2027,102 @@ if HACER_RENDER:
     col = coleccion("V_animales")
     vitrinas["animales"] = (col, fila(col, ["perro_marron", "perro_negro", "perro_blanco", "perro_echado", "perro_bolt", "cucha",
                                              "plato_hueso", "gato_naranja", "gato_negro", "gato_gris", "estatua_paloma"], 0, 0.5), -65, 20)
+    # ---- Mapa V3
+    def con_ruedas(col, pares):
+        """Pone las ruedas de cada vehículo [(nombre, objeto)] en los lugares de DATOS["ruedas"]."""
+        out = []
+        for n, o in pares:
+            d = DATOS.get(n, {})
+            if "ruedas" not in d:
+                continue
+            ru = "rueda_colectivo" if d["radio_rueda"] > 0.4 else "rueda_auto"
+            for p in d["ruedas"]:
+                M = Matrix.Translation(o.location) @ o.rotation_euler.to_matrix().to_4x4()
+                w = instancia(ru, col, M @ Vector(p))
+                w.rotation_euler = o.rotation_euler
+                out.append(w)
+        return out
+
+    col = coleccion("V_v3_vehiculos")
+    veh = [n for n in V3 if DATOS[n].get("tipo") == "vehiculo"] + ["moto_roja", "moto_celeste"]
+    objs = fila(col, veh[:7], 0, 1.0) + fila(col, veh[7:], -4.5, 1.0)
+    objs += con_ruedas(col, list(zip(veh, objs)))
+    vitrinas["v3_vehiculos"] = (col, objs, -60, 28)
+    col = coleccion("V_v3_calle")
+    calle = ["farola_curva", "semaforo_vereda", "hidrante", "contenedor_azul", "contenedor_amarillo", "contenedor", "tacho",
+             "cartel_estacionamiento", "caja_electrica", "cartelera", "tapa_cloaca", "valla_obra", "pozo_obra", "mesa_cafe_roja",
+             "mesa_cafe_verde", "banco_listones", "buzon"]
+    vitrinas["v3_calle"] = (col, fila(col, calle, 0, 0.8), -62, 24)
+    col = coleccion("V_v3_parque")
+    parque = ["arbol_grande_A", "arbol_grande_B", "arbol_grande_C", "jacaranda_grande", "pino_A", "pino_B", "arbusto_redondo_A",
+              "arbusto_redondo_B", "flores_A", "flores_B", "flores_C", "flores_D", "mata_pasto"]
+    vitrinas["v3_parque"] = (col, fila(col, parque, 0, 0.6), -62, 20)
+    col = coleccion("V_v3_juegos")
+    objs = [instancia("cancha_basquet", col, (0, 0, 0)), instancia("aro_basquet", col, (-12.6, 0, 0), 90),
+            instancia("aro_basquet", col, (12.6, 0, 0), -90), instancia("pelota", col, (2, 1, 0.05)),
+            instancia("tobogan_torre", col, (-6, 12, 0)), instancia("hamaca_madera", col, (3, 12, 0)),
+            instancia("hamaca_asiento", col, (2.35, 12, 2.5)), instancia("hamaca_asiento", col, (3.65, 12, 2.5)),
+            instancia("resorte_dino", col, (8, 11, 0), 30), instancia("resorte_elefante", col, (10, 13, 0), -20)]
+    for k in range(6):
+        objs.append(instancia("cerco_colores", col, (-9 + k * 3, 9, 0)))
+    vitrinas["v3_juegos"] = (col, objs, -60, 32)
+    col = coleccion("V_v3_locales")
+    vitrinas["v3_locales"] = (col, fila(col, ["panaderia_8", "golosineria_8", "farmacia_8", "minimercado_10", "ropa_10", "cafe_10",
+                                              "taller_12", "comisaria_20", "hospital_32"], 0, 1.5), -68, 18)
+    # Esquina armada en el estilo nuevo: edificios, vereda, calle, autos estacionados y vida
+    col = coleccion("V_v3_esquina")
+    objs = [instancia("esq_dep_a", col, (0, 0, 0))]
+    x = 16
+    for n in ("taller_12", "panaderia_8", "dep_10_a", "minimercado_10"):
+        W = DATOS[n]["ancho"]
+        objs.append(instancia(n, col, (x + W / 2, 0, 0)))
+        x += W
+    y = 16
+    for n in ("ropa_10", "cafe_10", "golosineria_8", "dep_12_a"):
+        W = DATOS[n]["ancho"]
+        objs.append(instancia(n, col, (0, y + W / 2, 0), -90))
+        y += W
+    pm = bpy.data.materials.new("vereda_v3")
+    try:
+        pm.use_nodes = True
+    except Exception:
+        pass
+    b2 = next(nd for nd in pm.node_tree.nodes if nd.type == "BSDF_PRINCIPLED")
+    b2.inputs["Base Color"].default_value = (srgb2lin(0.84), srgb2lin(0.8), srgb2lin(0.72), 1)
+    pa = bpy.data.materials.new("asfalto_v3")
+    try:
+        pa.use_nodes = True
+    except Exception:
+        pass
+    b3 = next(nd for nd in pa.node_tree.nodes if nd.type == "BSDF_PRINCIPLED")
+    b3.inputs["Base Color"].default_value = (srgb2lin(0.48), srgb2lin(0.49), srgb2lin(0.47), 1)
+    for nombre_p, (sx, sy, cx, cy, z, mat) in {"vereda1": (62, 4, 28, -2, 0.16, pm), "vereda2": (4, 62, -2, 30, 0.16, pm),
+                                                 "calle": (90, 90, 20, 20, 0.01, pa)}.items():
+        me = bpy.data.meshes.new(nombre_p)
+        bmv = bm_box(sx, sy, z, cx, cy, 0)
+        bmv.to_mesh(me)
+        bmv.free()
+        me.materials.append(mat)
+        ov = bpy.data.objects.new(nombre_p, me)
+        col.objects.link(ov)
+        objs.append(ov)
+    for k in range(6):
+        objs.append(instancia(("arbol_grande_A", "arbol_grande_B", "jacaranda_grande")[k % 3], col, (8 + k * 10, -2.5, 0.16), k * 40))
+    for k in range(3):
+        objs.append(instancia("farola_curva", col, (14 + k * 16, -3.4, 0.16)))
+    autos = []
+    for k, n in enumerate(("auto_hatch_celeste", "auto_hatch_naranja", "taxi", "auto_sedan_rojo")):
+        autos.append((n, instancia(n, col, (10 + k * 11, -5.4, 0.01))))
+    autos.append(("colectivo_verde", instancia("colectivo_verde", col, (34, -9.5, 0.01))))
+    autos.append(("auto_hatch_amarillo", instancia("auto_hatch_amarillo", col, (-5.4, 18, 0.01), 90)))
+    objs += [o for _, o in autos] + con_ruedas(col, autos)
+    for n, p, r in (("hidrante", (-2.8, 6, 0.16), 0), ("contenedor_azul", (-3.0, 30, 0.16), 90), ("contenedor_amarillo", (-3.0, 32, 0.16), 90),
+                    ("contenedor", (-3.0, 34, 0.16), 90), ("semaforo_vereda", (-3.4, -3.4, 0.16), 45), ("buzon", (20, -2.6, 0.16), 0),
+                    ("mesa_cafe_verde", (-2.0, 37, 0.16), 0), ("mesa_cafe_roja", (-2.0, 40, 0.16), 0), ("flores_A", (40, -1.2, 0.16), 0),
+                    ("cartel_estacionamiento", (30, -3.6, 0.16), 0), ("valla_obra", (50, -2.0, 0.16), 0), ("pozo_obra", (50, -0.8, 0.16), 0),
+                    ("moto_roja", (-4.6, 26, 0.01), 90), ("tacho", (44, -3.3, 0.16), 0), ("cartelera", (-2.5, 14, 0.16), 90)):
+        objs.append(instancia(n, col, p, r))
+    vitrinas["v3_esquina"] = (col, objs, -128, 30)
     for nombre, (col, objs, az, el) in vitrinas.items():
         for c2, *_ in vitrinas.values():
             c2.hide_render = c2 is not col

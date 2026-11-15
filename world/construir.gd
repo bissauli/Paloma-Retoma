@@ -70,6 +70,25 @@ static func material_baldosas(base: Color, junta: Color, escala_uv: Vector2, tam
 	return m
 
 
+## Material de lajas (mapa V3): una textura de modelos/ciudad/texturas/ (la genera
+## tools/generar_lajas.py) que cubre "metros" x "metros" y se aplica en coordenadas del mundo, así las
+## losas vecinas siguen el mismo dibujo sin uniones.
+static func material_lajas(nombre: String, metros := 4.0, tinte := Color.WHITE) -> StandardMaterial3D:
+	var clave := "lajas_%s_%.2f_%s" % [nombre, metros, tinte.to_html()]
+	if _materiales.has(clave):
+		return _materiales[clave]
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = load("res://modelos/ciudad/texturas/%s.png" % nombre)
+	m.albedo_color = tinte
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.uv1_scale = Vector3.ONE / metros
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.roughness = 0.95
+	_materiales[clave] = m
+	return m
+
+
 ## Cuerpo estático con una forma de colisión.
 static func colision(padre: Node, pos: Vector3, forma: Shape3D, rot := Vector3.ZERO) -> StaticBody3D:
 	var cuerpo := StaticBody3D.new()

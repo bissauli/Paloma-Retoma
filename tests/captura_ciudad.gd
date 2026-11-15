@@ -1,5 +1,5 @@
 extends Node
-## Capturas de la ciudad (mapa V2) desde varios puntos de vista (NO headless):
+## Capturas de la ciudad desde varios puntos de vista (NO headless). Sin el HUD ni los menús.
 ## godot --path . res://tests/captura_ciudad.tscn -- <carpeta_salida> [vista1,vista2...]
 
 const VISTAS := {
@@ -25,6 +25,13 @@ const VISTAS := {
 	"sur": [Vector3(0, 32, 38), Vector3(0, 5, 85)],
 	"esquina": [Vector3(-66.5, 1.7, -39), Vector3(-48, 7, -60)],
 	"techos": [Vector3(30, 40, -60), Vector3(120, 10, -80)],
+	# Vistas altas en diagonal, como las referencias del mapa V3
+	"iso_hospital": [Vector3(45, 38, -30), Vector3(82, 4, -66)],
+	"iso_comercial": [Vector3(-105, 34, 22), Vector3(-138, 3, 56)],
+	"iso_cancha": [Vector3(-88, 30, -12), Vector3(-110, 0, -37)],
+	"iso_rivadavia": [Vector3(22, 26, -24), Vector3(-2, 2, -50)],
+	"iso_juegos": [Vector3(-82, 26, -70), Vector3(-101, 0, -91)],
+	"iso_reconquista": [Vector3(66, 30, 8), Vector3(120, 2, -8)],
 }
 
 var salida := "user://"
@@ -42,6 +49,7 @@ func _ready() -> void:
 	add_child(cam)
 	await _frames(30)
 	cam.current = true
+	_esconder_interfaz(get_tree().root)
 	for nombre: String in VISTAS:
 		if not solo.is_empty() and not solo.has(nombre):
 			continue
@@ -53,6 +61,13 @@ func _ready() -> void:
 		get_viewport().get_texture().get_image().save_png(salida.path_join(nombre + ".png"))
 		print("captura: ", nombre, " dibujos=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
 	get_tree().quit()
+
+
+func _esconder_interfaz(n: Node) -> void:
+	for h in n.get_children():
+		if h is CanvasLayer:
+			(h as CanvasLayer).visible = false
+		_esconder_interfaz(h)
 
 
 func _frames(n: int) -> void:

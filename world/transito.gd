@@ -123,7 +123,7 @@ func _semaforo(padre: Node3D, pos: Vector3, dir: int) -> void:
 	# Los autos que van hacia +X vienen desde -X: el cabezal mira hacia -X
 	s.rotation.y = -PI / 2.0 if dir == 1 else PI / 2.0
 	var y_base := 0.16 if dir == 1 else 0.0   # El del sur está sobre la vereda
-	Construir.cilindro(s, Vector3(0, y_base + 1.6, 0), 0.07, 3.2, Color("23282b"), true, 6)
+	Construir.cilindro(s, Vector3(0, y_base + 1.6, 0), 0.07, 3.2, Color("a9b1b6"), true, 6)
 	Construir.caja(s, Vector3(0, y_base + 3.55, 0), Vector3(0.38, 1.05, 0.3), Color("1d2a22"), false)
 	# Visera de cada luz y la lámpara (mira hacia +Z local = hacia los autos)
 	var lamparas: Array = []

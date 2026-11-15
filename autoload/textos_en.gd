@@ -265,4 +265,7 @@ const MAPA := {
 	"Parque de perros": "Dog park",
 	"PROHIBIDO\nPALOMAS": "NO\nPIGEONS",
 	"A LAS PALOMAS\nDE LA PLAZA": "TO THE PIGEONS\nOF THE SQUARE",
+	# Carteles del mapa V3 (los nombres de los locales no se traducen)
+	"GUARDIA": "EMERGENCY",
+	"POLICÍA": "POLICE",
 }

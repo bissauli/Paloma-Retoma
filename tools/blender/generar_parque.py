@@ -42,72 +42,19 @@ T = 0.2            # altura de la superficie de la loseta
 SW = T + 0.07      # altura de la vereda bajo los muros
 
 # ---------------------------------------------------------------- paleta
-# La misma paleta (y la misma disposición de celdas) que el kit de la ciudad
-# (tools/blender/generar_ciudad.py): así en Godot las piezas de los dos kits comparten un solo
-# material y se fusionan juntas. Si se cambia un color, cambiarlo en los dos scripts.
-PAL = [  # nombre, arriba, abajo (sRGB)
-    ("pasto", "3fa865", "277a4a"), ("hoja", "5cd068", "238a45"), ("hoja_osc", "45b85c", "1d7340"),
-    ("tronco", "c4683f", "8a3f28"), ("piedra", "d5dde3", "9aa5ae"), ("piedra_osc", "aeb8c0", "7d8790"),
-    ("agua", "8fdcff", "3a9be0"), ("madera", "e9844a", "b0522e"),
-    ("metal", "4b5359", "23282c"), ("luz", "fff4b8", "ffcf5c"), ("tierra", "9a6a44", "6a452b"),
-    ("flor_rosa", "ff9ec4", "e0628f"), ("flor_amarilla", "ffe46b", "f2b53a"), ("jacaranda", "c3a6ff", "7f5ad1"),
-    ("arena", "f7cf98", "dda066"), ("blanco", "ffffff", "dde2e8"),
-    ("fachada_crema", "f6e7c8", "d8c096"), ("fachada_terracota", "eda07a", "bd6a4b"),
-    ("fachada_rosa", "f5bdb4", "cf8b86"), ("fachada_celeste", "bfe2f3", "84b2d3"),
-    ("fachada_verde", "c4e8cd", "8bbe9d"), ("fachada_amarilla", "f9de8e", "deb258"),
-    ("fachada_gris", "dcdcd6", "a6a7a2"), ("fachada_lila", "ddcbee", "a996c7"),
-    ("ladrillo", "d07a55", "974a30"), ("fachada_beige", "ecdcc0", "c3aa86"), ("medianera", "c8bba8", "928574"),
-    ("vidrio", "a6d8f5", "3f6f9e"), ("vidrio_osc", "6a8ba6", "26384b"), ("marco", "fbf9f4", "cdc8be"),
-    ("persiana", "dfe3e6", "a3a9ae"), ("hierro", "454b51", "1b1e21"),
-    ("toldo_rojo", "ec5e4f", "b2392f"), ("toldo_verde", "54b47f", "2c7a53"), ("toldo_azul", "5590d8", "2e599c"),
-    ("toldo_amarillo", "ffcd52", "de9628"), ("toldo_naranja", "ffa058", "d6672a"),
-    ("asfalto", "5f6268", "3c3e43"), ("vereda", "dcd5c6", "b6ad9c"), ("cordon", "eae7e0", "b9b5ad"),
-    ("pizarra", "75849a", "48526a"), ("cupula", "93c4b8", "5b8d84"), ("tejas", "dc784c", "a5472b"),
-    ("chapa", "bac3c9", "7a838a"), ("oxido", "cc8148", "86482a"), ("tanque", "4a5056", "1f2327"),
-    ("plastico_rojo", "ff6255", "cc3328"), ("plastico_azul", "56aaff", "2c6bd0"),
-    ("plastico_amarillo", "ffdc55", "eea52c"), ("plastico_verde", "74e070", "37a648"),
-    ("azotea", "c99079", "93604b"), ("goma_azul", "6596d8", "3f629c"),
-    ("perro_blanco", "fcfcf8", "d6d3cb"), ("perro_marron", "d0925a", "8c5832"), ("perro_negro", "54504d", "262220"),
-    ("gato_naranja", "f5a656", "bf6a28"), ("grafiti_rosa", "ff66b8", "cf2f7d"), ("grafiti_cian", "55e6e6", "21a6b6"),
-    ("grafiti_lima", "cdf460", "8cbe2c"), ("contenedor", "56a462", "2d683a"), ("buzon", "e8503f", "a5291f"),
-    ("sombra", "50545d", "2a2c32"), ("naranja", "ff9145", "dd5a1d"), ("kiosco", "3a7d58", "1c4a33"),
-]
-assert len(PAL) == 64, len(PAL)
-PIDX = {p[0]: i for i, p in enumerate(PAL)}
-CELLS = 8
-TEX = 512
-CS = TEX // CELLS
-MARGEN = 6.0 / CS   # los degradés no llegan al borde de la celda (no se mezclan colores vecinos)
+# La misma paleta (y la misma disposición de celdas) que el kit de la ciudad: está en paleta.py. Así en
+# Godot las piezas de los dos kits comparten un solo material y se fusionan juntas.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paleta  # noqa: E402
 
-
-def hex_rgb(h):
-    return np.array([int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)], dtype=np.float32)
-
-
-def imagen_paleta(nombre, solo=None):
-    arr = np.zeros((TEX, TEX, 4), dtype=np.float32)
-    arr[..., 3] = 1
-    for i, (n, top, bot) in enumerate(PAL):
-        if solo and n not in solo:
-            continue
-        cx, cy = i % CELLS, i // CELLS
-        a, b = hex_rgb(bot), hex_rgb(top)
-        for r in range(CS):
-            t = min(max((r / (CS - 1) - MARGEN) / (1 - 2 * MARGEN), 0.0), 1.0)
-            arr[cy * CS + r, cx * CS:(cx + 1) * CS, :3] = a + (b - a) * t
-    img = bpy.data.images.new(nombre, TEX, TEX, alpha=False)
-    img.pixels.foreach_set(arr.ravel())
-    img.filepath_raw = os.path.join(DIR_FUENTE, nombre + ".png")
-    img.file_format = "PNG"
-    img.save()
-    return img
-
-
+PAL = paleta.PAL
+PIDX = dict(paleta.PIDX)
 PIDX["arco"] = PIDX["naranja"]   # el arco del portal usa el naranja de la paleta de la ciudad
+CELLS = paleta.CELLS
+MARGEN = paleta.MARGEN
 
-
-IMG = imagen_paleta("parque_paleta")
-IMG_EM = imagen_paleta("parque_emision", solo={"luz"})
+IMG = paleta.imagen(bpy, "parque_paleta", DIR_FUENTE)
+IMG_EM = paleta.imagen(bpy, "parque_emision", DIR_FUENTE, solo={"luz"})
 
 
 def material():
@@ -316,12 +263,9 @@ def pintar(o, color, zmin=None, zmax=None):
     lo = min(zs) if zmin is None else zmin
     hi = max(zs) if zmax is None else zmax
     span = max(hi - lo, 1e-4)
-    cx, cy = i % CELLS, i // CELLS
-    u = (cx + 0.5) / CELLS
+    nombre = PAL[i][0]
     for li, l in enumerate(me.loops):
-        t = (me.vertices[l.vertex_index].co.z - lo) / span
-        t = min(max(t, 0.0), 1.0)
-        uv[li].uv = (u, (cy + MARGEN + t * (1 - 2 * MARGEN)) / CELLS)
+        uv[li].uv = paleta.uv(nombre, (me.vertices[l.vertex_index].co.z - lo) / span)
     me.materials.clear()
     me.materials.append(MAT)
 
