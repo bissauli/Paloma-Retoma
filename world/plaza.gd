@@ -304,6 +304,8 @@ func _crear_puntos() -> void:
 		"PuntoCafes": Vector3(0, 0.16, 35.7),   # Entre las mesas y las vidrieras
 		"PuntoSubte": Vector3(34, 0, -22),
 		"PuntoGranaderos": Vector3(40.5, 0, 0),
+		"PuntoCatedral": Vector3(0, 0, -14),      # Marca la brújula
+		"PuntoChoripan": Vector3(23, 0.16, 35.2),   # El carrito (ver _carrito_choripan)
 	}
 	for nombre: String in puntos:
 		var m := Marker3D.new()

@@ -68,12 +68,12 @@ func _refrescar() -> void:
 	if d.is_empty():
 		return
 	var bandada := int(d.get("bandada", 0))
-	_resumen.text = "%d %s  ·  %d DE COMIDA" % [bandada, "PALOMA" if bandada == 1 else "PALOMAS",
+	_resumen.text = tr("%d %s  ·  %d DE COMIDA") % [bandada, tr("PALOMA" if bandada == 1 else "PALOMAS"),
 		int(d.get("comida", 0))]
 	var t := int(d.get("tiempo_jugado", 0.0))
 	var fecha := Time.get_datetime_dict_from_unix_time(int(d.get("fecha", 0)) + _huso_horario())
-	_detalle.text = "TIEMPO JUGADO %d:%02d\nGUARDADA EL %02d/%02d/%d A LAS %02d:%02d" % [
-		floori(t / 60.0), t % 60, fecha.day, fecha.month, fecha.year, fecha.hour, fecha.minute]
+	_detalle.text = tr("TIEMPO JUGADO %d:%02d\nGUARDADA EL %s A LAS %s") % [
+		floori(t / 60.0), t % 60, Idioma.fecha(fecha), Idioma.hora(fecha)]
 
 
 func _cargar() -> void:

@@ -48,7 +48,7 @@ func _al_cambiar_bandada(n: int) -> void:
 
 
 func _al_cambiar_comida(n: int) -> void:
-	_cartel_comida.text = "NIDO · comida %d" % n
+	_cartel_comida.text = tr("NIDO · comida %d") % n
 
 
 func _process(delta: float) -> void:

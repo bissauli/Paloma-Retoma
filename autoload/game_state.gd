@@ -15,6 +15,7 @@ signal stamina_cambio(valor: float, maximo: float)
 signal objetivo_cambio(texto: String, actual: int, meta: int) ## meta 0: sin contador
 signal fase_dia_cambio(t: float)               ## 0 = mañana, 1 = atardecer
 signal umbral_alcanzado(cantidad: int)
+signal destinos_cambio(destinos: Array)       ## A dónde apunta la brújula (ver ui/brujula.gd)
 
 # --- Señales de eventos del mundo ---
 signal arrullo(posicion: Vector3, radio: float)        ## El jugador arrulló
@@ -41,6 +42,9 @@ var posicion_nido := Vector3(0, 0.5, 0)
 ## La paloma de la jugadora (la registra ella misma al entrar al árbol). Evita buscarla por
 ## grupo en cada cuadro desde enemigos, comida, tránsito, etc.
 var jugador: PalomaJugador
+## Lugares que marca la brújula: [{grupo, nombre, principal}]. "grupo" es el grupo del nodo del
+## mundo al que apunta (la brújula lo busca ahí), "nombre" lo que se lee debajo del rombo.
+var destinos: Array = []
 var _umbrales := {}
 var invulnerable := 0.0         ## Segundos de gracia después de que te atrapan
 var menu_activo := false        ## El menú principal (o su transición a la partida) está en pantalla
@@ -48,6 +52,11 @@ var saltar_menu := false        ## Al recargar la escena (Reiniciar) se arranca 
 var guardado_habilitado := false ## Sólo la partida "de verdad" guarda (las pruebas automáticas no)
 var archivo_partida := "user://partida.cfg"   ## Las pruebas usan otro archivo
 var _t_guardado := 0.0
+
+
+func _ready() -> void:
+	# Ajustes es otro autoload: se conecta cuando ya existen todos
+	(func() -> void: Ajustes.idioma_cambiado.connect(actualizar_objetivo)).call_deferred()
 
 
 func _process(delta: float) -> void:
@@ -222,32 +231,50 @@ func actualizar_objetivo() -> void:
 	var t := ""
 	var actual := 0
 	var meta := 0
+	var nuevos: Array = []
 	if partida_terminada:
 		t = "¡La plaza es nuestra!"
 	elif carga != "":
-		t = "Llevá la %s al nido, en la Pirámide de Mayo" % carga
+		t = tr("Llevá la %s al nido, en la Pirámide de Mayo") % tr(carga)
+		nuevos = [_destino(&"nido", "Nido")]
 	elif not tutorial_hecho and bandada == 0 and comida < 3:
 		t = "Comé las migas de Doña Rosa, en el Cabildo"
 		actual = migas_comidas
 		meta = 3
+		nuevos = [_destino(&"dona_rosa", "Doña Rosa")]
 	elif bandada < Config.UMBRAL_CHORIPAN:
 		if comida < 1:
 			t = "Conseguí comida: migas, medialunas de los cafés o facturas del subte"
+			nuevos = [_destino(&"punto_cafes", "Cafés"), _destino(&"punto_subte", "Subte")]
 		else:
 			t = "Reclutá palomas en la Catedral"
 			actual = bandada
 			meta = Config.UMBRAL_CHORIPAN
+			nuevos = [_destino(&"punto_catedral", "Catedral")]
 	elif bandada < Config.UMBRAL_TURISTAS:
 		t = "Levantá el choripán de la avenida y juntá más palomas"
 		actual = bandada
 		meta = Config.UMBRAL_TURISTAS
+		nuevos = [_destino(&"punto_choripan", "Choripán"), _destino(&"punto_catedral", "Catedral", false)]
 	elif bandada < Config.UMBRAL_BALCON:
 		t = "Cuidado con el halcón y seguí juntando palomas"
 		actual = bandada
 		meta = Config.UMBRAL_BALCON
+		nuevos = [_destino(&"punto_catedral", "Catedral")]
 	else:
 		t = "Tomá el balcón de la Casa Rosada con tu bandada"
+		nuevos = [_destino(&"balcon", "Balcón")]
+	# El nido siempre queda marcado (más chico) salvo que sea el destino
+	if not partida_terminada and carga == "":
+		nuevos.append(_destino(&"nido", "Nido", false))
+	if nuevos != destinos:
+		destinos = nuevos
+		destinos_cambio.emit(destinos)
 	objetivo_cambio.emit(t, actual, meta)
+
+
+func _destino(grupo: StringName, nombre: String, principal := true) -> Dictionary:
+	return {"grupo": grupo, "nombre": nombre, "principal": principal}
 
 
 # ---------------------------------------------------------------- Fin

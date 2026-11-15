@@ -1,6 +1,9 @@
 extends CanvasLayer
 ## Victoria: la cámara gira alrededor del balcón, la plaza se llena de palomas arrullando,
-## aparece "¡LA PLAZA ES NUESTRA!" y después los créditos con nombres de palomas.
+## aparece "¡LA PLAZA ES NUESTRA!" arriba a la derecha (como el título del menú principal, con la
+## bandada y el tiempo en barras cyan) y después los créditos con nombres de palomas en una tarjeta,
+## con el botón de volver al menú abajo a la derecha. Usa el mismo tema y las mismas cajas que
+## el menú y el HUD (ver EstiloUI).
 
 const ESCENA_MENU := "res://main.tscn"
 const NOMBRES_FIJOS := ["Carlos", "La Tana", "El Ruso", "Coqui"]
@@ -45,17 +48,42 @@ func _al_ganar() -> void:
 	_camara.current = true
 	AudioManager.reproducir("victoria", 0.0, false)
 
-	# Texto grande
-	var titulo: Label = %Titulo
+	# Título y estadísticas: bajan y se aclaran como el título del menú principal
+	_armar_estadisticas()
+	var titulo: Control = %Titulo
+	var y_base := titulo.offset_top
 	titulo.modulate.a = 0.0
-	titulo.scale = Vector2.ONE * 0.3
-	titulo.pivot_offset = titulo.size / 2.0
-	var tw := create_tween()
-	tw.tween_interval(1.2)
-	tw.tween_property(titulo, "modulate:a", 1.0, 0.4)
-	tw.parallel().tween_property(titulo, "scale", Vector2.ONE, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_interval(4.0)
+	titulo.offset_top = y_base - 24.0
+	titulo.offset_bottom -= 24.0
+	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(1.0)
+	tw.tween_property(titulo, "modulate:a", 1.0, 0.7)
+	tw.parallel().tween_property(titulo, "offset_top", y_base, 0.9)
+	tw.parallel().tween_property(titulo, "offset_bottom", titulo.offset_bottom + 24.0, 0.9)
+	tw.tween_interval(4.5)
 	tw.tween_callback(_mostrar_creditos)
+
+
+## Dos barras como las del HUD: la bandada (cyan) y el tiempo jugado (oscura).
+func _armar_estadisticas() -> void:
+	var fila: HBoxContainer = %Estadisticas
+	for h in fila.get_children():
+		h.queue_free()
+	_barra_estadistica(fila, EstiloUI.C_CYAN, str(GameState.bandada), "PALOMAS", true)
+	var t := int(GameState.tiempo_jugado)
+	_barra_estadistica(fila, EstiloUI.C_OSCURO, "%d:%02d" % [floori(t / 60.0), t % 60], "TIEMPO", false)
+
+
+func _barra_estadistica(fila: Control, color: Color, valor: String, rotulo: String, con_borde: bool) -> void:
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", EstiloUI.caja(color, 0.42, EstiloUI.C_CYAN_BORDE if con_borde else Color.TRANSPARENT))
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fila.add_child(panel)
+	var caja := HBoxContainer.new()
+	caja.add_theme_constant_override("separation", 12)
+	panel.add_child(caja)
+	EstiloUI.texto(caja, &"TituloPantalla", 56, valor)
+	EstiloUI.texto(caja, &"Seccion", 20, rotulo)
 
 
 ## La cámara va y viene en arco por el lado de la plaza, mirando al balcón y a la bandada.
@@ -85,19 +113,25 @@ func _mostrar_creditos() -> void:
 		var p := n as PalomaNPC
 		if p and not nombres.has(p.nombre):
 			nombres.append(p.nombre)
-		if nombres.size() >= 18:
+		if nombres.size() >= 12:
 			break
-	var texto := "LA BANDADA\n\n"
-	for i in nombres.size():
-		texto += nombres[i] + ("\n" if i % 3 == 2 else "   ·   ")
-	texto += "\n\ny la paloma flaca que empezó todo\n\n"
-	texto += "Hecho con Godot para una game jam\nNinguna medialuna fue desperdiciada"
-	var creditos: Label = %Creditos
-	creditos.text = texto
-	var titulo: Label = %Titulo
-	create_tween().tween_property(titulo, "scale", Vector2.ONE * 0.6, 0.8)
+	var lineas: Array[String] = []
+	for i in range(0, nombres.size(), 3):
+		lineas.append("   ·   ".join(nombres.slice(i, i + 3)))
+	(%Creditos as Label).text = "\n".join(lineas)
+	(%Pie as Label).text = tr("y la paloma flaca que empezó todo") + "\n" \
+		+ tr("Hecho con Godot para una game jam\nNinguna medialuna fue desperdiciada")
 	var panel: Control = %PanelCreditos
 	panel.visible = true
 	panel.modulate.a = 0.0
-	create_tween().tween_property(panel, "modulate:a", 1.0, 1.0)
+	var botones: Control = %Botones
+	botones.visible = true
+	botones.modulate.a = 0.0
+	botones.offset_left += 160.0
+	botones.offset_right += 160.0
+	var tw := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.8)
+	tw.tween_property(botones, "modulate:a", 1.0, 0.35).set_delay(0.5)
+	tw.tween_property(botones, "offset_left", botones.offset_left - 160.0, 0.5).set_delay(0.5)
+	tw.tween_property(botones, "offset_right", botones.offset_right - 160.0, 0.5).set_delay(0.5)
 	%VolverTitulo.grab_focus()

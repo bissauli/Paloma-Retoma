@@ -5,6 +5,9 @@ extends Node
 ## Se guardan en user://opciones.cfg y se aplican al arrancar.
 
 signal cambio
+## Se cambió el idioma (selector de banderas del menú). Los Label ya se traducen solos; esto es
+## para lo que arma textos por código.
+signal idioma_cambiado
 
 ## La versión para teléfonos guarda aparte: en la web las dos comparten el mismo user://.
 var ARCHIVO := "user://opciones_movil.cfg" if _es_movil() else "user://opciones.cfg"
@@ -44,6 +47,7 @@ var invertir_y := false
 var calidad := 2                ## 0 bajo, 1 medio, 2 alto
 var resolucion := Vector2i.ZERO ## (0, 0) = nativa
 var limite_fps := 0             ## Ver LIMITES_FPS
+var idioma := ""                ## "es" o "en" (ver Idioma). Vacío = el del sistema hasta que elija
 
 ## Versión para teléfonos: controles táctiles, sin captura del mouse y gráficos livianos.
 ## Una sola build web sirve para PC y teléfono: se activa sola al abrirla desde Android o iOS
@@ -66,7 +70,11 @@ func _ready() -> void:
 		resolucion = Vector2i(1280, 720)
 		_preparar_movil()
 		aplicar_perfil_movil()
+	Idioma.instalar()
 	_cargar()
+	if not Idioma.es_valido(idioma):
+		idioma = Idioma.por_defecto()
+	Idioma.aplicar(idioma)
 	_asegurar_buses()
 	_aplicar_audio()
 	# En la web el navegador sólo deja pasar a pantalla completa después de un click
@@ -77,6 +85,16 @@ func _ready() -> void:
 	_aplicar_resolucion.call_deferred(true)
 	# Si la ventana cambia de tamaño (a mano o al pasar a pantalla completa) se recalcula la escala 3D
 	get_tree().root.size_changed.connect(_aplicar_resolucion)
+
+
+## Cambia el idioma de todo el juego y lo guarda.
+func set_idioma(codigo: String) -> void:
+	if not Idioma.es_valido(codigo) or codigo == idioma:
+		return
+	idioma = codigo
+	Idioma.aplicar(idioma)
+	_guardar()
+	idioma_cambiado.emit()
 
 
 func set_volumen(v: float) -> void:
@@ -377,6 +395,7 @@ func _cargar() -> void:
 		limite_fps = 0
 	sensibilidad = cfg.get_value("control", "sensibilidad", sensibilidad)
 	invertir_y = cfg.get_value("control", "invertir_y", invertir_y)
+	idioma = cfg.get_value("general", "idioma", idioma)
 
 
 func _guardar() -> void:
@@ -393,5 +412,6 @@ func _guardar() -> void:
 	cfg.set_value("video", "limite_fps", limite_fps)
 	cfg.set_value("control", "sensibilidad", sensibilidad)
 	cfg.set_value("control", "invertir_y", invertir_y)
+	cfg.set_value("general", "idioma", idioma)
 	cfg.save(ARCHIVO)
 	cambio.emit()

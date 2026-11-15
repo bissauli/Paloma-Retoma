@@ -13,6 +13,7 @@ const ESTIRAR := 26.0          ## Píxeles que crece la barra hacia la izquierda
 
 var _opciones: OpcionesMenu
 var _cargar: CargarMenu
+var _idiomas: SelectorIdioma
 var _activo := false
 var _tween: Tween
 
@@ -42,6 +43,11 @@ func _ready() -> void:
 	_cargar.cerrada.connect(_al_cerrar_pantalla.bind(%CargarPartida))
 	_cargar.cargar.connect(func(datos: Dictionary) -> void: _arrancar(continuar.emit.bind(datos)))
 
+	# Banderas para cambiar de idioma, abajo a la izquierda
+	_idiomas = SelectorIdioma.new()
+	raiz.add_child(_idiomas)
+	_idiomas.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 26)
+
 
 ## Muestra el menú con una entrada suave (el título baja y los botones entran desde la derecha).
 func mostrar() -> void:
@@ -70,6 +76,7 @@ func mostrar() -> void:
 ## Saca el menú (al empezar la partida): los botones salen hacia la derecha y todo se desvanece.
 func ocultar() -> void:
 	_activo = false
+	_idiomas.set_activo(false)
 	for b in botones:
 		b.focus_mode = Control.FOCUS_NONE
 		b.mouse_filter = Control.MOUSE_FILTER_IGNORE

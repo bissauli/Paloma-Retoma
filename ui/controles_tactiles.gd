@@ -240,11 +240,11 @@ func _dibujar() -> void:
 		var r: float = b["radio"]
 		var col: Color = b["color"]
 		var apretado := int(b["toque"]) != -1
-		var texto: String = b["texto"]
+		var texto: String = tr(b["texto"])
 		var a := 1.0
 		match b["id"]:
 			"volar":
-				texto = "ALETEAR" if en_aire else "DESPEGAR"
+				texto = tr("ALETEAR" if en_aire else "DESPEGAR")
 			"picada":
 				a = 1.0 if en_aire else 0.4   # en el piso no hace nada
 		if apretado:

@@ -1,58 +1,144 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://ui/victoria.gd" id="1"]
+[ext_resource type="Theme" path="res://ui/tema/tema_paloma.tres" id="2_tema"]
+
+[sub_resource type="Gradient" id="Gradient_velo"]
+offsets = PackedFloat32Array(0, 0.45, 1)
+colors = PackedColorArray(0, 0.03, 0.06, 0, 0, 0.03, 0.06, 0.34, 0, 0.03, 0.06, 0.62)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_velo"]
+gradient = SubResource("Gradient_velo")
+width = 256
+height = 4
 
 [node name="Victoria" type="CanvasLayer"]
 script = ExtResource("1")
 
-[node name="Titulo" type="Label" parent="."]
+[node name="Raiz" type="Control" parent="."]
 unique_name_in_owner = true
-anchors_preset = 10
+layout_mode = 3
+anchors_preset = 15
 anchor_right = 1.0
-offset_top = 60.0
-offset_bottom = 170.0
+anchor_bottom = 1.0
 grow_horizontal = 2
-theme_override_colors/font_color = Color(1, 0.86, 0.35, 1)
-theme_override_colors/font_outline_color = Color(0.3, 0.12, 0.25, 1)
-theme_override_constants/outline_size = 24
-theme_override_font_sizes/font_size = 80
-text = "¡LA PLAZA ES NUESTRA!"
-horizontal_alignment = 1
-vertical_alignment = 1
+grow_vertical = 2
+mouse_filter = 2
+theme = ExtResource("2_tema")
 
-[node name="PanelCreditos" type="PanelContainer" parent="."]
+[node name="Velo" type="TextureRect" parent="Raiz"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.35
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 0
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_velo")
+expand_mode = 1
+
+[node name="Titulo" type="VBoxContainer" parent="Raiz"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -700.0
+offset_top = 24.0
+offset_right = -60.0
+offset_bottom = 250.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Nombre" type="Label" parent="Raiz/Titulo"]
+layout_mode = 2
+theme_type_variation = &"TituloJuego"
+theme_override_font_sizes/font_size = 92
+text = "¡LA PLAZA ES NUESTRA!"
+horizontal_alignment = 2
+autowrap_mode = 3
+
+[node name="Raya" type="HSeparator" parent="Raiz/Titulo"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Estadisticas" type="HBoxContainer" parent="Raiz/Titulo"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 14
+alignment = 2
+
+[node name="PanelCreditos" type="PanelContainer" parent="Raiz"]
 unique_name_in_owner = true
 visible = false
-anchors_preset = 7
-anchor_left = 0.5
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
 anchor_top = 1.0
-anchor_right = 0.5
+anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -360.0
-offset_top = -430.0
-offset_right = 360.0
-offset_bottom = -30.0
-grow_horizontal = 2
+offset_left = -610.0
+offset_top = -372.0
+offset_right = -60.0
+offset_bottom = -92.0
+grow_horizontal = 0
 grow_vertical = 0
+mouse_filter = 2
+theme_type_variation = &"Tarjeta"
 
-[node name="Columna" type="VBoxContainer" parent="PanelCreditos"]
+[node name="Columna" type="VBoxContainer" parent="Raiz/PanelCreditos"]
 layout_mode = 2
-theme_override_constants/separation = 12
+mouse_filter = 2
+theme_override_constants/separation = 8
 alignment = 1
 
-[node name="Creditos" type="Label" parent="PanelCreditos/Columna"]
+[node name="Encabezado" type="Label" parent="Raiz/PanelCreditos/Columna"]
+layout_mode = 2
+theme_type_variation = &"Seccion"
+text = "LA BANDADA"
+horizontal_alignment = 1
+
+[node name="Creditos" type="Label" parent="Raiz/PanelCreditos/Columna"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.98, 0.94, 1)
-theme_override_font_sizes/font_size = 18
-text = "LA BANDADA"
+theme_type_variation = &"TextoTarjeta"
 horizontal_alignment = 1
 autowrap_mode = 3
 
-[node name="VolverTitulo" type="Button" parent="PanelCreditos/Columna"]
+[node name="Pie" type="Label" parent="Raiz/PanelCreditos/Columna"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(260, 50)
 layout_mode = 2
-size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 24
-text = "Volver al menú"
+theme_type_variation = &"TextoChico"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Botones" type="Control" parent="Raiz"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -350.0
+offset_top = -78.0
+offset_bottom = -28.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="VolverTitulo" type="Button" parent="Raiz/Botones"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"BotonMenu"
+text = "VOLVER AL MENÚ"
+alignment = 2
