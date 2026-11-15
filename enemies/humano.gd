@@ -15,6 +15,7 @@ signal se_levanto
 
 var zona_centro := Vector3.ZERO
 var zona_radio := 5.0
+var zona_tam := Vector2.ZERO        ## Si no es cero, la zona es un rectángulo de este tamaño (peatonal, parque)
 var generador: GeneradorMigas       ## A dónde van las migas que tira (lo asigna la escena)
 var destino_final := Vector3.ZERO   ## Para oficinistas: a dónde va antes de desaparecer
 
@@ -121,6 +122,8 @@ func _pasear(delta: float) -> void:
 		_timer_paseo = randf_range(2.5, 7.0)
 		var a := randf() * TAU
 		_destino = zona_centro + Vector3(cos(a), 0, sin(a)) * sqrt(randf()) * zona_radio
+		if zona_tam != Vector2.ZERO:
+			_destino = zona_centro + Vector3(randf_range(-0.5, 0.5) * zona_tam.x, 0, randf_range(-0.5, 0.5) * zona_tam.y)
 		if randf() < 0.4:
 			_destino = global_position
 	var hacia := plano(_destino - global_position)

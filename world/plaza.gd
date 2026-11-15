@@ -1,6 +1,7 @@
 extends Node3D
-## Construye la Plaza de Mayo con primitivas al iniciar.
-## Coordenadas: X = este (+) / oeste (-), Z = sur (+) / norte (-). El mapa mide 120 x 80 m.
+## Construye la Plaza de Mayo con primitivas al iniciar, y la ciudad que la rodea (world/ciudad.gd).
+## Coordenadas: X = este (+) / oeste (-), Z = sur (+) / norte (-). La plaza mide 120 x 80 m y la
+## ciudad entera unos 394 x 222 m (ver Ciudad.X_MIN...).
 
 const ANCHO := 120.0
 const LARGO := 80.0
@@ -47,7 +48,7 @@ func _crear_ambiente() -> void:
 	entorno.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	entorno.fog_enabled = true
 	entorno.fog_light_color = Color("cfe3f0")
-	entorno.fog_density = 0.0035
+	entorno.fog_density = 0.0026   # la ciudad es grande: un poco menos de niebla que con la plaza sola
 	entorno.fog_sky_affect = 0.15
 
 	var we := WorldEnvironment.new()
@@ -104,28 +105,39 @@ func _crear_piso() -> void:
 	var piso := Node3D.new()
 	piso.name = "Piso"
 	add_child(piso)
-	# Plaza de baldosas grises
+	# Plaza de baldosas grises: sólo su manzana (alrededor están las calles y veredas de la ciudad,
+	# ver world/ciudad.gd)
 	var baldosas := Construir.material_baldosas(C_PISO, C_JUNTA, Vector2(0.34, 0.34))
-	Construir.caja_mat(piso, Vector3(0, -0.5, -4), Vector3(ANCHO + 40, 1.0, LARGO + 32), baldosas)
-	# Avenida al sur (asfalto con líneas)
-	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(ANCHO + 40, 0.01, 8), C_ASFALTO, false)
-	for i in range(-8, 9):
+	var r := Ciudad.PLAZA
+	Construir.caja_mat(piso, Vector3(r.get_center().x, -0.5, r.get_center().y), Vector3(r.size.x, 1.0, r.size.y), baldosas)
+	# Avenida al sur (asfalto con líneas): cruza la manzana y llega hasta Bolívar y Paseo Colón
+	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(128, 0.01, 8), C_ASFALTO, false)
+	for i in range(-6, 7):
 		Construir.caja(piso, Vector3(i * 9.0, 0.012, 30), Vector3(4.0, 0.01, 0.25), Color("e8e4d0"), false)
 	# Vereda del lado de los cafés
-	Construir.caja(piso, Vector3(0, 0.08, 37), Vector3(ANCHO + 40, 0.16, 6), C_VEREDA)
+	Construir.caja(piso, Vector3(0, 0.08, 37), Vector3(r.size.x, 0.16, 6), C_VEREDA)
 
 
-## Paredes invisibles alrededor del mapa (y un techo para no irse al espacio).
+## Paredes invisibles en el borde de la ciudad (y un techo para no irse al espacio).
 func _crear_limites() -> void:
 	var lim := Node3D.new()
 	lim.name = "Limites"
 	add_child(lim)
-	var alto := 60.0
-	Construir.pared_invisible(lim, Vector3(0, alto / 2, -LARGO / 2 - 1), Vector3(ANCHO + 4, alto, 2))
-	Construir.pared_invisible(lim, Vector3(0, alto / 2, LARGO / 2 + 1), Vector3(ANCHO + 4, alto, 2))
-	Construir.pared_invisible(lim, Vector3(-ANCHO / 2 - 1, alto / 2, 0), Vector3(2, alto, LARGO + 4))
-	Construir.pared_invisible(lim, Vector3(ANCHO / 2 + 1, alto / 2, 0), Vector3(2, alto, LARGO + 4))
-	Construir.pared_invisible(lim, Vector3(0, 36, 0), Vector3(ANCHO + 4, 2, LARGO + 4))
+	var alto := 90.0
+	var x0 := Ciudad.X_MIN
+	var x1 := Ciudad.X_MAX
+	var z0 := Ciudad.Z_MIN
+	var z1 := Ciudad.Z_MAX
+	var ancho := x1 - x0
+	var largo := z1 - z0
+	var cx := (x0 + x1) / 2.0
+	var cz := (z0 + z1) / 2.0
+	Construir.pared_invisible(lim, Vector3(cx, alto / 2, z0 - 1), Vector3(ancho + 4, alto, 2))
+	Construir.pared_invisible(lim, Vector3(cx, alto / 2, z1 + 1), Vector3(ancho + 4, alto, 2))
+	Construir.pared_invisible(lim, Vector3(x0 - 1, alto / 2, cz), Vector3(2, alto, largo + 4))
+	Construir.pared_invisible(lim, Vector3(x1 + 1, alto / 2, cz), Vector3(2, alto, largo + 4))
+	# El techo queda por encima de las azoteas más altas, así se puede aterrizar en todas
+	Construir.pared_invisible(lim, Vector3(cx, Ciudad.TECHO + 1.0, cz), Vector3(ancho + 4, 2, largo + 4))
 
 
 # ---------------------------------------------------------------- Zonas
@@ -145,6 +157,8 @@ func _crear_zonas() -> void:
 	Edificios.subte(edif, Vector3(34, 0, -22))
 	posicion_balcon = Edificios.casa_rosada(edif)
 	var mesas := Edificios.cafes(edif)
+	# La ciudad alrededor de la plaza (mapa V2): arma y fusiona sus propias piezas
+	add_child(Ciudad.new())
 	add_child(Transito.new())
 
 	_crear_jardines()
