@@ -34,11 +34,17 @@ const MEZCLA := 0.15   ## Segundos de transición entre animaciones
 
 var carga_visual: Node3D
 
+var _congelada := false   ## Ver congelar()
+
 var _glb: Node3D
 var _anim: AnimationPlayer
+var _anim_accion: AnimationPlayer   ## Picoteo y arrullo, aparte de la base (ver _armar_acciones)
 var _skel: Skeleton3D
 var _base := ""        ## Animación de base actual (Idle, Walk, Fly, Glide, Dive)
 var _accion := ""      ## Animación de un solo uso en curso (Peck, Coo)
+
+## Picoteo y arrullo sin los huesos de las patas: se arman una sola vez y las comparten todas las palomas.
+static var _acciones_sin_patas: AnimationLibrary
 var _mallas: Array[GeometryInstance3D] = []
 
 # Animación de las NPC: se avanza a mano, más espaciado cuanto más lejos está de la cámara (o si
@@ -78,7 +84,7 @@ func _armar() -> void:
 	add_child(_glb)
 	_anim = _glb.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
 	_skel = _glb.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
-	_anim.animation_finished.connect(_al_terminar_animacion)
+	_armar_acciones()
 
 	# La comida que lleva en el pico sigue al hueso de la cabeza
 	var adjunto := BoneAttachment3D.new()
@@ -92,6 +98,13 @@ func _armar() -> void:
 	var cabeza_rest := _skel.get_bone_global_rest(_skel.find_bone("head"))
 	carga_visual.transform = cabeza_rest.affine_inverse() * Transform3D(Basis(), skel_en_glb.affine_inverse() * PUNTO_PICO)
 
+	# Sólo la paloma de la jugadora se personaliza (colores por zona y accesorios)
+	if es_jugador:
+		var perfil := PerfilPaloma.actual()
+		aplicar_perfil(perfil)
+		perfil.cambiado.connect(_al_cambiar_perfil)
+		perfil.pintura_cambiada.connect(_al_pintar)
+
 	# Arranca en reposo, cada una en un punto distinto del ciclo para que no se muevan todas igual
 	_reproducir_base("Idle", 1.0, 0.0)
 	_anim.seek(randf() * _anim.current_animation_length, true)
@@ -104,8 +117,55 @@ func _armar() -> void:
 		add_to_group(Ajustes.GRUPO_DISTANCIA_PALOMAS)
 		aplicar_distancia(Ajustes.distancia_palomas())
 		_anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+		_anim_accion.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 		_anim_desfase = randi() % 16
 	set_process(not es_jugador)
+
+
+## Aplica una configuración de colores y accesorios (ver PerfilPaloma). Con un perfil vacío o null
+## la paloma queda como viene del GLB.
+func aplicar_perfil(perfil: PerfilPaloma) -> void:
+	if _glb == null:
+		return
+	AplicadorPaloma.aplicar(_glb, _skel, perfil)
+	var gestos := _skel.get_node_or_null("Gestos") as GestosPaloma   # Los párpados siguen el color de la cabeza
+	if gestos:
+		gestos.refrescar_material()
+	_mostrar_accesorios(not _congelada)
+
+
+## La paloma de la jugadora sigue al perfil en uso: si la pantalla de personalizar lo cambia,
+## se ve al instante (en el menú, en la vista previa y en los créditos).
+func _al_cambiar_perfil() -> void:
+	aplicar_perfil(PerfilPaloma.actual())
+
+
+## Se pintó sobre el perfil en uso: la textura de pintura se actualiza en el lugar.
+func _al_pintar() -> void:
+	if _glb:
+		AplicadorPaloma.actualizar_pintura(_glb, PerfilPaloma.actual())
+
+
+## Modo pintura de "Mi paloma": la paloma queda quieta en su pose de reposo (sin animación, gestos
+## ni accesorios) para que lo pintado coincida con lo que se ve.
+func congelar(si: bool) -> void:
+	if _glb == null or _congelada == si:
+		return
+	_congelada = si
+	_anim.active = not si
+	_anim_accion.active = not si
+	var gestos := _skel.get_node_or_null("Gestos") as GestosPaloma
+	if gestos:
+		gestos.pausar(si)
+	if si:
+		_skel.reset_bone_poses()
+	_mostrar_accesorios(not si)
+
+
+func _mostrar_accesorios(si: bool) -> void:
+	for n in _skel.get_children():
+		if n.name.begins_with(AplicadorPaloma.PREFIJO):
+			(n as Node3D).visible = si
 
 
 ## Distancia máxima a la que se dibuja esta paloma NPC (la cambia Ajustes según la calidad).
@@ -143,6 +203,8 @@ func _avanzar_animacion(delta: float) -> void:
 	if (cuadro + _anim_desfase) % cada != 0:
 		return
 	_anim.advance(_anim_acum)
+	if _accion != "":
+		_anim_accion.advance(_anim_acum)
 	_anim_acum = 0.0
 
 
@@ -175,11 +237,11 @@ func animar(_delta: float, modo: int, velocidad_suelo: float) -> void:
 			base = "Glide"
 		3:
 			base = "Dive"
-	if _accion != "":
-		if modo == 0:
-			_base = base   # Al terminar el picoteo/arrullo sigue con esta
-			return
-		_accion = ""       # Despegó: se corta el picoteo/arrullo
+	if _accion != "" and modo != 0:
+		# Despegó: se corta el picoteo/arrullo
+		_accion = ""
+		_anim_accion.stop()
+	# La base (caminar, aletear...) sigue siempre: el picoteo y el arrullo van aparte, encima
 	_reproducir_base(base, vel)
 
 
@@ -194,18 +256,37 @@ func _accion_unica(nombre: String, vel: float) -> void:
 	if _base not in ["Idle", "Walk"]:
 		return  # En el aire no picotea ni arrulla con el cuerpo (el efecto del juego igual ocurre)
 	_accion = nombre
-	_anim.play(nombre, 0.08)
-	_anim.seek(0.0, true)
-	_anim.speed_scale = vel
+	_anim_accion.play(nombre)
+	_anim_accion.seek(0.0, true)
+	_anim_accion.speed_scale = vel
 	_anim_acum = 0.0
 
 
 func _al_terminar_animacion(nombre: StringName) -> void:
 	if String(nombre) == _accion:
 		_accion = ""
-		var b := _base if _base != "" else "Idle"
-		_base = ""
-		_reproducir_base(b, 1.0)
+
+
+## Un segundo AnimationPlayer para el picoteo y el arrullo. Esas animaciones del GLB mueven todos los
+## huesos, y como un AnimationPlayer reproduce una sola animación a la vez, al arrullar caminando las
+## patas se quedaban quietas. Acá se usan copias sin las pistas de las patas y se reproducen encima
+## de la base: el cuerpo hace el gesto y las patas siguen caminando. Va después del otro en el árbol
+## para que lo que mueve (cabeza, alas, cola, cuerpo) pise a la base.
+func _armar_acciones() -> void:
+	if _acciones_sin_patas == null:
+		_acciones_sin_patas = AnimationLibrary.new()
+		for nombre in ["Peck", "Coo"]:
+			var copia := _anim.get_animation(nombre).duplicate() as Animation
+			for i in range(copia.get_track_count() - 1, -1, -1):
+				var pista := String(copia.track_get_path(i))
+				if pista.ends_with(":leg_L") or pista.ends_with(":leg_R"):
+					copia.remove_track(i)
+			_acciones_sin_patas.add_animation(nombre, copia)
+	_anim_accion = AnimationPlayer.new()
+	_anim_accion.name = "Acciones"
+	_glb.add_child(_anim_accion)
+	_anim_accion.add_animation_library("", _acciones_sin_patas)
+	_anim_accion.animation_finished.connect(_al_terminar_animacion)
 
 
 ## Agrega los gestos de paloma quieta (mirada, parpadeo, picoteo y arrullo ocasionales) que se
@@ -231,6 +312,7 @@ func arrullar() -> void:
 func mostrar_carga(tipo: String) -> void:
 	for h in carga_visual.get_children():
 		h.queue_free()
+	AplicadorPaloma.pico_visible(_skel, tipo == "")   # Los accesorios del pico no tapan la comida
 	match tipo:
 		"medialuna":
 			var m := _pieza(_esfera(0.08), Color("d9a24a"), Vector3(1.6, 0.6, 0.8))

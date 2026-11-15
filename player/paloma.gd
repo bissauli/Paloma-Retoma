@@ -44,6 +44,7 @@ var aleteando := false
 var controlable := true
 
 var _tiempo_en_aire := 0.0
+var _tiempo_en_suelo := 0.0    ## Segundos seguidos en el piso: la stamina se recarga cada vez más rápido
 var _coyote := 0.0
 var _timer_aleteo_sfx := 0.0
 var _enfriamiento_arrullo := 0.0
@@ -118,8 +119,9 @@ func _fisica_suelo(delta: float, dir: Vector3) -> void:
 	velocity.x = h.x
 	velocity.z = h.y
 	velocity.y -= gravedad_suelo * delta
-	# Recarga lenta caminando
-	GameState.set_stamina(GameState.stamina + Config.STAMINA_RECARGA_SUELO * delta)
+	# En el piso la stamina se recarga, y cada vez más rápido cuanto más tiempo seguido estés
+	_tiempo_en_suelo += delta
+	GameState.set_stamina(GameState.stamina + Config.recarga_suelo(_tiempo_en_suelo) * delta)
 	if controlable and Input.is_action_just_pressed("volar"):
 		despegar()
 
@@ -160,6 +162,7 @@ func saltar_inicio() -> void:
 
 func _fisica_aire(delta: float, dir: Vector3) -> void:
 	_tiempo_en_aire += delta
+	_tiempo_en_suelo = 0.0     # Al despegar, la recarga vuelve a empezar de cero
 	var hay_stamina := GameState.stamina > 0.5
 	var picada_antes := en_picada
 	en_picada = controlable and Input.is_action_pressed("picada")

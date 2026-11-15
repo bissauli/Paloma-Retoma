@@ -17,8 +17,16 @@ const STAMINA_MAX := 100.0
 const STAMINA_DESPEGUE := 8.0      ## Costo de despegar
 const STAMINA_ALETEO := 14.0       ## Costo por segundo manteniendo Espacio en el aire
 const STAMINA_PLANEO := 1.5        ## Costo por segundo sólo por estar en el aire
-const STAMINA_RECARGA_SUELO := 7.0 ## Recarga por segundo en el suelo (las migas siguen siendo lo más rápido)
+const STAMINA_RECARGA_SUELO := 10.0     ## Recarga por segundo apenas aterrizás (las migas siguen siendo lo más rápido)
+const STAMINA_RECARGA_SUELO_MAX := 40.0 ## ...y a la que llega después de STAMINA_RAMPA_SUELO segundos en el piso
+const STAMINA_RAMPA_SUELO := 2.5        ## Cuánto tarda en llegar a la recarga máxima (de 0 a lleno: unos 3,5 s)
 const STAMINA_MIGA := 18.0         ## Recarga al comer una miga
+
+
+## Recarga por segundo en el suelo después de "segundos" en el piso: cuanto más tiempo, más rápido
+## (el juego es de explorar y divertirse: no hay que castigar a quien se queda sin aire).
+static func recarga_suelo(segundos: float) -> float:
+	return lerpf(STAMINA_RECARGA_SUELO, STAMINA_RECARGA_SUELO_MAX, clampf(segundos / STAMINA_RAMPA_SUELO, 0.0, 1.0))
 
 # --- Comida (unidades de "comida acumulada") ---
 const COMIDA_MIGA := 1

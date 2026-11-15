@@ -171,6 +171,9 @@ func _poner_modelo(variante: String) -> void:
 	reproductor.stop()
 	reproductor.active = false
 	_esqueleto = _modelo.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	# "La paloma flaca" de los créditos es la de la jugadora: lleva sus colores y accesorios
+	if variante == "Original":
+		AplicadorPaloma.aplicar(_modelo, _esqueleto, PerfilPaloma.actual())
 	_reposo.clear()
 	for i in _esqueleto.get_bone_count():
 		_reposo.append(_esqueleto.get_bone_global_rest(i).basis)

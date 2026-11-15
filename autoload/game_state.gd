@@ -90,6 +90,7 @@ func reiniciar(datos: Dictionary = {}) -> void:
 	halcon_activo = false
 	tutorial_hecho = bool(datos.get("tutorial_hecho", false))
 	migas_comidas = int(datos.get("migas_comidas", 0))
+	Misiones.desde_dict(datos.get("misiones", {}))   # {} = partida nueva: sin misiones
 	_umbrales.clear()
 	for u in datos.get("umbrales", []):
 		_umbrales[int(u)] = true   # Los avisos de 5, 15 y 30 palomas no se repiten
@@ -139,6 +140,7 @@ func guardar_partida() -> void:
 	cfg.set_value("partida", "tutorial_hecho", tutorial_hecho)
 	cfg.set_value("partida", "migas_comidas", migas_comidas)
 	cfg.set_value("partida", "umbrales", _umbrales.keys())
+	cfg.set_value("partida", "misiones", Misiones.a_dict())
 	cfg.save(archivo_partida)
 
 
@@ -219,6 +221,7 @@ func set_stamina(v: float) -> void:
 
 func comio_miga() -> void:
 	migas_comidas += 1
+	Misiones.notificar("miga")
 	if migas_comidas >= 3 and not tutorial_hecho:
 		tutorial_hecho = true
 	actualizar_objetivo()
@@ -267,6 +270,7 @@ func actualizar_objetivo() -> void:
 	# El nido siempre queda marcado (más chico) salvo que sea el destino
 	if not partida_terminada and carga == "":
 		nuevos.append(_destino(&"nido", "Nido", false))
+	nuevos.append_array(Misiones.destinos())   # Las misiones secundarias en curso
 	if nuevos != destinos:
 		destinos = nuevos
 		destinos_cambio.emit(destinos)
