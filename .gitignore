@@ -6,3 +6,7 @@
 .beckett/
 .mcp.json
 .claude/
+
+# Kits de Blender: el .blend y las vistas previas se regeneran con tools/blender/*.py
+modelos/*/fuente/
+modelos/*/previas/

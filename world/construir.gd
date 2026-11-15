@@ -260,12 +260,22 @@ static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
 				var t := inv * mi.global_transform
 				var centro := t * mi.mesh.get_aabb().get_center()
 				var clave_mat := ("v%.2f" % (mat as BaseMaterial3D).roughness) if con_color else ("m%d" % mat.get_instance_id())
-				var clave := "%d_%d_%s_%d" % [floori(centro.x / celda), floori(centro.z / celda), clave_mat, mi.cast_shadow]
+				# Las piezas con la meta "rango" (árboles, props chicos) van aparte y se dejan de
+				# dibujar a esa distancia de la cámara
+				var rango := float(mi.get_meta(&"rango", 0.0))
+				var desde := float(mi.get_meta(&"rango_desde", 0.0))   # versiones "de lejos" (ver Kit)
+				var clave := "%d_%d_%s_%d_%d_%d" % [floori(centro.x / celda), floori(centro.z / celda), clave_mat,
+					mi.cast_shadow, roundi(rango), roundi(desde)]
 				if not grupos.has(clave):
+					# La malla fusionada queda con su origen en el centro de la celda: así la distancia
+					# de dibujo (visibility_range) se mide desde ahí y no desde el origen del mundo
+					var origen := Vector3((floori(centro.x / celda) + 0.5) * celda, 0.0, (floori(centro.z / celda) + 0.5) * celda)
 					grupos[clave] = {"mat": material_vertices((mat as BaseMaterial3D).roughness) if con_color else mat,
-						"color": con_color, "sombra": mi.cast_shadow, "piezas": []}
+						"color": con_color, "sombra": mi.cast_shadow, "rango": rango, "desde": desde, "origen": origen,
+						"piezas": []}
 				var color: Color = mat.get_meta(&"color_plano") if con_color else Color.WHITE
-				(grupos[clave]["piezas"] as Array).append([mi.mesh, t, color])
+				var o: Vector3 = grupos[clave]["origen"]
+				(grupos[clave]["piezas"] as Array).append([mi.mesh, t.translated(-o), color])
 				fusionadas.append(mi)
 				continue
 			pendientes.append(h)
@@ -277,7 +287,14 @@ static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
 		mi.mesh = combinar(g["piezas"], g["color"], not g["color"])
 		mi.material_override = g["mat"]
 		mi.cast_shadow = g["sombra"]
+		if float(g["rango"]) > 0.0:
+			mi.visibility_range_end = float(g["rango"])
+			mi.visibility_range_end_margin = 4.0
+		if float(g["desde"]) > 0.0:
+			mi.visibility_range_begin = float(g["desde"])
+			mi.visibility_range_begin_margin = 4.0
 		raiz.add_child(mi)
+		mi.position = g["origen"]
 		i += 1
 	for mi in fusionadas:
 		mi.get_parent().remove_child(mi)

@@ -258,4 +258,11 @@ const MAPA := {
 	"Blanco puro": "Pure white",
 	"Arrastrá sobre la paloma para pintar. Clic derecho: girar.": "Drag over the pigeon to paint. Right click: rotate.",
 	"Muestra": "Sample",
+
+	# Carteles de la ciudad (mapa V2). Los nombres de calles y negocios no se traducen.
+	"DIARIOS Y REVISTAS": "NEWSPAPERS",
+	"Plaza de juegos": "Playground",
+	"Parque de perros": "Dog park",
+	"PROHIBIDO\nPALOMAS": "NO\nPIGEONS",
+	"A LAS PALOMAS\nDE LA PLAZA": "TO THE PIGEONS\nOF THE SQUARE",
 }
