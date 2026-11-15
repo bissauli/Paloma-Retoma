@@ -60,7 +60,7 @@ func _process(delta: float) -> void:
 func _physics_process(_delta: float) -> void:
 	if GameState.carga == "":
 		return
-	var j := get_tree().get_first_node_in_group("jugador") as Node3D
+	var j := GameState.jugador
 	if j == null:
 		return
 	var d := Vector2(j.global_position.x - global_position.x, j.global_position.z - global_position.z).length()

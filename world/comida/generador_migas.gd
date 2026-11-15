@@ -40,13 +40,7 @@ func _punto_al_azar() -> Vector3:
 
 
 func _crear_miga(pos: Vector3) -> Comida:
-	var m := Comida.new()
-	m.tipo = "miga"
-	m.reaparece = false
-	m.vida = vida_miga
-	add_child(m)
-	m.global_position = Vector3(pos.x, global_position.y, pos.z)
-	return m
+	return Comida.soltar(self, "miga", Vector3(pos.x, global_position.y, pos.z), vida_miga)
 
 
 ## Tira una miga desde un punto (la mano de un humano) con una parábola hasta el piso.

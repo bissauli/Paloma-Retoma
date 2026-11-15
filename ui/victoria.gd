@@ -31,7 +31,7 @@ func _al_ganar() -> void:
 	var balcon := get_tree().get_first_node_in_group("balcon") as Node3D
 	if balcon:
 		_centro = balcon.global_position
-	var j := get_tree().get_first_node_in_group("jugador") as PalomaJugador
+	var j := GameState.jugador
 	if j:
 		j.controlable = false
 		j.camara.bloqueada = true

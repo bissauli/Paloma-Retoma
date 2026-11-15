@@ -57,8 +57,18 @@ var _aleteo_auto := 0.0     ## Segundos de aleteo animado sin input (el salto de
 @onready var camara: CamaraOrbital = $CamaraOrbital
 
 
-func _ready() -> void:
+func _enter_tree() -> void:
+	# Antes que el _ready de cualquier hermano que la busque (bandada, enemigos)
+	GameState.jugador = self
 	add_to_group("jugador")
+
+
+func _exit_tree() -> void:
+	if GameState.jugador == self:
+		GameState.jugador = null
+
+
+func _ready() -> void:
 	_rumbo = rotation.y
 	rotation = Vector3.ZERO
 	floor_snap_length = 0.25

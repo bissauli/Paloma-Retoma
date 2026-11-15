@@ -148,3 +148,11 @@ Elegí siempre la opción más simple y divertida cuando algo era ambiguo. Las a
 - Las cinemáticas se **saltean** con cualquier tecla (menos Esc, que pausa), click, toque o botón del mando, a partir de 0,6 s. La pausa las congela.
 - La flecha usa un material transparente y sin luz: la misma variante de shader que el anillo del arrullo, que ya se compila con el menú.
 - **Pruebas**: las cinemáticas sólo están en el juego de verdad o con el menú forzado (`main.forzar_menu`): las pruebas de vuelo, bandada y enemigos ven sólo los carteles. `tests/test_menu.tscn` revisa el banco, la cinemática de entrada (sin control, con la cámara de cine), el salteo, que vuelvan el control y el HUD, y la cinemática del objetivo. `tests/captura_inicio.tscn` saca capturas de todo el arranque.
+
+## Modularidad y estabilidad (noviembre 2026)
+- **Medición primero**: el juego ya rinde de sobra en una RX 5500 XT (~1 ms de CPU por cuadro con la bandada de 60). `tests/bench_estabilidad.tscn` mide lo que se siente (p50, p99, p99.9 y el peor cuadro, 20 s con la bandada volando): p99 de 3,5 ms y peor cuadro de 11 ms. Instanciar una paloma nueva cuesta 0,2 ms, así que no hizo falta un pool.
+- **`GameState.jugador`**: la paloma de la jugadora se registra sola en `_enter_tree` (y se borra en `_exit_tree`). Reemplaza 14 búsquedas `get_first_node_in_group("jugador")` en enemigos, comida, tránsito, tutorial, UI y bandada.
+- **`enemies/enemigo.gd` (`Enemigo`)**: base de `Humano`, `Mozo`, `Nene` y `Granadero`. Tiene la velocidad suavizada (`_acelerar`, `_ir_hacia`), el giro del modelo (`_girar_hacia_velocidad`), `_avanzar` y la visión en cono (`_en_cono`). Antes cada uno tenía su copia.
+- **`Comida.soltar(padre, tipo, pos, vida)`**: reemplaza 4 copias de crear comida que desaparece sola (humanos y generador de migas).
+- **Bandada**: `_nueva_paloma` y `_punto_de_llegada` reemplazan 4 copias de "instanciar, pintar y agregar".
+- **Probado y descartado**: bajar los FPS cuando la ventana pierde el foco. Con OBS o con otra ventana encima el juego se vería a 20 cuadros, y hasta los benchmarks lanzados en segundo plano daban resultados falsos.

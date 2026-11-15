@@ -122,7 +122,7 @@ func _crear_auto(dir: int, x: float) -> Auto:
 func _physics_process(delta: float) -> void:
 	_avanzar_luz(delta)
 	_salidas(delta)
-	var jugador := get_tree().get_first_node_in_group("jugador") as Node3D
+	var jugador := GameState.jugador
 	# Sólo importa la gente que está sobre la avenida (casi nunca hay nadie): se filtra una vez
 	# acá y no por cada auto
 	var gente: Array[Node3D] = []

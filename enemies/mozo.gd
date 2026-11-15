@@ -1,5 +1,5 @@
 class_name Mozo
-extends Node3D
+extends Enemigo
 ## El mozo: patrulla las mesas de los cafés. Si te ve cerca de las mesas, corre a espantarte
 ## con la bandeja. Si te alcanza, salís volando y se te cae lo que llevabas.
 
@@ -16,8 +16,6 @@ enum Estado { PATRULLA, PERSIGUE, VUELVE }
 
 var estado: Estado = Estado.PATRULLA
 var _sentido := 1.0
-var _vel := Vector3.ZERO
-var _rumbo := 0.0
 var _z_patrulla := 0.0
 var _t := 0.0
 var _enfriamiento := 0.0
@@ -36,7 +34,7 @@ func _physics_process(delta: float) -> void:
 	if not _iniciado:
 		_iniciado = true
 		_z_patrulla = global_position.z
-	var j := get_tree().get_first_node_in_group("jugador") as Node3D
+	var j := GameState.jugador
 	_t -= delta
 	_enfriamiento = maxf(_enfriamiento - delta, 0.0)
 	match estado:
@@ -51,7 +49,7 @@ func _physics_process(delta: float) -> void:
 				_t = 1.5  # Pausa: atiende una mesa
 			if _t > 0.0:
 				v = Vector3.ZERO
-			_vel = _vel.lerp(v, minf(delta * 4.0, 1.0))
+			_acelerar(v, 4.0, delta)
 			if j and _enfriamiento <= 0.0 and _ve(j):
 				estado = Estado.PERSIGUE
 				_t = 5.0
@@ -60,21 +58,18 @@ func _physics_process(delta: float) -> void:
 			if j == null or _t <= 0.0 or j.global_position.y > 3.0 or j.global_position.z < 26.0:
 				_volver()
 			else:
-				var hacia := j.global_position - global_position
-				hacia.y = 0
-				_vel = _vel.lerp(hacia.normalized() * velocidad_carrera, minf(delta * 5.0, 1.0))
+				var hacia := plano(j.global_position - global_position)
+				_ir_hacia(j.global_position, velocidad_carrera, 5.0, delta)
 				if hacia.length() < alcance and j.global_position.y < 2.5:
 					_espantar(j)
 		Estado.VUELVE:
-			var hacia := Vector3(clampf(global_position.x, desde_x, hasta_x), 0, _z_patrulla) - global_position
-			hacia.y = 0
-			if hacia.length() < 0.5:
+			var base := Vector3(clampf(global_position.x, desde_x, hasta_x), 0, _z_patrulla)
+			if plano(base - global_position).length() < 0.5:
 				estado = Estado.PATRULLA
 			else:
-				_vel = _vel.lerp(hacia.normalized() * velocidad_patrulla * 1.5, minf(delta * 4.0, 1.0))
+				_ir_hacia(base, velocidad_patrulla * 1.5, 4.0, delta)
 	global_position += _vel * delta
-	if _vel.length() > 0.1:
-		_rumbo = lerp_angle(_rumbo, atan2(-_vel.x, -_vel.z), minf(delta * 8.0, 1.0))
+	_girar_hacia_velocidad(delta, 8.0)
 	modelo.rotation.y = _rumbo
 	modelo.animar(delta, _vel.length(), estado == Estado.PERSIGUE)
 
@@ -86,14 +81,13 @@ func _ve(j: Node3D) -> bool:
 	var hacia := j.global_position - global_position
 	if hacia.y > 2.5:
 		return false
-	hacia.y = 0
+	hacia = plano(hacia)
 	var d := hacia.length()
 	if d < 2.0:
 		return true
 	if d > radio_vision:
 		return false
-	var mira := Vector3(-sin(_rumbo), 0, -cos(_rumbo))
-	return rad_to_deg(mira.angle_to(hacia)) < angulo_vision
+	return _en_cono(hacia, angulo_vision)
 
 
 func _espantar(j: Node3D) -> void:

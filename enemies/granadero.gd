@@ -1,5 +1,5 @@
 class_name Granadero
-extends Node3D
+extends Enemigo
 ## Granadero: patrulla frente a la Casa Rosada con un cono de visión (visible en el piso).
 ## Si te ve cerca de la Casa Rosada sin 30 palomas, silba y volvés al nido.
 ## Con 30 palomas o más se distrae mirando la bandada y te deja pasar.
@@ -12,7 +12,6 @@ extends Node3D
 @export var tiempo_reaccion := 0.6         ## Cuánto tiene que verte antes de silbar
 
 var _sentido := 1.0
-var _rumbo := 0.0
 var _mirar_extra := 0.0
 var _visto := 0.0
 var _pausa := 0.0
@@ -66,7 +65,7 @@ func _distraido() -> bool:
 
 
 func _physics_process(delta: float) -> void:
-	var j := get_tree().get_first_node_in_group("jugador") as Node3D
+	var j := GameState.jugador
 	var distraido := _distraido()
 	# Patrulla: camina de punta a punta, frena y mira hacia la plaza
 	if _pausa > 0.0:
@@ -113,13 +112,10 @@ func _ve(j: Node3D) -> bool:
 	if j.global_position.x < 30.0:
 		return false
 	var hacia := j.global_position - global_position
-	var plano := Vector3(hacia.x, 0, hacia.z)
-	if plano.length() > radio_vision or hacia.y > 12.0:
+	var en_plano := plano(hacia)
+	if en_plano.length() > radio_vision or hacia.y > 12.0:
 		return false
-	if plano.length() < 2.5:
-		return true
-	var mira := Vector3(-sin(_rumbo), 0, -cos(_rumbo))
-	return rad_to_deg(mira.angle_to(plano)) < angulo_vision
+	return en_plano.length() < 2.5 or _en_cono(en_plano, angulo_vision)
 
 
 func _atrapar() -> void:

@@ -58,7 +58,7 @@ func _ready() -> void:
 
 
 func _buscar_jugador() -> void:
-	_jugador = get_tree().get_first_node_in_group("jugador") as PalomaJugador
+	_jugador = GameState.jugador
 
 
 func _boton(id: String, accion: StringName, texto: String, offset: Vector2, radio: float,

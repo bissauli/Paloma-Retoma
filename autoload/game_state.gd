@@ -38,6 +38,9 @@ var halcon_activo := false
 var tutorial_hecho := false
 var migas_comidas := 0
 var posicion_nido := Vector3(0, 0.5, 0)
+## La paloma de la jugadora (la registra ella misma al entrar al árbol). Evita buscarla por
+## grupo en cada cuadro desde enemigos, comida, tránsito, etc.
+var jugador: PalomaJugador
 var _umbrales := {}
 var invulnerable := 0.0         ## Segundos de gracia después de que te atrapan
 var menu_activo := false        ## El menú principal (o su transición a la partida) está en pantalla

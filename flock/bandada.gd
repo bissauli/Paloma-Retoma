@@ -54,7 +54,7 @@ func _ready() -> void:
 
 ## Crea las palomas iniciales en cada zona marcada por la plaza.
 func _poblar() -> void:
-	_jugador = get_tree().get_first_node_in_group("jugador") as PalomaJugador
+	_jugador = GameState.jugador
 	for n in get_tree().get_nodes_in_group("zona_palomas"):
 		var z := n as Marker3D
 		_zonas.append(z)
@@ -67,11 +67,23 @@ func _poblar() -> void:
 			p.configurar_zona(z.global_position, radio)
 
 
-func _crear_paloma(pos: Vector3) -> PalomaNPC:
+## Paloma NPC nueva (de color al azar) ya dentro de la bandada, en la posición global "pos".
+func _nueva_paloma(pos: Vector3) -> PalomaNPC:
 	var p := ESCENA_PALOMA.instantiate() as PalomaNPC
 	p.randomizar_colores()
 	add_child(p)
 	p.global_position = pos
+	return p
+
+
+## Punto en el aire sobre el borde norte o sur del mapa, por donde llegan palomas nuevas.
+func _punto_de_llegada() -> Vector3:
+	return Vector3(randf_range(-55, 55), 18.0, -38.0 if randf() < 0.5 else 38.0)
+
+
+## Paloma suelta apoyada en el piso.
+func _crear_paloma(pos: Vector3) -> PalomaNPC:
+	var p := _nueva_paloma(pos)
 	p.altura_suelo = p.medir_suelo(pos)
 	p.global_position.y = p.altura_suelo
 	return p
@@ -106,7 +118,7 @@ func _al_arrullar(pos: Vector3, radio: float) -> void:
 ## Vienen las sueltas más cercanas y, si no alcanzan, llegan volando desde los bordes del mapa.
 func restaurar(cantidad: int) -> void:
 	if _jugador == null:
-		_jugador = get_tree().get_first_node_in_group("jugador") as PalomaJugador
+		_jugador = GameState.jugador
 	var desde := _jugador.global_position if _jugador else Vector3.ZERO
 	var sueltas: Array[PalomaNPC] = []
 	for n in get_children():
@@ -120,10 +132,7 @@ func restaurar(cantidad: int) -> void:
 		if i < sueltas.size():
 			p = sueltas[i]
 		else:
-			p = ESCENA_PALOMA.instantiate() as PalomaNPC
-			p.randomizar_colores()
-			add_child(p)
-			p.global_position = Vector3(randf_range(-55, 55), 18.0, -38.0 if randf() < 0.5 else 38.0)
+			p = _nueva_paloma(_punto_de_llegada())
 		p.reclutar()
 		seguidoras.append(p)
 
@@ -154,10 +163,7 @@ func _al_ganar() -> void:
 			p.global_position = Vector3(randf_range(18, 36), 0, randf_range(-16, 16))
 	# Más palomas que vienen a festejar
 	for i in 50:
-		var p := ESCENA_PALOMA.instantiate() as PalomaNPC
-		p.randomizar_colores()
-		add_child(p)
-		p.global_position = Vector3(randf_range(-10, 36), 0, randf_range(-20, 20))
+		_nueva_paloma(Vector3(randf_range(-10, 36), 0, randf_range(-20, 20)))
 	for n in get_children():
 		var p := n as PalomaNPC
 		if p:
@@ -435,10 +441,7 @@ func _llegadas(delta: float) -> void:
 	var z := _zona_al_azar()
 	if z == null:
 		return
-	var borde := Vector3(randf_range(-55, 55), 18.0, -38.0 if randf() < 0.5 else 38.0)
-	var p := ESCENA_PALOMA.instantiate() as PalomaNPC
-	p.randomizar_colores()
-	add_child(p)
-	p.global_position = borde
+	var borde := _punto_de_llegada()
+	var p := _nueva_paloma(borde)
 	p.soltar(borde + Vector3(0, 0, 1))
 	p.ir_a_zona(z.global_position, z.get_meta("radio", 5.0))

@@ -90,7 +90,7 @@ func _intentar_empezar(delta: float) -> void:
 		_terminado = true
 		queue_free()   # Partida continuada: el tutorial ya se hizo
 		return
-	var j := get_tree().get_first_node_in_group("jugador") as PalomaJugador
+	var j := GameState.jugador
 	if j == null:
 		return
 	_espera_suelo += delta

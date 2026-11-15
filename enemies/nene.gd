@@ -1,5 +1,5 @@
 class_name Nene
-extends Node3D
+extends Enemigo
 ## El nene: pasea por la plaza y, si te ve en el piso o volando bajito, te corre gritando.
 ## Si te alcanza, espanta parte de la bandada (no te manda al nido).
 
@@ -18,8 +18,6 @@ var estado: Estado = Estado.PASEO
 
 var _t := 0.0
 var _destino := Vector3.ZERO
-var _vel := Vector3.ZERO
-var _rumbo := 0.0
 var _timer_grito := 0.0
 
 @onready var modelo: ModeloHumano = $Modelo
@@ -38,7 +36,7 @@ func _physics_process(delta: float) -> void:
 		_iniciado = true
 		zona_centro = global_position
 		_destino = global_position
-	var j := get_tree().get_first_node_in_group("jugador") as Node3D
+	var j := GameState.jugador
 	_t -= delta
 	_timer_grito -= delta
 	match estado:
@@ -54,9 +52,8 @@ func _physics_process(delta: float) -> void:
 				estado = Estado.CANSADO
 				_t = descanso
 			else:
-				var hacia := j.global_position - global_position
-				hacia.y = 0
-				_vel = _vel.lerp(hacia.normalized() * velocidad_carrera, minf(delta * 5.0, 1.0))
+				var hacia := plano(j.global_position - global_position)
+				_ir_hacia(j.global_position, velocidad_carrera, 5.0, delta)
 				if _timer_grito <= 0.0:
 					_gritar()
 				# ¿La alcanzó?
@@ -64,13 +61,12 @@ func _physics_process(delta: float) -> void:
 				if hacia.length() < 0.9 and dy < altura_maxima:
 					_atrapar(j)
 		Estado.CANSADO:
-			_vel = _vel.lerp(Vector3.ZERO, minf(delta * 3.0, 1.0))
+			_acelerar(Vector3.ZERO, 3.0, delta)
 			if _t <= 0.0:
 				estado = Estado.PASEO
 	global_position += _vel * delta
 	global_position.y = 0.0
-	if _vel.length() > 0.1:
-		_rumbo = lerp_angle(_rumbo, atan2(-_vel.x, -_vel.z), minf(delta * 8.0, 1.0))
+	_girar_hacia_velocidad(delta, 8.0)
 	modelo.rotation.y = _rumbo
 	modelo.animar(delta, _vel.length(), estado == Estado.CORRIENDO)
 
@@ -87,10 +83,8 @@ func _pasear(delta: float) -> void:
 		_t = randf_range(2.0, 5.0)
 		var a := randf() * TAU
 		_destino = zona_centro + Vector3(cos(a), 0, sin(a)) * sqrt(randf()) * zona_radio
-	var hacia := _destino - global_position
-	hacia.y = 0
-	var v := Vector3.ZERO if hacia.length() < 0.4 else hacia.normalized() * velocidad_paseo
-	_vel = _vel.lerp(v, minf(delta * 3.0, 1.0))
+	var hacia := plano(_destino - global_position)
+	_acelerar(Vector3.ZERO if hacia.length() < 0.4 else hacia.normalized() * velocidad_paseo, 3.0, delta)
 
 
 func _gritar() -> void:

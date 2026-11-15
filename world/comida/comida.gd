@@ -20,11 +20,22 @@ const VALORES := {
 @export var tiempo_reaparicion := 35.0
 @export var vida := 0.0                     ## > 0: desaparece sola (migas tiradas al piso)
 
+
+## Comida suelta que no reaparece y desaparece sola a los "vida" segundos (lo que se les cae a
+## la gente y las migas que tiran). "pos" es la posición global.
+static func soltar(padre: Node, tipo_comida: String, pos: Vector3, vida_s: float) -> Comida:
+	var c := Comida.new()
+	c.tipo = tipo_comida
+	c.reaparece = false
+	c.vida = vida_s
+	padre.add_child(c)
+	c.global_position = pos
+	return c
+
 ## Las migas brillan suavecito cuando la paloma anda cerca (para avisar que se comen).
 const DESTELLO_LEJOS := 6.0
 const DESTELLO_CERCA := 2.5
 
-static var _paloma_jugadora: Node3D
 ## Malla ya fusionada de cada tipo de comida (las migas tienen varias formas al azar): cada pedazo
 ## es un solo dibujo en vez de 2 a 7.
 static var _mallas := {}
@@ -109,11 +120,10 @@ func _reaparecer() -> void:
 
 ## Destello de la miga: aparece de a poco al acercarse, titila y gira despacio. Lejos no se ve.
 func _animar_destello(delta: float) -> void:
-	if _paloma_jugadora == null or not is_instance_valid(_paloma_jugadora):
-		_paloma_jugadora = get_tree().get_first_node_in_group("jugador") as Node3D
 	var objetivo := 0.0
-	if _paloma_jugadora:
-		var d := _paloma_jugadora.global_position.distance_to(global_position)
+	var jugadora := GameState.jugador
+	if jugadora:
+		var d := jugadora.global_position.distance_to(global_position)
 		objetivo = clampf((DESTELLO_LEJOS - d) / (DESTELLO_LEJOS - DESTELLO_CERCA), 0.0, 1.0)
 	_destello_alfa = move_toward(_destello_alfa, objetivo, delta * 2.5)
 	_destello.visible = _destello_alfa > 0.01

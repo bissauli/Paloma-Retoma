@@ -1,5 +1,5 @@
 class_name Humano
-extends Node3D
+extends Enemigo
 ## Humano "pasivo": turistas, escolares, señoras y oficinistas.
 ## - turista/escolar: pasea por su zona y tira migas; con 15+ palomas se asusta y suelta comida.
 ## - senora: sentada en un banco, tira migas cada tanto (zona segura).
@@ -23,8 +23,6 @@ var _timer_paseo := 0.0
 var _timer_migas := 0.0
 var _miedo := 0.0
 var _enfriamiento_susto := 0.0
-var _rumbo := 0.0
-var _vel := Vector3.ZERO
 var _soltar_factura_en := -1.0
 var _altura := 0.0
 
@@ -108,10 +106,8 @@ func _physics_process(delta: float) -> void:
 			_revisar_susto()
 			_pasear(delta)
 			_tirar_migas(delta)
-	global_position += _vel * delta
-	global_position.y = _altura
-	if Vector2(_vel.x, _vel.z).length() > 0.1:
-		_rumbo = lerp_angle(_rumbo, atan2(-_vel.x, -_vel.z), minf(delta * 6.0, 1.0))
+	_avanzar(delta, _altura)
+	_girar_hacia_velocidad(delta, 6.0)
 	modelo.rotation.y = _rumbo
 	modelo.animar(delta, _vel.length(), _miedo > 0.0)
 
@@ -127,10 +123,8 @@ func _pasear(delta: float) -> void:
 		_destino = zona_centro + Vector3(cos(a), 0, sin(a)) * sqrt(randf()) * zona_radio
 		if randf() < 0.4:
 			_destino = global_position
-	var hacia := _destino - global_position
-	hacia.y = 0
-	var v := Vector3.ZERO if hacia.length() < 0.3 else hacia.normalized() * velocidad
-	_vel = _vel.lerp(v, minf(delta * 3.0, 1.0))
+	var hacia := plano(_destino - global_position)
+	_acelerar(Vector3.ZERO if hacia.length() < 0.3 else hacia.normalized() * velocidad, 3.0, delta)
 
 
 func _tirar_migas(delta: float) -> void:
@@ -154,18 +148,14 @@ func tirar_migas_ya() -> void:
 func _revisar_susto() -> void:
 	if _miedo > 0.0 or _enfriamiento_susto > 0.0 or GameState.bandada < Config.UMBRAL_TURISTAS:
 		return
-	var j := get_tree().get_first_node_in_group("jugador") as Node3D
+	var j := GameState.jugador
 	if j == null or j.global_position.distance_to(global_position) > 5.5:
 		return
 	asustar(j.global_position)
 	# Suelta algo rico
 	if randf() < 0.75:
-		var c := Comida.new()
-		c.tipo = "papa" if randf() < 0.5 else "factura"
-		c.reaparece = false
-		c.vida = 45.0
-		get_parent().add_child(c)
-		c.global_position = Vector3(global_position.x, 0.02, global_position.z)
+		Comida.soltar(get_parent(), "papa" if randf() < 0.5 else "factura",
+			Vector3(global_position.x, 0.02, global_position.z), 45.0)
 
 
 func asustar(desde: Vector3) -> void:
@@ -178,21 +168,14 @@ func asustar(desde: Vector3) -> void:
 
 
 func _paso_oficinista(delta: float) -> void:
-	var hacia := destino_final - global_position
-	hacia.y = 0
-	if hacia.length() < 1.0:
+	if plano(destino_final - global_position).length() < 1.0:
 		queue_free()
 		return
-	_vel = _vel.lerp(hacia.normalized() * velocidad, minf(delta * 3.0, 1.0))
+	_ir_hacia(destino_final, velocidad, 3.0, delta)
 	if _soltar_factura_en > 0.0:
 		_soltar_factura_en -= delta
 		if _soltar_factura_en <= 0.0:
-			var c := Comida.new()
-			c.tipo = "factura"
-			c.reaparece = false
-			c.vida = 40.0
-			get_parent().add_child(c)
-			c.global_position = Vector3(global_position.x, 0.02, global_position.z)
+			Comida.soltar(get_parent(), "factura", Vector3(global_position.x, 0.02, global_position.z), 40.0)
 
 
 # ---------------------------------------------------------------- Comensales
@@ -241,13 +224,8 @@ func _paso_comer(delta: float) -> void:
 		modelo.gesto_comer()
 		# A veces se le cae una miga al piso (las palomas lo saben...)
 		if randf() < 0.3:
-			var c := Comida.new()
-			c.tipo = "miga"
-			c.reaparece = false
-			c.vida = 45.0
-			get_parent().add_child(c)
-			c.global_position = Vector3(asiento.x - lado * randf_range(0.2, 0.5), asiento.y + 0.01,
-				asiento.z + randf_range(-0.45, 0.45))
+			Comida.soltar(get_parent(), "miga", Vector3(asiento.x - lado * randf_range(0.2, 0.5),
+				asiento.y + 0.01, asiento.z + randf_range(-0.45, 0.45)), 45.0)
 	if tiempo_comida <= 0.0:
 		_levantarse()
 

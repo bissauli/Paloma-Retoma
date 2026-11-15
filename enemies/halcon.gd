@@ -51,7 +51,7 @@ func _physics_process(delta: float) -> void:
 			_circular(delta)
 		return
 	_enfriamiento = maxf(_enfriamiento - delta, 0.0)
-	var j := get_tree().get_first_node_in_group("jugador") as PalomaJugador
+	var j := GameState.jugador
 	match estado:
 		Estado.CIRCULANDO:
 			_circular(delta)
