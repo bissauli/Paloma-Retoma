@@ -194,3 +194,7 @@ Elegí siempre la opción más simple y divertida cuando algo era ambiguo. Las a
 - **En el editor** se lee de git en el momento (`OS.execute("git", ...)`), así que siempre está al día. **En una build exportada** no hay git (ni en la web ni en el teléfono): usa `autoload/info_version.gd`, que escribe `tools/generar_version.gd`. Hay que correrlo antes de exportar y después del último commit (está en el README); si no, la build muestra el número del último momento en que se generó.
 - Se eligió un script `.gd` generado y no un `.json` porque los scripts siempre entran en la exportación.
 - Prueba: `tests/test_version.tscn` (el número, el reconocimiento de Manuel y Nahuel, otro autor y la lectura de git).
+
+## Opciones desde la pausa (noviembre 2026)
+- Al abrir las Opciones desde la pausa se veían encima el título "PAUSA" y los botones, y la misión y la brújula del HUD. Ahora `Pausa._abrir_opciones` esconde `Centro` (título y botones) y el HUD, y `_al_cerrar_opciones` los devuelve. El HUD sólo se vuelve a mostrar si lo escondió la pausa: en una cinemática ya estaba escondido y tiene que seguir así. Queda el fondo oscuro de la pausa y las Opciones.
+- Prueba: `tests/test_pausa.tscn` (corre también con ventana y saca una captura en `user://capturas/`).
