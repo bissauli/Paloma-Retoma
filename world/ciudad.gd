@@ -1,6 +1,10 @@
 class_name Ciudad
 extends Node3D
-## La ciudad alrededor de la Plaza de Mayo (mapa V2), según el boceto del mapa:
+## La ciudad alrededor de la Plaza de Mayo, según el boceto del mapa. Mapa V3: la misma distribución
+## del V2 con el kit nuevo (tools/blender/ciudad_v3.py): veredas de lajas, edificios con remates de
+## color, autos estacionados, faroles curvos, semáforos, hidrantes, contenedores de colores, obras,
+## mesas de café, árboles grandes con flores, la cancha de básquet, el hospital, la comisaría y
+## locales temáticos.
 ## - Oeste: el parque (zona de palomas con su estatua, juegos con calesita, plaza en rombo, parque
 ##   de perros y la cucha de Bolt escondida) y, cruzando la Av. de Mayo, las manzanas comerciales
 ##   partidas por la Peatonal Florida.
@@ -45,9 +49,9 @@ const RECONQUISTA := [74.0, -11.0, 200.0, -1.0]       ## Entre los edificios del
 const PEATONAL := [-200.0, 54.0, -74.0, 62.0]         ## Peatonal Florida (piso peatonal)
 const PASAJE := [-64.0, 48.0, 64.0, 54.0]             ## Pasaje Las Palomas, detrás de los cafés
 
-const C_ASFALTO := Color("4a4a4f")
-const C_CORDON := Color("d9d5cc")
-const C_LINEA := Color("e8e4d0")
+const C_ASFALTO := Color("76787a")
+const C_CORDON := Color("e6e3dc")
+const C_LINEA := Color("f4f3ee")
 const C_TIERRA := Color("8c6a4b")
 const C_POTRERO := Color("9b7653")
 
@@ -63,17 +67,40 @@ const ESQ_COMERCIAL := ["esq_mod_a", "esq_cupula_a", "esq_dep_a", "esq_mod_a"]
 
 ## Negocios inventados (los nombres propios no se traducen)
 const LOCALES := ["Kiosco El Pibe", "Pizzería Los Hornos", "Ferretería Don Tito", "Verdulería Los Primos",
-	"Heladería La Cornisa", "Panadería La Espiga", "Lavadero Burbujas", "Almacén Don Pepe", "Café Los Gorriones",
+	"Heladería La Cornisa", "Lavadero Burbujas", "Almacén Don Pepe",
 	"Bar El Tero", "Óptica Mirada", "Peluquería Rulos", "Zapatería El Taco", "Regalería Moño", "Disquería Vinilo",
 	"Cerrajería La Llave", "Mercería El Ovillo", "Fiambrería La Picada", "Juguetería El Trompo", "Bazar Todo Suelto",
 	"Parrilla El Fogón", "Empanadas La Abuela", "Vinoteca El Tonel", "Pastas La Nonna", "Bicicletería Rayo",
-	"Pinturería Arcoíris", "Florería Jacarandá", "Kiosco 24 Horas", "Farmacia Del Pasaje", "Librería El Gorrión",
+	"Pinturería Arcoíris", "Florería Jacarandá", "Kiosco 24 Horas", "Librería El Gorrión",
 	"Rotisería El Buen Plato", "Tintorería Planchita", "Sastrería El Botón", "Pollería Don Pollo"]
 const OFICINAS := ["Seguros El Vuelo", "Banco del Palomar", "Inmobiliaria El Nido", "Estudio Contable Plumas",
 	"Agencia de Viajes Migrar", "Galería Paloma", "Bolsa de Migas", "Casa de Cambio La Moneda", "Editorial El Pico",
 	"Compañía de Seguros La Cornisa", "Escuela de Idiomas Arrullo", "Consultora Bandada"]
 
+## Carteles de los locales temáticos y edificios especiales (por tipo de cartel del kit): texto y color
+## de la letra. "HOSPITAL", "GUARDIA" y "POLICÍA" se traducen (autoload/textos_en.gd).
+const CARTELES := {
+	"panaderia": ["Panadería La Espiga", Color("8a4a2a")],
+	"golosineria": ["Golosinas El Caramelo", Color("e0507a")],
+	"farmacia": ["Farmacia del Pasaje", Color.WHITE],
+	"minimercado": ["Minimercado La Bandada", Color.WHITE],
+	"ropa": ["Ropa La Percha", Color("3a6fc0")],
+	"cafe": ["Café Los Gorriones", Color.WHITE],
+	"taller": ["Taller El Pistón", Color.WHITE],
+	"hospital": ["HOSPITAL", Color("e03a3a")],
+	"guardia": ["GUARDIA", Color.WHITE],
+	"comisaria": ["POLICÍA", Color.WHITE],
+}
+const AUTOS := ["auto_hatch_celeste", "auto_hatch_naranja", "auto_hatch_amarillo", "auto_hatch_verde", "auto_hatch_rojo",
+	"auto_hatch_blanco", "auto_sedan_celeste", "auto_sedan_rojo", "auto_sedan_blanco", "auto_sedan_verde", "taxi", "taxi"]
+const ARBOLES := ["arbol_grande_A", "arbol_grande_B", "arbol_grande_C", "jacaranda_grande", "arbol_grande_A", "pino_A", "pino_B"]
+const ARBOLES_VEREDA := ["arbol_grande_B", "arbol_grande_A", "jacaranda_grande", "arbol_grande_B"]
+const FLORES := ["flores_A", "flores_B", "flores_C", "flores_D"]
+const ARBUSTOS := ["arbusto_redondo_A", "arbusto_redondo_B", "arbusto_A", "arbusto_flores"]
+
 var _rng := RandomNumberGenerator.new()
+## Las flores tienen su propio azar: en el teléfono van menos y así no cambia el resto del mapa
+var _rng_flores := RandomNumberGenerator.new()
 var _cuerpos := {}                  ## Celda -> StaticBody3D con las colisiones de esa zona (ver _cuerpo_en)
 var _mat_vereda: Material
 var _mat_peatonal: Material
@@ -85,26 +112,30 @@ func _ready() -> void:
 	name = "Ciudad"
 	var t0 := Time.get_ticks_msec()
 	_rng.seed = 20261115
-	_mat_vereda = Construir.material_baldosas(Color("d6ccb6"), Color("b3a88f"), Vector2(0.7, 0.7))
-	_mat_peatonal = Construir.material_baldosas(Color("c99a7e"), Color("a87a61"), Vector2(0.55, 0.55))
+	_rng_flores.seed = 4242
+	_mat_vereda = Construir.material_lajas("lajas_vereda", 4.0)
+	_mat_peatonal = Construir.material_lajas("lajas_peatonal", 4.0)
 	_locales = LOCALES.duplicate()
 	_oficinas = OFICINAS.duplicate()
-	_suelos()
-	_manzanas()
-	_parque()
-	_barrio()
-	_peatonal()
-	_pasaje()
-	_props_veredas()
-	_fondo()
-	_puntos_de_juego()
+	# Cada etapa anota cuánto tardó (se ve con --verbose)
+	var etapas: Array[String] = []
+	for etapa: Callable in [_suelos, _manzanas, _parque, _barrio, _peatonal, _pasaje, _props_veredas, _estacionamientos,
+			_obras, _fondo, _puntos_de_juego]:
+		var t := Time.get_ticks_usec()
+		etapa.call()
+		etapas.append("%s %d" % [etapa.get_method(), (Time.get_ticks_usec() - t) / 1000])
 	# Los cuerpos entran al árbol recién ahora, con todas sus formas (así cada uno se arma una sola vez)
+	var t1 := Time.get_ticks_usec()
 	for c: Vector2i in _cuerpos:
 		add_child(_cuerpos[c])
+	etapas.append("colisiones %d" % ((Time.get_ticks_usec() - t1) / 1000))
 	# Miles de piezas pasan a ser pocas mallas grandes por celda (los árboles y props chicos van
 	# aparte y se dejan de dibujar lejos)
+	t1 = Time.get_ticks_usec()
+	var piezas := get_child_count()
 	Construir.fusionar_estaticas(self, 64.0)
-	print_verbose("Ciudad armada en %d ms" % (Time.get_ticks_msec() - t0))
+	etapas.append("fusión de %d piezas %d" % [piezas, (Time.get_ticks_usec() - t1) / 1000])
+	print_verbose("Ciudad armada en %d ms (%s)" % [Time.get_ticks_msec() - t0, ", ".join(etapas)])
 
 
 ## Cuerpo estático de la zona de "pos" (celdas de 48 m): miles de formas repartidas en varios
@@ -246,12 +277,17 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 	for c: Array in Kit.carteles(nombre, t):
 		var tipo: String = c[4]
 		var texto: String = textos.get(tipo, "")
-		if texto == "" and tipo == "local":
+		var color := Color.WHITE
+		if texto == "" and CARTELES.has(tipo):
+			texto = CARTELES[tipo][0]
+			color = CARTELES[tipo][1]
+		elif texto == "" and tipo == "local":
 			texto = _nombre_local(nombre)
 		elif texto == "" and tipo == "kiosco":
 			texto = "DIARIOS Y REVISTAS"
 		if texto != "":
-			_texto(c[0], c[1], texto, c[2], c[3], Color.WHITE, 55.0 if tipo == "local" else 40.0)
+			var rango := 40.0 if tipo == "kiosco" else (90.0 if tipo == "hospital" or tipo == "comisaria" else 55.0)
+			_texto(c[0], c[1], texto, c[2], c[3], color, rango)
 	return mi
 
 
@@ -313,12 +349,19 @@ func _repartir(largo: float, pool: Array) -> Array[String]:
 
 
 ## Fila de edificios sobre una línea de fachada: desde "a" hacia "dir", "largo" metros, con las
-## fachadas girando "rot" (0 = mirando a +Z).
+## fachadas girando "rot" (0 = mirando a +Z). "fijos": edificios que tienen que estar en la fila
+## (locales temáticos, hospital...); el resto se reparte del pool y los fijos caen en lugares al azar.
 func _fila(a: Vector3, dir: Vector3, largo: float, rot: float, pool: Array, colision := true,
-		sombra := true, lejos := false) -> Array[MeshInstance3D]:
+		sombra := true, lejos := false, fijos: Array = []) -> Array[MeshInstance3D]:
 	var out: Array[MeshInstance3D] = []
+	var resto := largo
+	for n: String in fijos:
+		resto -= float(KitDatos.PIEZAS[n]["ancho"])
+	var lista: Array = _repartir(resto, pool)
+	for n: String in fijos:
+		lista.insert(_rng.randi_range(0, lista.size()), n)
 	var d := 0.0
-	for n in _repartir(largo, pool):
+	for n: String in lista:
 		var w := float(KitDatos.PIEZAS[n]["ancho"])
 		var mi := _poner(n, a + dir * (d + w / 2.0), rot, Vector3.ONE, colision, {}, colision, lejos)
 		if not sombra:
@@ -328,9 +371,7 @@ func _fila(a: Vector3, dir: Vector3, largo: float, rot: float, pool: Array, coli
 	return out
 
 
-## Manzana con edificios en los lados de "lados" (N, S, E, O) y esquinas con ochava donde se tocan
-## dos lados. Si "patio", el centro de la manzana es un jardín (pulmón de manzana).
-func _manzana(r: Rect2, lados: String, pool: Array, esquinas: Array, patio := true) -> void:
+func _manzana(r: Rect2, lados: String, pool: Array, esquinas: Array, patio := true, fijos := {}) -> void:
 	var x0 := r.position.x
 	var z0 := r.position.y
 	var x1 := r.end.x
@@ -349,21 +390,21 @@ func _manzana(r: Rect2, lados: String, pool: Array, esquinas: Array, patio := tr
 		_poner(esquinas[_rng.randi() % esquinas.size()], Vector3(x0, 0, z0), -PI / 2.0)
 	if lados.contains("S"):
 		var a := x0 + (FONDO if so else 0.0)
-		_fila(Vector3(a, 0, z1), Vector3.RIGHT, x1 - (FONDO if se else 0.0) - a, 0.0, pool)
+		_fila(Vector3(a, 0, z1), Vector3.RIGHT, x1 - (FONDO if se else 0.0) - a, 0.0, pool, true, true, false, fijos.get("S", []))
 	if lados.contains("N"):
 		var a := x0 + (FONDO if no else 0.0)
-		_fila(Vector3(a, 0, z0), Vector3.RIGHT, x1 - (FONDO if ne else 0.0) - a, PI, pool)
+		_fila(Vector3(a, 0, z0), Vector3.RIGHT, x1 - (FONDO if ne else 0.0) - a, PI, pool, true, true, false, fijos.get("N", []))
 	if lados.contains("E"):
 		var a := z0 + (FONDO if ne else 0.0)
-		_fila(Vector3(x1, 0, a), Vector3.BACK, z1 - (FONDO if se else 0.0) - a, PI / 2.0, pool)
+		_fila(Vector3(x1, 0, a), Vector3.BACK, z1 - (FONDO if se else 0.0) - a, PI / 2.0, pool, true, true, false, fijos.get("E", []))
 	if lados.contains("O"):
 		var a := z0 + (FONDO if no else 0.0)
-		_fila(Vector3(x0, 0, a), Vector3.BACK, z1 - (FONDO if so else 0.0) - a, -PI / 2.0, pool)
+		_fila(Vector3(x0, 0, a), Vector3.BACK, z1 - (FONDO if so else 0.0) - a, -PI / 2.0, pool, true, true, false, fijos.get("O", []))
 	if patio:
 		_jardin(r.grow(-FONDO))
 
 
-## Pulmón de manzana: losetas de pasto con árboles, arbustos y algún tendedero.
+## Pulmón de manzana: losetas de pasto con árboles grandes, flores, arbustos y algún tendedero.
 func _jardin(r: Rect2) -> void:
 	if r.size.x < 6.0 or r.size.y < 6.0:
 		return
@@ -376,15 +417,13 @@ func _jardin(r: Rect2) -> void:
 			var c := Vector3(x0 + 3.0 + 6.0 * i, 0.0, z0 + 3.0 + 6.0 * j)
 			Kit.colocar(self, "pasto", c)
 			var dado := _rng.randf()
-			if dado < 0.45:
-				var arbol: String = ["arbol_A", "arbol_B", "arbol_C", "arbol_E", "jacaranda", "arbol_D"][_rng.randi() % 6]
-				_poner(arbol, c + Vector3(_rng.randf_range(-1.5, 1.5), T_PARQUE, _rng.randf_range(-1.5, 1.5)), _rng.randf() * TAU)
-			elif dado < 0.6:
+			if dado < 0.3:
+				_poner(ARBOLES[_rng.randi() % ARBOLES.size()], c + Vector3(_rng.randf_range(-1.2, 1.2), T_PARQUE,
+					_rng.randf_range(-1.2, 1.2)), _rng.randf() * TAU, Vector3.ONE * _rng.randf_range(0.75, 0.95))
+			elif dado < 0.42:
 				_poner("tendedero", c + Vector3(_rng.randf_range(-1, 1), T_PARQUE, _rng.randf_range(-1, 1)),
 					_rng.randf() * TAU, Vector3.ONE, false)
-			if _rng.randf() < 0.5:
-				var arbusto: String = ["arbusto_A", "arbusto_B", "arbusto_C", "arbusto_flores"][_rng.randi() % 4]
-				_poner(arbusto, c + Vector3(_rng.randf_range(-2.4, 2.4), T_PARQUE, _rng.randf_range(-2.4, 2.4)), _rng.randf() * TAU)
+			_flores_en(c, 2.4, 1 if Ajustes.movil else 2)
 	# Colisión del jardín (a la altura de las losetas)
 	var forma := BoxShape3D.new()
 	forma.size = Vector3(nx * 6.0, 0.2, nz * 6.0)
@@ -392,12 +431,30 @@ func _jardin(r: Rect2) -> void:
 		Transform3D(Basis.IDENTITY, Vector3(r.get_center().x, 0.1, r.get_center().y)))
 
 
+## Matas de flores, arbustos y pasto alto al azar alrededor de "c" (sobre el pasto del parque).
+func _flores_en(c: Vector3, radio: float, cantidad: int) -> void:
+	for k in cantidad:
+		var p := c + Vector3(_rng_flores.randf_range(-radio, radio), T_PARQUE, _rng_flores.randf_range(-radio, radio))
+		var dado := _rng_flores.randf()
+		if dado < 0.6:
+			_poner(FLORES[_rng_flores.randi() % FLORES.size()], p, _rng_flores.randf() * TAU, Vector3.ONE, false)
+		elif dado < 0.8:
+			_poner(ARBUSTOS[_rng_flores.randi() % ARBUSTOS.size()], p, _rng_flores.randf() * TAU, Vector3.ONE, false)
+		else:
+			_poner("mata_pasto", p, _rng_flores.randf() * TAU, Vector3.ONE, false)
+
+
 func _manzanas() -> void:
-	_manzana(NORTE, "NSEO", POOL_CENTRO, ESQ_CENTRO)
-	_manzana(SUR, "NSEO", POOL_CENTRO, ESQ_CENTRO)
-	_manzana(ESTE, "NSEO", POOL_CENTRO, ESQ_CENTRO)
-	_manzana(COMERCIAL_A, "NSEO", POOL_COMERCIAL, ESQ_COMERCIAL)
-	_manzana(COMERCIAL_B, "NSEO", POOL_COMERCIAL, ESQ_COMERCIAL)
+	# Norte: la farmacia sobre Rivadavia, mirando a la plaza
+	_manzana(NORTE, "NSEO", POOL_CENTRO, ESQ_CENTRO, true, {"S": ["farmacia_8"]})
+	# Sur: la golosinería sobre el pasaje
+	_manzana(SUR, "NSEO", POOL_CENTRO, ESQ_CENTRO, true, {"N": ["golosineria_8"]})
+	# Este: el hospital sobre Paseo Colón y la comisaría sobre Reconquista (frente al barrio enemigo)
+	_manzana(ESTE, "NSEO", POOL_CENTRO, ESQ_CENTRO, true, {"O": ["hospital_32"], "S": ["comisaria_20"]})
+	# Comerciales: los locales temáticos sobre la Peatonal Florida y la Av. de Mayo
+	_manzana(COMERCIAL_A, "NSEO", POOL_COMERCIAL, ESQ_COMERCIAL, true,
+		{"S": ["panaderia_8", "cafe_10", "ropa_10"], "N": ["minimercado_10"]})
+	_manzana(COMERCIAL_B, "NSEO", POOL_COMERCIAL, ESQ_COMERCIAL, true, {"N": ["taller_12", "cafe_10"]})
 
 
 # ---------------------------------------------------------------- Parque (losetas de 6 m)
@@ -469,6 +526,8 @@ func _parque() -> void:
 			return true                           # parque de perros
 		if i <= 2 and j >= 7 and j <= 9:
 			return true                           # la cucha de Bolt
+		if i >= 12 and i <= 16 and j >= 11 and j <= 13:
+			return true                           # la cancha de básquet
 		return false
 	for i in nx:
 		for j in nz:
@@ -505,21 +564,18 @@ func _parque() -> void:
 			elif reservado.call(i, j):
 				Kit.colocar(self, "pasto", c)
 			else:
+				# Mapa V3: menos árboles pero grandes, y muchas flores (como en las referencias)
 				var dado := _rng.randf()
-				if dado < 0.24:
-					_poner("bosque", c, _rng.randi_range(0, 3) * PI / 2.0)
-				elif dado < 0.36:
+				if dado < 0.08:
 					_poner("jacaranda_banco", c, _rng.randi_range(0, 3) * PI / 2.0)
-				elif dado < 0.41:
+				elif dado < 0.13:
 					_poner("plaza_cantero", c, 0.0)
 				else:
 					Kit.colocar(self, "pasto", c)
-					if _rng.randf() < 0.75:
-						var arbol: String = ["arbol_A", "arbol_B", "arbol_C", "arbol_E", "arbol_D", "jacaranda"][_rng.randi() % 6]
-						_poner(arbol, c + Vector3(_rng.randf_range(-1.6, 1.6), T_PARQUE, _rng.randf_range(-1.6, 1.6)), _rng.randf() * TAU)
-					for k in _rng.randi_range(0, 2):
-						var arbusto: String = ["arbusto_A", "arbusto_B", "arbusto_C", "arbusto_flores"][_rng.randi() % 4]
-						_poner(arbusto, c + Vector3(_rng.randf_range(-2.4, 2.4), T_PARQUE, _rng.randf_range(-2.4, 2.4)), _rng.randf() * TAU)
+					if _rng.randf() < 0.42:
+						_poner(ARBOLES[_rng.randi() % ARBOLES.size()], c + Vector3(_rng.randf_range(-1.4, 1.4), T_PARQUE,
+							_rng.randf_range(-1.4, 1.4)), _rng.randf() * TAU, Vector3.ONE * _rng.randf_range(0.85, 1.1))
+					_flores_en(c, 2.5, _rng_flores.randi_range(1, 2) if Ajustes.movil else _rng_flores.randi_range(2, 4))
 	# Colisión del piso del parque (las losetas están a 20 cm)
 	var forma := BoxShape3D.new()
 	forma.size = Vector3(r.size.x, T_PARQUE, r.size.y)
@@ -530,6 +586,7 @@ func _parque() -> void:
 	_plaza_rombo()
 	_parque_perros()
 	_bolt()
+	_cancha()
 
 
 const Y_PISO := T_PARQUE + 0.07   ## Superficie de los pisos especiales del parque
@@ -562,26 +619,32 @@ func _juegos() -> void:
 	# Calesita (la parte de arriba gira)
 	_poner("calesita_base", c + Vector3(7, y, -4))
 	_animado("calesita_giro", c + Vector3(7, y, -4), 0.0, "girar", 0.45)
-	# Hamacas: el marco fijo y cada asiento se hamaca sobre el eje de arriba
-	_poner("hamaca_marco", c + Vector3(-6, y, -6.5))
+	# Hamacas de madera: el marco fijo y cada asiento se hamaca sobre el eje de arriba
+	_poner("hamaca_madera", c + Vector3(-6, y, -6.5))
 	for x: float in [-0.65, 0.65]:
 		_animado("hamaca_asiento", c + Vector3(-6 + x, y + 2.5, -6.5), 0.0, "hamacar", 1.6 + x, 0.55)
-	_poner("tobogan", c + Vector3(-8, y, 5), deg_to_rad(30))
+	_poner("tobogan_torre", c + Vector3(-9, y, 4), deg_to_rad(20))
 	_poner("subibaja_base", c + Vector3(9, y, 6))
 	_animado("subibaja_tabla", c + Vector3(9, y + 0.5, 6), 0.0, "subibaja", 1.2, 0.25)
 	_poner("arenero", c + Vector3(0.5, y, 1.5))
-	# Cerco bajo de colores alrededor (con la entrada al sur, donde llega el camino)
+	# Caballitos de resorte
+	_poner("resorte_dino", c + Vector3(3.5, y, 7.5), 0.4)
+	_poner("resorte_elefante", c + Vector3(-2.0, y, 8.0), -0.3)
+	_poner("resorte_dino", c + Vector3(12.5, y, -1.0), 2.0)
+	# Cerco bajo de palos de colores alrededor (con la entrada al sur, donde llega el camino)
 	var x0 := c.x - 16.5
 	var x1 := c.x + 16.5
 	var z0 := c.z - 13.5
 	var z1 := c.z + 13.5
-	_cerco("cerco_juegos", Vector3(x0, T_PARQUE, z0), Vector3(x1, T_PARQUE, z0), [])
-	_cerco("cerco_juegos", Vector3(x1, T_PARQUE, z0), Vector3(x1, T_PARQUE, z1), [])
-	_cerco("cerco_juegos", Vector3(x1, T_PARQUE, z1), Vector3(x0, T_PARQUE, z1), [6])
-	_cerco("cerco_juegos", Vector3(x0, T_PARQUE, z1), Vector3(x0, T_PARQUE, z0), [])
+	_cerco("cerco_colores", Vector3(x0, T_PARQUE, z0), Vector3(x1, T_PARQUE, z0), [])
+	_cerco("cerco_colores", Vector3(x1, T_PARQUE, z0), Vector3(x1, T_PARQUE, z1), [])
+	_cerco("cerco_colores", Vector3(x1, T_PARQUE, z1), Vector3(x0, T_PARQUE, z1), [6])
+	_cerco("cerco_colores", Vector3(x0, T_PARQUE, z1), Vector3(x0, T_PARQUE, z0), [])
 	_poner("cartel_madera", Vector3(-108, T_PARQUE, -76.4), 0.0, Vector3.ONE, true, {"madera": "Plaza de juegos"})
 	for x: float in [-12.0, 12.0]:
-		_poner("banco", c + Vector3(x, y, 11.6), PI)
+		_poner("banco_listones", c + Vector3(x, y, 11.6), PI)
+	for p: Vector3 in [Vector3(-14.5, 0, -11.5), Vector3(14.5, 0, -11.5), Vector3(14.5, 0, 11.5)]:
+		_poner("arbol_grande_B", c + p + Vector3(0, T_PARQUE, 0), _rng.randf() * TAU, Vector3.ONE * 0.8)
 	_paseo(c + Vector3(0, y, 3), Vector2(22, 14), 3, "turista", "")
 
 
@@ -627,6 +690,23 @@ func _parque_perros() -> void:
 		var a := _animado(nombre, p, _rng.randf() * TAU, "pasear", 1.6)
 		a.zona = zona
 	_paseo(Vector3(-168, y, -29), Vector2(30, 12), 2, "turista", "")
+
+
+## Cancha de básquet en el sureste del parque, con sus aros, una pelota, bancos y un par de árboles.
+func _cancha() -> void:
+	var c := Vector3(-110, T_PARQUE, -37)
+	_poner("cancha_basquet", c, 0.0, Vector3.ONE, false)
+	_poner("aro_basquet", c + Vector3(-12.6, 0.035, 0), PI / 2.0)
+	_poner("aro_basquet", c + Vector3(12.6, 0.035, 0), -PI / 2.0)
+	_poner("pelota", c + Vector3(3.0, 0.035, 2.0), 0.0, Vector3.ONE, false)
+	for x: float in [-6.0, 0.0, 6.0]:
+		_poner("banco_listones", c + Vector3(x, 0, -8.6), 0.0)
+	for p: Vector3 in [Vector3(-14.5, 0, -8.5), Vector3(14.5, 0, -8.5), Vector3(14.5, 0, 8.5), Vector3(-14.5, 0, 8.5)]:
+		_poner(["arbol_grande_A", "pino_B"][_rng.randi() % 2], c + p, _rng.randf() * TAU)
+	var forma := BoxShape3D.new()
+	forma.size = Vector3(28, 0.04, 16)
+	Kit._forma(_cuerpo_en(c), forma, Transform3D(Basis.IDENTITY, c + Vector3(0, 0.02, 0)))
+	_paseo(c + Vector3(0, 0.04, 0), Vector2(22, 10), 2, "turista", "")
 
 
 ## El easter egg de Bolt: su cucha escondida entre los arbustos del lado oeste del parque.
@@ -737,19 +817,21 @@ func _peatonal() -> void:
 		match k % 4:
 			0:
 				_poner("cazuela", Vector3(x, Y_VEREDA, z))
-				_poner(["arbol_calle_A", "arbol_calle_C", "jacaranda_calle"][_rng.randi() % 3], Vector3(x, Y_VEREDA, z), _rng.randf() * TAU)
+				_poner(ARBOLES_VEREDA[_rng.randi() % ARBOLES_VEREDA.size()], Vector3(x, Y_VEREDA, z), _rng.randf() * TAU,
+					Vector3.ONE * 0.7)
 			1:
-				_poner("farol_doble", Vector3(x, Y_VEREDA, z), PI / 2.0)
-				_poner("banco", Vector3(x - 1.5, Y_VEREDA, z - 1.2), PI)
-				_poner("banco", Vector3(x + 1.5, Y_VEREDA, z + 1.2), 0.0)
+				_poner("farola_curva", Vector3(x, Y_VEREDA, z), PI / 2.0)
+				_poner("banco_listones", Vector3(x - 1.5, Y_VEREDA, z - 1.2), PI)
+				_poner("banco_listones", Vector3(x + 1.5, Y_VEREDA, z + 1.2), 0.0)
 			2:
-				_poner(["maceton_flores", "maceton"][_rng.randi() % 2], Vector3(x - 1.2, Y_VEREDA, z), 0.0)
-				_poner(["maceton_flores", "maceton"][_rng.randi() % 2], Vector3(x + 1.2, Y_VEREDA, z), 0.0)
+				# Mesas de los cafés en el medio de la peatonal
+				_poner(["mesa_cafe_roja", "mesa_cafe_verde"][_rng.randi() % 2], Vector3(x - 1.6, Y_VEREDA, z), 0.0)
+				_poner(["maceton_flores", "maceton"][_rng.randi() % 2], Vector3(x + 1.4, Y_VEREDA, z), 0.0)
 			3:
 				if k == 7:
 					_poner("kiosco_diarios", Vector3(x, Y_VEREDA, z), PI / 2.0)
 				else:
-					_poner("cesto", Vector3(x, Y_VEREDA, z - 0.8))
+					_poner("tacho", Vector3(x, Y_VEREDA, z - 0.8))
 					_poner(["bici_roja", "bici_azul", "bici_verde"][_rng.randi() % 3], Vector3(x + 1.5, Y_VEREDA, z + 1.5), 0.2, Vector3.ONE, false)
 		x += 7.5
 		k += 1
@@ -764,49 +846,67 @@ func _pasaje() -> void:
 		_poner("guirnalda", Vector3(x, Y_VEREDA, z), PI / 2.0, Vector3(1.0, 1.0, 1.0), false)
 		if k % 2 == 0:
 			_poner(["maceton", "maceton_flores"][_rng.randi() % 2], Vector3(x + 2.5, Y_VEREDA, PASAJE[3] - 0.7))
+		elif k % 4 == 1:
+			_poner(["mesa_cafe_roja", "mesa_cafe_verde"][_rng.randi() % 2], Vector3(x + 3.0, Y_VEREDA, z + 0.6), 0.0)
 		else:
 			_poner(["bici_roja", "bici_azul", "bici_verde"][_rng.randi() % 3], Vector3(x + 3.0, Y_VEREDA, PASAJE[3] - 0.5), 0.0,
 				Vector3.ONE, false)
 		if k % 3 == 1:
-			_poner("cesto", Vector3(x - 2.0, Y_VEREDA, PASAJE[1] + 0.6))
+			_poner("tacho", Vector3(x - 2.0, Y_VEREDA, PASAJE[1] + 0.6))
 		x += 9.0
 		k += 1
 
 
 # ---------------------------------------------------------------- Veredas: árboles, faroles, carteles
 
-## Árboles en cazuelas, farolas y algo de mobiliario sobre una vereda. "a" y "b" son los extremos
+## Árboles en cazuelas, faroles curvos y mobiliario sobre una vereda. "a" y "b" son los extremos
 ## sobre el cordón y "adentro" apunta hacia las fachadas.
 func _props_vereda(a: Vector3, b: Vector3, adentro: Vector3, paso := 9.0) -> void:
 	var largo := a.distance_to(b)
 	var dir := (b - a) / largo
 	var rot_calle := atan2(-adentro.x, -adentro.z)   # +Z local hacia la calle
 	var rot_largo := atan2(-dir.z, dir.x)            # X local a lo largo de la vereda
+	var rot_adentro := atan2(adentro.x, adentro.z)   # +Z local hacia las fachadas
 	var d := 6.0
 	var k := _rng.randi() % 3
 	while d < largo - 5.0:
 		var p := a + dir * d + Vector3(0, Y_VEREDA, 0)
-		if k % 3 == 1:
-			_poner("farola", p + adentro * 0.45, rot_calle)
-		else:
-			var arbol: String = ["arbol_calle_A", "arbol_calle_B", "arbol_calle_C", "arbol_calle_A", "jacaranda_calle"][_rng.randi() % 5]
-			_poner("cazuela", p + adentro * 1.0, rot_largo)
-			_poner(arbol, p + adentro * 1.0, _rng.randf() * TAU)
 		var extra := _rng.randf()
-		if extra < 0.1:
-			_poner("contenedor" if _rng.randf() < 0.7 else "contenedor_gris", p - adentro * 0.75 + Vector3(0, -Y_VEREDA + Y_CALZADA, 0),
-				rot_largo)
-		elif extra < 0.17:
-			_poner("cesto", p + adentro * 0.45 + dir * 2.0)
-		elif extra < 0.22:
-			_poner(["bici_roja", "bici_azul", "bici_verde"][_rng.randi() % 3], p + adentro * 2.4 + dir * 2.5, rot_largo, Vector3.ONE, false)
-		elif extra < 0.27:
-			_poner(["maceton", "maceton_flores"][_rng.randi() % 2], p + adentro * 2.45 + dir * 3.0)
+		if extra < 0.06:
+			# Los tres contenedores juntos (reciclables, basura y vidrio) en vez del árbol
+			for u in 3:
+				_poner(["contenedor_azul", "contenedor", "contenedor_amarillo"][u], p + adentro * 0.75 + dir * (u - 1) * 1.85, rot_largo)
+		elif k % 3 == 1:
+			_poner("farola_curva", p + adentro * 0.4, rot_calle)
+		else:
+			_poner("cazuela", p + adentro * 1.0, rot_largo)
+			_poner(ARBOLES_VEREDA[_rng.randi() % ARBOLES_VEREDA.size()], p + adentro * 1.0, _rng.randf() * TAU,
+				Vector3.ONE * _rng.randf_range(0.6, 0.72))
+		var q := p + dir * 3.5
+		if extra < 0.06:
+			pass
+		elif extra < 0.15:
+			_poner("hidrante", q + adentro * 0.5, rot_calle)
+		elif extra < 0.23:
+			_poner("tacho", q + adentro * 0.5)
+		elif extra < 0.28:
+			_poner("cartelera", q + adentro * 1.3, rot_largo)
+		elif extra < 0.33:
+			_poner("caja_electrica", q + adentro * 2.6, rot_calle)
+		elif extra < 0.38:
+			_poner("cartel_estacionamiento", q + adentro * 0.3, rot_calle)
+		elif extra < 0.43:
+			_poner(["bici_roja", "bici_azul", "bici_verde"][_rng.randi() % 3], q + adentro * 2.4, rot_largo, Vector3.ONE, false)
+		elif extra < 0.48:
+			_poner(["maceton", "maceton_flores"][_rng.randi() % 2], q + adentro * 2.45)
+		elif extra < 0.52:
+			_poner("banco_listones", q + adentro * 2.4, rot_adentro + PI)
+		if _rng.randf() < 0.12:
+			_poner("tapa_cloaca", p + dir * 1.5 + adentro * 2.0, _rng.randf() * TAU, Vector3.ONE, false)
 		d += paso
 		k += 1
 
 
-## Cartel con los nombres de las dos calles que se cruzan, en la esquina de la vereda.
 func _cartel_calle(pos: Vector3, este_oeste: String, norte_sur: String) -> void:
 	var p := Vector3(pos.x, Y_VEREDA, pos.z)
 	_poner("cartel_calle", p)
@@ -850,7 +950,11 @@ func _props_veredas() -> void:
 		for q: Array in esquinas:
 			if q[1] != "" and q[2] != "":
 				_cartel_calle(q[0], q[1], q[2])
-				_poner("pilote", (q[0] as Vector3) + Vector3(0, Y_VEREDA, 0) + Vector3(signf(r.get_center().x - (q[0] as Vector3).x), 0, 0) * 1.2)
+				var esq: Vector3 = q[0]
+				var hacia := Vector3(signf(r.get_center().x - esq.x), 0, signf(r.get_center().y - esq.z))
+				_poner("pilote", esq + Vector3(0, Y_VEREDA, 0) + Vector3(hacia.x, 0, 0) * 1.2)
+				# Semáforo de vereda mirando a la esquina (los de la avenida los maneja Transito)
+				_poner("semaforo_vereda", esq + Vector3(0, Y_VEREDA, 0) + Vector3(0, 0, hacia.z) * 1.6, atan2(-hacia.x, -hacia.z))
 	# Veredas de la plaza (detrás del Cabildo, de la Catedral y de la Casa Rosada)
 	_props_vereda(Vector3(-64, 0, -43), Vector3(-64, 0, 26), Vector3.RIGHT)
 	_props_vereda(Vector3(64, 0, -43), Vector3(64, 0, 26), Vector3.LEFT)
@@ -871,6 +975,76 @@ func _props_veredas() -> void:
 	_poner("buzon", Vector3(-20, Y_VEREDA, -54.4), 0.0)
 
 
+# ---------------------------------------------------------------- Autos estacionados y obras
+
+## Auto del kit estacionado (con colisión) y sus cuatro ruedas. Los modelos miran a +X.
+func _auto_estacionado(nombre: String, pos: Vector3, rot: float) -> void:
+	_poner(nombre, pos, rot)
+	var d: Dictionary = KitDatos.PIEZAS[nombre]
+	var rueda := "rueda_colectivo" if float(d["radio_rueda"]) > 0.4 else "rueda_auto"
+	var t := Transform3D(Basis.from_euler(Vector3(0, rot, 0)), pos)
+	for p: Array in d["ruedas"]:
+		Kit.colocar(self, rueda, t * Vector3(p[0], p[1], p[2]), rot)
+
+
+## Lugares de estacionamiento a lo largo de un cordón: marcas blancas en L cada 5,5 m y autos en la
+## mayoría. "a" y "b" son los extremos sobre el cordón y "afuera" apunta hacia el medio de la calle;
+## los autos miran hacia "sentido" (la mano de ese lado de la calle).
+func _estacionar(a: Vector3, b: Vector3, afuera: Vector3, sentido: Vector3, ocupado := 0.7, modelos: Array = AUTOS) -> void:
+	const LUGAR := 5.5
+	var largo := a.distance_to(b)
+	var dir := (b - a) / largo
+	var n := int(largo / LUGAR)
+	var inicio := (largo - n * LUGAR) / 2.0
+	var rot := atan2(-sentido.z, sentido.x)
+	for k in n + 1:
+		var p := a + dir * (inicio + k * LUGAR)
+		# Marca en L: la raya perpendicular al cordón y una pata corta a lo largo
+		_raya(p + afuera * 1.1, Vector2(0.14, 2.2) if absf(afuera.x) < 0.5 else Vector2(2.2, 0.14))
+		var pata := p + afuera * 2.15 + dir * 0.3
+		_raya(pata, Vector2(0.6, 0.14) if absf(afuera.x) < 0.5 else Vector2(0.14, 0.6))
+		if k < n and _rng.randf() < ocupado:
+			var c := a + dir * (inicio + (k + 0.5) * LUGAR) + afuera * 1.25 + Vector3(0, Y_CALZADA, 0)
+			if _rng.randf() < 0.06:
+				_poner(["moto_roja", "moto_celeste"][_rng.randi() % 2], c, rot + _rng.randf_range(-0.2, 0.2))
+			else:
+				_auto_estacionado(modelos[_rng.randi() % modelos.size()], c, rot)
+
+
+func _raya(c: Vector3, tam: Vector2) -> void:
+	Construir.caja(self, Vector3(c.x, 0.016, c.z), Vector3(tam.x, 0.01, tam.y), C_LINEA, false)
+
+
+func _estacionamientos() -> void:
+	# Sólo en las calles sin tránsito (Rivadavia, la Av. de Mayo y Reconquista): los autos que andan
+	# van por Bolívar, la avenida y Paseo Colón (ver world/transito.gd)
+	_estacionar(Vector3(-57, 0, -53), Vector3(57, 0, -53), Vector3.BACK, Vector3.LEFT)
+	_estacionar(Vector3(-57, 0, -43), Vector3(57, 0, -43), Vector3.FORWARD, Vector3.RIGHT)
+	_estacionar(Vector3(-196, 0, -7), Vector3(-82, 0, -7), Vector3.BACK, Vector3.LEFT)
+	_estacionar(Vector3(-196, 0, 3), Vector3(-82, 0, 3), Vector3.FORWARD, Vector3.RIGHT)
+	# Reconquista: del lado de la comisaría estacionan también los patrulleros
+	_estacionar(Vector3(82, 0, -11), Vector3(196, 0, -11), Vector3.BACK, Vector3.LEFT, 0.65,
+		AUTOS + ["patrullero", "patrullero", "patrullero"])
+	_estacionar(Vector3(82, 0, -1), Vector3(196, 0, -1), Vector3.FORWARD, Vector3.RIGHT, 0.75)
+
+
+## Obras en la vereda: un pozo con un caño, vallas de rayas y conos.
+func _obra(c: Vector3, rot: float) -> void:
+	var t := Transform3D(Basis.from_euler(Vector3(0, rot, 0)), c + Vector3(0, Y_VEREDA, 0))
+	_poner("pozo_obra", t.origin, rot, Vector3.ONE, false)
+	for v: Array in [[Vector3(0, 0, -1.25), 0.0], [Vector3(0, 0, 1.25), 0.0], [Vector3(-1.7, 0, 0), PI / 2.0],
+			[Vector3(1.9, 0, 0), PI / 2.0]]:
+		_poner("valla_obra", t * (v[0] as Vector3), rot + float(v[1]))
+	for p: Vector3 in [Vector3(-1.6, 0, -1.4), Vector3(1.8, 0, 1.4), Vector3(2.2, 0, -1.2)]:
+		_poner("cono", t * p, _rng.randf() * TAU)
+
+
+func _obras() -> void:
+	_obra(Vector3(20, 0, -54.6), 0.0)          # vereda norte de Rivadavia
+	_obra(Vector3(-150, 0, 4.6), 0.0)          # vereda de la Av. de Mayo, frente a las comerciales
+	_obra(Vector3(76.6, 0, 70), PI / 2.0)      # Paseo Colón, frente al barrio
+
+
 # ---------------------------------------------------------------- Fondo (fuera del mapa jugable)
 
 ## Una fila de edificios del kit mirando hacia el mapa y, detrás, torres simples que hacen de horizonte.
@@ -885,7 +1059,7 @@ func _fondo() -> void:
 	_fila(Vector3(-213, 0, -128), Vector3.BACK, 254.0, PI / 2.0, POOL_FONDO, false, false, true)
 	_fila(Vector3(213, 0, -128), Vector3.BACK, 254.0, -PI / 2.0, POOL_FONDO, false, false, true)
 	# Torres del horizonte
-	var colores := [Color("c9d3dc"), Color("b9c6d2"), Color("d8d2c8"), Color("aebccb"), Color("cfc8d6")]
+	var colores := [Color("c4d6e8"), Color("e8d5b8"), Color("d4c4e2"), Color("c2e0cf"), Color("efc9b8"), Color("d9dde3")]
 	for k in 70:
 		var ang := TAU * k / 70.0 + _rng.randf_range(-0.03, 0.03)
 		var d := Vector3(cos(ang) * 290.0, 0, sin(ang) * 215.0)

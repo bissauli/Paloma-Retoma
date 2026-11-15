@@ -10,3 +10,6 @@
 # Kits de Blender: el .blend y las vistas previas se regeneran con tools/blender/*.py
 modelos/*/fuente/
 modelos/*/previas/
+
+# Caché de Python de los generadores de Blender
+__pycache__/

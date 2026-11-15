@@ -15,17 +15,32 @@ const C_PASTO := Color("6fa14f")
 const C_TRONCO := Color("6b4a32")
 const C_JACARANDA := Color("9b7ad8")
 const C_JACARANDA_2 := Color("b296e6")
+const C_TECHO := Color("9c9a92")
 
 
 # ---------------------------------------------------------------- Genéricos
 
 ## Edificio de caja con cornisas (para posarse) y ventanas en el frente.
 ## base = centro de la base; frente = normal de la fachada principal (eje X o Z).
+## Mapa V3: azotea gris con un borde de color que sobresale (como los edificios del kit) y un par de
+## aires acondicionados.
 static func edificio(padre: Node3D, base: Vector3, tam: Vector3, color: Color, frente: Vector3,
 		color_cornisa := C_BLANCO, pisos := -1) -> void:
 	Construir.caja(padre, base + Vector3(0, tam.y / 2.0, 0), tam, color)
-	# Cornisa superior: sobresale para que se pueda aterrizar en el borde
-	Construir.caja(padre, base + Vector3(0, tam.y + 0.2, 0), Vector3(tam.x + 1.0, 0.4, tam.z + 1.0), color_cornisa)
+	# Azotea gris y el borde de color: sobresale para que se pueda aterrizar en él
+	Construir.caja(padre, base + Vector3(0, tam.y + 0.05, 0), Vector3(tam.x, 0.1, tam.z), C_TECHO)
+	const B := 0.55
+	var y_borde := tam.y + 0.35
+	for s in [-1.0, 1.0]:
+		Construir.caja(padre, base + Vector3(0, y_borde, s * (tam.z / 2.0 + 0.5 - B / 2.0)), Vector3(tam.x + 1.0, 0.7, B), color_cornisa)
+		Construir.caja(padre, base + Vector3(s * (tam.x / 2.0 + 0.5 - B / 2.0), y_borde, 0), Vector3(B, 0.7, tam.z), color_cornisa)
+	# Aires acondicionados en la azotea (caja blanca con el ventilador oscuro arriba)
+	var semilla := absi(int(base.x * 7.0 + base.z * 13.0))
+	for k in 1 + semilla % 2:
+		var p := base + Vector3((tam.x / 2.0 - 2.2) * (1.0 if k == 0 else -0.4), tam.y + 0.1, (tam.z / 2.0 - 2.0) * (-0.5 if k == 0 else 0.4))
+		Construir.caja(padre, p + Vector3(0, 0.4, 0), Vector3(1.5, 0.8, 1.0), Color("e8eaea"))
+		for dx in [-0.38, 0.38]:
+			Construir.cilindro(padre, p + Vector3(dx, 0.82, 0), 0.32, 0.04, Color("5f666b"), false, 10)
 	# Cornisa intermedia sólo en el frente
 	var ancho_frente := tam.x if absf(frente.z) > 0.5 else tam.z
 	var prof := tam.z if absf(frente.z) > 0.5 else tam.x
@@ -217,15 +232,19 @@ static func catedral(padre: Node3D) -> void:
 static func cafes(padre: Node3D) -> Array[Vector3]:
 	var mesas: Array[Vector3] = []
 	var negocios := [
-		{"x": -30.0, "ancho": 18.0, "alto": 11.0, "color": Color("e9d5b0"), "toldo": Color("2f7d5b"), "nombre": "Café La Medialuna Feliz"},
-		{"x": -8.0, "ancho": 16.0, "alto": 13.0, "color": Color("d9b48f"), "toldo": Color("b8423a"), "nombre": "Confitería El Buen Mozo"},
-		{"x": 13.0, "ancho": 16.0, "alto": 10.0, "color": Color("efe3c8"), "toldo": Color("2b4f8a"), "nombre": "Bar Los Vencejos"},
-		{"x": 32.0, "ancho": 14.0, "alto": 14.0, "color": Color("cfcfc7"), "toldo": Color("54585c"), "nombre": "Banco Austral Imaginario"},
+		{"x": -30.0, "ancho": 18.0, "alto": 11.0, "color": Color("f6e2b0"), "toldo": Color("2f7d5b"), "nombre": "Café La Medialuna Feliz",
+			"remate": Color("4f9a64")},
+		{"x": -8.0, "ancho": 16.0, "alto": 13.0, "color": Color("e8a070"), "toldo": Color("b8423a"), "nombre": "Confitería El Buen Mozo",
+			"remate": Color("fbf1d8")},
+		{"x": 13.0, "ancho": 16.0, "alto": 10.0, "color": Color("a6d6f4"), "toldo": Color("2b4f8a"), "nombre": "Bar Los Vencejos",
+			"remate": Color("ffffff")},
+		{"x": 32.0, "ancho": 14.0, "alto": 14.0, "color": Color("dddbd3"), "toldo": Color("54585c"), "nombre": "Banco Austral Imaginario",
+			"remate": Color("4f7fc0")},
 	]
 	for n: Dictionary in negocios:
 		var x: float = n["x"]
 		var ancho: float = n["ancho"]
-		edificio(padre, Vector3(x, 0, 43.0), Vector3(ancho, n["alto"], 10), n["color"], Vector3(0, 0, -1))
+		edificio(padre, Vector3(x, 0, 43.0), Vector3(ancho, n["alto"], 10), n["color"], Vector3(0, 0, -1), n["remate"])
 		# Vidriera oscura en planta baja
 		Construir.caja(padre, Vector3(x, 1.6, 37.95), Vector3(ancho - 2.0, 2.6, 0.1), Color("2e3640"), false)
 		# Toldo inclinado (se puede aterrizar encima)
@@ -312,13 +331,13 @@ static func casa_rosada(padre: Node3D) -> Vector3:
 ## Edificios bajos alrededor (con techos y cornisas para posarse).
 static func alrededores(padre: Node3D) -> void:
 	# Norte, a los costados de la Catedral
-	edificio(padre, Vector3(-27, 0, -36), Vector3(18, 12, 8), Color("d8c9b1"), Vector3(0, 0, 1))
-	edificio(padre, Vector3(-44, 0, -35), Vector3(14, 10, 10), Color("c9b9a4"), Vector3(0, 0, 1))
-	edificio(padre, Vector3(26, 0, -36), Vector3(16, 13, 8), Color("e0cdb4"), Vector3(0, 0, 1))
-	edificio(padre, Vector3(46, 0, -35), Vector3(16, 11, 10), Color("bfb5a8"), Vector3(0, 0, 1))
+	edificio(padre, Vector3(-27, 0, -36), Vector3(18, 12, 8), Color("e3b764"), Vector3(0, 0, 1), Color("a85a3c"))
+	edificio(padre, Vector3(-44, 0, -35), Vector3(14, 10, 10), Color("9fd2ab"), Vector3(0, 0, 1))
+	edificio(padre, Vector3(26, 0, -36), Vector3(16, 13, 8), Color("e98a74"), Vector3(0, 0, 1))
+	edificio(padre, Vector3(46, 0, -35), Vector3(16, 11, 10), Color("92c4ea"), Vector3(0, 0, 1), Color("4f7fc0"))
 	# Al sur de la avenida, en las dos puntas (dejan la calle libre para los autos)
-	edificio(padre, Vector3(-52, 0, 43), Vector3(12, 9, 12), Color("e4d3b8"), Vector3(0, 0, -1))
-	edificio(padre, Vector3(50, 0, 43), Vector3(18, 12, 10), Color("d6c7b3"), Vector3(0, 0, -1))
+	edificio(padre, Vector3(-52, 0, 43), Vector3(12, 9, 12), Color("f0d27a"), Vector3(0, 0, -1), Color("a85a3c"))
+	edificio(padre, Vector3(50, 0, 43), Vector3(18, 12, 10), Color("d3bff0"), Vector3(0, 0, -1))
 	# Carteles de comercios inventados, sobre una tabla pegada a la pared
 	Construir.letrero(padre, Vector3(-27, 4.85, -31.8), "Librería El Palomar", Color.WHITE, Color("5b3b2a"), 48,
 		Vector2(6.4, 0.6))

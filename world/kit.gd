@@ -3,7 +3,8 @@ extends RefCounted
 ## Piezas hechas en Blender, listas para poner en el mundo: el kit de la ciudad
 ## (tools/blender/generar_ciudad.py -> modelos/ciudad/) y el kit del parque
 ## (tools/blender/generar_parque.py -> modelos/parque/).
-## Los dos kits usan la misma paleta de degradés (8x8 celdas, ver KitDatos.PALETA) y por eso UN solo
+## Los dos kits usan la misma paleta de degradés (8 x 16 celdas, ver KitDatos.PALETA y
+## tools/blender/paleta.py) y por eso UN solo
 ## material, cuya textura se arma acá con los colores de la paleta (no hay imagen que importar ni
 ## comprimir): todas las piezas se pueden fusionar juntas en pocas mallas (ver
 ## Construir.fusionar_estaticas).
@@ -125,14 +126,13 @@ static func material() -> StandardMaterial3D:
 	if _materiales.has("kit"):
 		return _materiales["kit"]
 	var paleta: Array = KitDatos.PALETA
-	var celdas: int = KitDatos.CELDAS
-	var margen: float = KitDatos.MARGEN
 	var m := StandardMaterial3D.new()
-	m.albedo_texture = _paleta(paleta, celdas, margen, "")
-	# Brillan sólo las lámparas: con el operador "sumar", la emisión es color + textura (color negro)
+	m.albedo_texture = _paleta(paleta, [])
+	# Brillan sólo las lámparas, los faros y la luz verde de los semáforos (KitDatos.EMISION): con el
+	# operador "sumar", la emisión es color + textura (color negro)
 	m.emission_enabled = true
 	m.emission = Color.BLACK
-	m.emission_texture = _paleta(paleta, celdas, margen, "luz")
+	m.emission_texture = _paleta(paleta, KitDatos.EMISION)
 	m.emission_energy_multiplier = 1.2
 	m.roughness = 0.85
 	m.metallic_specular = 0.25
@@ -151,16 +151,20 @@ static func material_sombra() -> StandardMaterial3D:
 	return _materiales["sombra"]
 
 
-## Textura de la paleta: celdas de 64 px de alto con el degradé (abajo oscuro, arriba claro) y 4 px
-## de ancho (la U siempre cae en el medio de la celda). Fila 0 = arriba, como la imagen de Blender.
-static func _paleta(paleta: Array, celdas: int, margen: float, solo: String) -> ImageTexture:
+## Textura de la paleta: KitDatos.CELDAS columnas x KitDatos.FILAS filas; cada celda tiene 64 px de alto
+## con el degradé (abajo oscuro, arriba claro) y 4 px de ancho (la U siempre cae en el medio de la
+## celda). La fila 0 queda abajo, como en la imagen de Blender. "solo": si no está vacío, sólo esos
+## colores (el resto, negro).
+static func _paleta(paleta: Array, solo: Array) -> ImageTexture:
 	const CS := 64
-	var alto := CS * celdas
+	var celdas: int = KitDatos.CELDAS
+	var margen: float = KitDatos.MARGEN
+	var alto: int = CS * KitDatos.FILAS
 	var img := Image.create(celdas * 4, alto, false, Image.FORMAT_RGB8)
 	img.fill(Color.BLACK)
 	for i in paleta.size():
 		var p: Array = paleta[i]
-		if solo != "" and p[0] != solo:
+		if not solo.is_empty() and not solo.has(p[0]):
 			continue
 		@warning_ignore("integer_division")
 		var cy: int = i / celdas
