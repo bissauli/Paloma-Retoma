@@ -54,6 +54,7 @@ func _poblar() -> void:
 	dona_rosa.rotation.y = PI / 2.0   # Mira al oeste, hacia el Cabildo
 	dona_rosa.add_to_group("dona_rosa")
 	add_child(dona_rosa)
+	Interlocutor.marcar(dona_rosa, "dona_rosa", 2.0)   # Con ella se puede hablar (y da una misión)
 	dona_rosa.global_position = _punto("donarosa", Vector3(-35.95, 0, -8))
 	# Turistas en el Cabildo (sus migas también caen delante del banco de Doña Rosa)
 	var p_tur := _punto("turistas", Vector3(-40, 0, -14))

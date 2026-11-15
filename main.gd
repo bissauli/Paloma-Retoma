@@ -79,6 +79,9 @@ func _abrir_menu() -> void:
 	frente.y = 0.0
 	($Bandada as Bandada).zona_libre = [_jugador.global_position,
 		camara_menu.global_position + frente.normalized() * 0.6, 1.4]
+	menu.preguntando.connect(func(si: bool) -> void:
+		if is_instance_valid(_gestos):
+			_gestos.preguntar(si))
 	menu.nueva_partida.connect(_empezar.bind({}))
 	menu.continuar.connect(_empezar)
 	# Antes de mostrar el menú se compilan los shaders de toda la plaza (unos pocos cuadros), así

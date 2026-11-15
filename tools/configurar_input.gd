@@ -13,6 +13,7 @@ const TECLAS := {
 	"volar": [KEY_SPACE],
 	"picada": [KEY_SHIFT],
 	"pausa": [KEY_ESCAPE],
+	"interactuar": [KEY_E],
 }
 const BOTONES := {
 	"picotear": MOUSE_BUTTON_LEFT,

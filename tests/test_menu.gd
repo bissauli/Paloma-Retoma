@@ -35,7 +35,8 @@ func _nueva_partida() -> void:
 	_check("sin partida guardada no hay CONTINUAR", not menu._fila(menu.botones[0]).visible)
 	_check("el HUD no se ve en el menú", not main.hud.visible)
 	_check("los textos del menú están en español", menu.botones[1].text == "NUEVA PARTIDA"
-		and menu.botones[2].text == "CARGAR PARTIDA" and menu.botones[3].text == "OPCIONES")
+		and menu.botones[2].text == "CARGAR PARTIDA" and menu.botones[3].text == "PERSONALIZAR PALOMA"
+		and menu.botones[4].text == "OPCIONES")
 	# Que la paloma mire a la cámara cada tanto: el modificador de la cabeza existe
 	_check("la paloma tiene gestos (mirada y parpadeo)", j.modelo.find_children("*", "GestosPaloma", true, false).size() == 1)
 	_check("la paloma arranca sentada en el banco", j.global_position.y > 0.4 and j.is_on_floor())

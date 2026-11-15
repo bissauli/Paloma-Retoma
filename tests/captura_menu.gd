@@ -28,7 +28,7 @@ func _ready() -> void:
 	var menu: MenuPrincipal = main.menu
 
 	# Foco en otro botón (como con las flechas o el mando)
-	menu.botones[3].grab_focus()
+	menu.botones[4].grab_focus()   # Opciones (el 3 es Personalizar paloma)
 	await _esperar(20)
 	_capturar("menu_foco_opciones")
 
@@ -68,8 +68,19 @@ func _ready() -> void:
 	await _esperar(30)
 	_capturar("menu_con_continuar")
 
-	# Transición: NUEVA PARTIDA (la paloma salta y la cámara pasa a seguirla sin cortes)
+	# NUEVA PARTIDA con una partida guardada: avisa que se borra y la paloma ladea la cabeza
 	menu.botones[1].emit_signal("pressed")
+	await _esperar_segundos(0.8)
+	_capturar("confirmar_nueva_1")
+	await _esperar_segundos(2.2)
+	_capturar("confirmar_nueva_2")
+	menu._confirmar.cerrar()
+	await _esperar(30)
+	_capturar("confirmar_cancelada")
+	menu.botones[1].emit_signal("pressed")
+	await _esperar(10)
+	# Transición: confirmar (la paloma salta y la cámara pasa a seguirla sin cortes)
+	menu._confirmar._empezar.emit_signal("pressed")
 	var cam: CamaraMenu = main.camara_menu
 	var dur := cam.duracion
 	for i in 5:

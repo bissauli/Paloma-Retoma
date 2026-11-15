@@ -39,6 +39,8 @@ var _segundo := 0.0              ## Cuenta regresiva del segundo parpadeo de uno
 var _parpados: Array[Node3D] = []
 var _cabeza: Node3D              ## Sigue la pose final del hueso "head" (ahí cuelgan los párpados)
 var _apagando := false
+var _preguntando := false        ## Ladea la cabeza mirando a la cámara (ver preguntar)
+var _lado_pregunta := 1.0
 
 
 func _ready() -> void:
@@ -54,6 +56,18 @@ func soltar_cabeza() -> void:
 	_apagando = true
 
 
+## La paloma pregunta (el menú avisa que se va a borrar la partida): se queda mirando a la cámara
+## con la cabeza ladeada, cambiando de ojo cada tanto, hasta que se vuelve a llamar con false.
+func preguntar(si: bool) -> void:
+	_preguntando = si
+	_t_mirada = 0.0
+	if si:
+		_lado_pregunta = 1.0 if randf() < 0.5 else -1.0
+		_t_picoteo = maxf(_t_picoteo, 4.0)
+		_t_arrullo = maxf(_t_arrullo, 8.0)
+		_parpadear(false)
+
+
 func _process(delta: float) -> void:
 	_actualizar_parpadeo(delta)
 	if _apagando:
@@ -66,6 +80,8 @@ func _process(delta: float) -> void:
 	_t_mirada -= delta
 	if _t_mirada <= 0.0:
 		_elegir_mirada()
+	if _preguntando:
+		return    # Sin picoteos ni arrullos: sólo mira con la cabeza ladeada
 	_t_picoteo -= delta
 	if _t_picoteo <= 0.0:
 		_t_picoteo = randf_range(6.0, 14.0)
@@ -109,6 +125,16 @@ func _process_modification_with_delta(delta: float) -> void:
 
 func _elegir_mirada() -> void:
 	var camara := _hacia_camara()
+	if _preguntando:
+		# Cabeza ladeada (roll) mirando a la cámara con un ojo; al rato cambia de lado
+		var p := Vector3(camara.x - 0.08, camara.y + _lado_pregunta * 0.55, -_lado_pregunta * 0.6)
+		p.x = clampf(p.x, -MAX_PITCH, MAX_PITCH)
+		p.y = clampf(p.y, -MAX_YAW, MAX_YAW)
+		_destino = p
+		_rigidez = 24.0
+		_t_mirada = randf_range(1.8, 2.8)
+		_lado_pregunta = -_lado_pregunta
+		return
 	var r := randf()
 	var nuevo: Vector3
 	var espera := randf_range(0.6, 2.2)
@@ -167,6 +193,10 @@ func _picotear() -> void:
 ## Material de la malla de la paloma (o uno gris parecido si no lo encuentra).
 func _material_modelo(sk: Skeleton3D) -> Material:
 	for n in sk.find_children("*", "MeshInstance3D", true, false):
+		# Paloma recoloreada por zonas: el párpado toma el color de la cabeza de ese perfil
+		var recoloreada := (n as MeshInstance3D).material_override as ShaderMaterial
+		if recoloreada != null:
+			return AplicadorPaloma.material_parpado(recoloreada)
 		var m := (n as MeshInstance3D).get_active_material(0) as BaseMaterial3D
 		if m:
 			var copia := m.duplicate() as BaseMaterial3D
@@ -176,6 +206,25 @@ func _material_modelo(sk: Skeleton3D) -> Material:
 	var gris := StandardMaterial3D.new()
 	gris.albedo_color = Color("bcbece")
 	return gris
+
+
+## Pausa los gestos (modo pintura): la cabeza vuelve a su pose y los párpados se esconden.
+func pausar(si: bool) -> void:
+	active = not si
+	set_process(not si)
+	if si:
+		_parpadeo_t = -1.0
+		_parpado = 0.0
+		for p in _parpados:
+			p.visible = false
+
+
+## Vuelve a tomar el material de la paloma (cuando cambia su perfil de colores).
+func refrescar_material() -> void:
+	var mat := _material_modelo(get_skeleton())
+	for b in _parpados:
+		if is_instance_valid(b) and b.get_child_count() > 0:
+			(b.get_child(0) as MeshInstance3D).material_override = mat
 
 
 func _armar_parpados(sk: Skeleton3D, mat: Material) -> void:

@@ -1,7 +1,7 @@
 extends CanvasLayer
 ## HUD con el estilo del menú principal (barras cyan translúcidas cortadas en diagonal, texto
 ## blanco, Bebas Neue para los números y Oswald para los rótulos).
-## Arriba a la izquierda: la bandada, la stamina en segmentos y la comida (y lo que llevás en el
+## Arriba a la izquierda: la bandada y la comida (y lo que llevás en el
 ## pico). Arriba a la derecha: la misión actual con su contador. Sólo escucha señales de GameState.
 
 const TEMA := EstiloUI.TEMA
@@ -10,14 +10,11 @@ const MARGEN := Vector2(28, 24)
 const C_CYAN := EstiloUI.C_CYAN
 const C_CYAN_BORDE := EstiloUI.C_CYAN_BORDE
 const C_OSCURO := EstiloUI.C_OSCURO
-const C_STAMINA := Color(1, 1, 1, 0.95)
-const C_STAMINA_BAJA := Color("ff7a6b")
 const ANCHO_MISION := 400.0         ## Ancho máximo del texto de la misión (en pantallas angostas se achica)
 const ANCHO_BRUJULA := Vector2(340.0, 600.0)   ## Mínimo y máximo de la brújula
 
 var _raiz: Control
 var _bandada: Label
-var _stamina: BarraSegmentada
 var _comida: Label
 var _carga: PanelContainer
 var _carga_texto: Label
@@ -40,7 +37,6 @@ func _ready() -> void:
 	GameState.bandada_cambio.connect(_al_cambiar_bandada)
 	GameState.comida_cambio.connect(_al_cambiar_comida)
 	GameState.carga_cambio.connect(_al_cambiar_carga)
-	GameState.stamina_cambio.connect(_al_cambiar_stamina)
 	GameState.objetivo_cambio.connect(_al_cambiar_objetivo)
 	GameState.jugador_atrapado.connect(_al_ser_atrapada)
 	GameState.victoria.connect(func() -> void: visible = false)
@@ -48,7 +44,6 @@ func _ready() -> void:
 	_bandada.text = str(GameState.bandada)
 	_comida.text = str(GameState.comida)
 	_al_cambiar_carga(GameState.carga)
-	_al_cambiar_stamina(GameState.stamina, Config.STAMINA_MAX)
 	GameState.actualizar_objetivo()
 
 
@@ -61,6 +56,7 @@ func _armar() -> void:
 	_raiz.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_raiz.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_raiz)
+	_raiz.add_child(AnilloStamina.new())    # Atrás de todo lo demás
 	_armar_estado()
 	_armar_mision()
 	_armar_brujula()
@@ -70,7 +66,8 @@ func _armar() -> void:
 	_ajustar_anchos()
 
 
-## Arriba a la izquierda: bandada (barra cyan), stamina y comida (barra oscura) y la carga.
+## Arriba a la izquierda: bandada (barra cyan), comida (barra oscura) y la carga. La stamina no está
+## acá: va junto a la paloma (ver AnilloStamina).
 func _armar_estado() -> void:
 	var col := VBoxContainer.new()
 	col.name = "Estado"
@@ -100,7 +97,7 @@ func _armar_estado() -> void:
 	_bandada.resized.connect(func() -> void: _bandada.pivot_offset = _bandada.size / 2.0)
 	EstiloUI.texto(fila, &"Seccion", 20, "PALOMAS")
 
-	# Stamina y comida
+	# Comida
 	var barra := PanelContainer.new()
 	barra.add_theme_stylebox_override("panel", EstiloUI.caja(C_OSCURO, -0.42))
 	barra.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
@@ -108,16 +105,6 @@ func _armar_estado() -> void:
 	var fila2 := HBoxContainer.new()
 	fila2.add_theme_constant_override("separation", 12)
 	barra.add_child(fila2)
-	EstiloUI.texto(fila2, &"Seccion", 15, "STAMINA")
-	_stamina = BarraSegmentada.new()
-	_stamina.custom_minimum_size = Vector2(170, 12)
-	_stamina.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_stamina.segmentos = 10
-	_stamina.color = C_STAMINA
-	fila2.add_child(_stamina)
-	var sep := Control.new()
-	sep.custom_minimum_size = Vector2(6, 0)
-	fila2.add_child(sep)
 	EstiloUI.texto(fila2, &"Seccion", 15, "COMIDA")
 	_comida = EstiloUI.texto(fila2, &"TituloPantalla", 34, "0")
 	_comida.custom_minimum_size = Vector2(30, 0)
@@ -249,13 +236,6 @@ func _al_cambiar_comida(n: int) -> void:
 func _al_cambiar_carga(tipo: String) -> void:
 	_carga.visible = tipo != ""
 	_carga_texto.text = tipo.to_upper()
-
-
-func _al_cambiar_stamina(valor: float, maximo: float) -> void:
-	var k := valor / maxf(maximo, 0.001)
-	_stamina.valor = k
-	_stamina.alerta = k < 0.25
-	_stamina.color = C_STAMINA_BAJA.lerp(C_STAMINA, clampf((k - 0.15) * 4.0, 0.0, 1.0))
 
 
 func _al_cambiar_objetivo(texto: String, actual: int, meta: int) -> void:

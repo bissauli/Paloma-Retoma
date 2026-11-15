@@ -8,11 +8,15 @@ extends CanvasLayer
 
 signal nueva_partida
 signal continuar(datos: Dictionary)
+## La jugadora está decidiendo si borra su partida (la paloma ladea la cabeza, ver main.gd)
+signal preguntando(si: bool)
 
 const ESTIRAR := 26.0          ## Píxeles que crece la barra hacia la izquierda con foco
 
 var _opciones: OpcionesMenu
 var _cargar: CargarMenu
+var _personalizar: PersonalizarMenu
+var _confirmar: ConfirmarNueva
 var _idiomas: SelectorIdioma
 var _activo := false
 var _tween: Tween
@@ -20,7 +24,7 @@ var _tween: Tween
 @onready var raiz: Control = $Raiz
 @onready var titulo: Control = %Titulo
 @onready var caja_botones: VBoxContainer = %Botones
-@onready var botones: Array[Button] = [%Continuar, %NuevaPartida, %CargarPartida, %Opciones, %Salir]
+@onready var botones: Array[Button] = [%Continuar, %NuevaPartida, %CargarPartida, %Personalizar, %Opciones, %Salir]
 
 
 func _ready() -> void:
@@ -30,6 +34,7 @@ func _ready() -> void:
 	%Continuar.pressed.connect(_continuar)
 	%NuevaPartida.pressed.connect(_nueva)
 	%CargarPartida.pressed.connect(_abrir.bind("cargar"))
+	%Personalizar.pressed.connect(_abrir.bind("personalizar"))
 	%Opciones.pressed.connect(_abrir.bind("opciones"))
 	%Salir.pressed.connect(_salir)
 	# En el navegador "Salir" no tiene sentido (dejaría la pestaña congelada)
@@ -42,6 +47,13 @@ func _ready() -> void:
 	add_child(_cargar)
 	_cargar.cerrada.connect(_al_cerrar_pantalla.bind(%CargarPartida))
 	_cargar.cargar.connect(func(datos: Dictionary) -> void: _arrancar(continuar.emit.bind(datos)))
+	_personalizar = PersonalizarMenu.new()
+	add_child(_personalizar)
+	_personalizar.cerrada.connect(_al_cerrar_pantalla.bind(%Personalizar))
+	_confirmar = ConfirmarNueva.new()
+	add_child(_confirmar)
+	_confirmar.confirmada.connect(_al_confirmar_nueva)
+	_confirmar.cancelada.connect(_al_cancelar_nueva)
 
 	# Banderas para cambiar de idioma, abajo a la izquierda
 	# ...y debajo, chiquita, la versión con quién hizo el último commit
@@ -100,7 +112,7 @@ func ocultar() -> void:
 
 func _input(event: InputEvent) -> void:
 	# Si se perdió el foco (click en un lugar vacío), las flechas o el mando lo recuperan
-	if not _activo or _opciones.visible or _cargar.visible:
+	if not _activo or _opciones.visible or _cargar.visible or _personalizar.visible or _confirmar.visible:
 		return
 	if get_viewport().gui_get_focus_owner() == null and (event.is_action_pressed("ui_down")
 			or event.is_action_pressed("ui_up") or event.is_action_pressed("ui_accept")):
@@ -176,8 +188,31 @@ func _continuar() -> void:
 	_arrancar(continuar.emit.bind(datos))
 
 
+## Con una partida guardada, antes avisa que se va a borrar (y la paloma pregunta con la cabeza).
 func _nueva() -> void:
+	var datos := GameState.datos_guardados()
+	if datos.is_empty():
+		_arrancar(nueva_partida.emit)
+		return
+	AudioManager.reproducir("picoteo")
+	for b in botones:
+		b.focus_mode = Control.FOCUS_NONE
+		_resaltar(b, false)
+	_desvanecer(0.0)
+	preguntando.emit(true)
+	_confirmar.abrir(datos)
+
+
+func _al_confirmar_nueva() -> void:
+	preguntando.emit(false)
+	GameState.borrar_partida()
+	raiz.modulate.a = 1.0
 	_arrancar(nueva_partida.emit)
+
+
+func _al_cancelar_nueva() -> void:
+	preguntando.emit(false)
+	_al_cerrar_pantalla(%NuevaPartida)
 
 
 func _arrancar(aviso: Callable) -> void:
@@ -200,7 +235,13 @@ func _abrir(cual: String) -> void:
 		b.focus_mode = Control.FOCUS_NONE
 		_resaltar(b, false)
 	_desvanecer(0.0)
-	(_opciones if cual == "opciones" else _cargar).abrir()
+	match cual:
+		"opciones":
+			_opciones.abrir()
+		"personalizar":
+			_personalizar.abrir()
+		_:
+			_cargar.abrir()
 
 
 func _al_cerrar_pantalla(boton: Button) -> void:
