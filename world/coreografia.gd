@@ -1,0 +1,394 @@
+class_name Coreografia
+extends RefCounted
+## Los bailes de los créditos: cada uno es una función del tiempo (en segundos desde que empieza)
+## que devuelve la PoseBaile de ese instante. Ninguno usa animaciones del GLB: se arman girando los
+## huesos y el cuerpo entero, así se pueden afinar sin tocar el modelo de Blender.
+## Los bailes largos se arman con tramos (toprock, suelo, congelado...) que se mezclan entre sí.
+## El orden de ORDEN es el de los créditos (el primero es el break dance de Carlos) y FINAL cierra
+## con la paloma flaca. Para sumar uno: escribir su función, agregarlo a DURACION y a pose().
+
+const ORDEN: Array[StringName] = [&"breakdance", &"moonwalk", &"disco", &"robot", &"twist",
+	&"salto", &"pirueta", &"cabeceo", &"salsa"]
+const FINAL := &"voltereta"
+const DURACION := {
+	&"breakdance": 6.5, &"moonwalk": 5.0, &"disco": 5.0, &"robot": 5.0, &"twist": 5.0,
+	&"salto": 5.0, &"pirueta": 5.5, &"cabeceo": 5.0, &"salsa": 5.0, &"voltereta": 7.0,
+}
+const YAW := 20.0       ## Cada paloma se ve de tres cuartos, no justo de frente
+
+
+static func duracion(baile: StringName) -> float:
+	return DURACION.get(baile, 5.0)
+
+
+static func pose(baile: StringName, t: float) -> PoseBaile:
+	match baile:
+		&"breakdance": return _breakdance(t)
+		&"moonwalk": return _moonwalk(t)
+		&"disco": return _disco(t)
+		&"robot": return _robot(t)
+		&"twist": return _twist(t)
+		&"salto": return _salto(t)
+		&"pirueta": return _pirueta(t)
+		&"cabeceo": return _cabeceo(t)
+		&"salsa": return _salsa(t)
+		&"voltereta": return _voltereta(t)
+	return PoseBaile.new()
+
+
+# ---------------------------------------------------------------- Giros de ayuda
+
+static func _x(grados: float) -> Basis:
+	return Basis(Vector3.RIGHT, deg_to_rad(grados))
+
+
+static func _y(grados: float) -> Basis:
+	return Basis(Vector3.UP, deg_to_rad(grados))
+
+
+static func _z(grados: float) -> Basis:
+	return Basis(Vector3.BACK, deg_to_rad(grados))
+
+
+## Ala izquierda: "abrir" la separa del cuerpo (0 = plegada, 90 = recta al costado) y "subir" la
+## levanta (90 = vertical). El ala derecha es igual, espejada.
+static func _ala_izq(abrir: float, subir := 0.0) -> Basis:
+	return _z(subir) * _y(-abrir)
+
+
+static func _ala_der(abrir: float, subir := 0.0) -> Basis:
+	return _z(-subir) * _y(abrir)
+
+
+## 0 -> 1 y vuelve a 0 (una campana), para cosas que pasan una sola vez en un rato.
+static func _campana(desde: float, hasta: float, t: float) -> float:
+	return sin(clampf((t - desde) / (hasta - desde), 0.0, 1.0) * PI)
+
+
+# ---------------------------------------------------------------- 1. Break dance (Carlos)
+
+## Toprock (pasos de pie), giro de espaldas en el piso pateando al aire y un "freeze" final.
+static func _breakdance(t: float) -> PoseBaile:
+	var w_suelo := smoothstep(0.9, 1.6, t)
+	var w_freeze := smoothstep(4.5, 5.1, t)
+	var p := _break_toprock(t).mezclar(_break_suelo(t), w_suelo).mezclar(_break_freeze(t), w_freeze)
+	# El giro del cuerpo NO se mezcla con slerp: entre "de pie" y "de espaldas" hay casi 180° y el
+	# camino más corto cambia de lado de golpe (un tirón). Se mezclan el rumbo y el vuelco por separado.
+	var a := _break_toprock_ejes(t)
+	var b := _break_suelo_ejes(t)
+	var c := Vector2(-15.0, 38.0 + sin(t * 30.0) * 1.2)
+	var ejes := _mezclar_ejes(_mezclar_ejes(a, b, w_suelo), c, w_freeze)
+	p.rot = _y(ejes.x) * _z(ejes.y)
+	return p
+
+
+## Rumbo (x) y vuelco (y) del cuerpo, en grados.
+static func _mezclar_ejes(a: Vector2, b: Vector2, w: float) -> Vector2:
+	return Vector2(rad_to_deg(lerp_angle(deg_to_rad(a.x), deg_to_rad(b.x), w)), lerpf(a.y, b.y, w))
+
+
+static func _break_toprock_ejes(t: float) -> Vector2:
+	return Vector2(YAW + sin(t * TAU * 0.9) * 25.0, sin(t * TAU * 2.0) * 6.0)
+
+
+static func _break_suelo_ejes(t: float) -> Vector2:
+	return Vector2(YAW + 3.0 * 360.0 * smoothstep(1.1, 4.7, t), 180.0)
+
+
+static func _break_toprock(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var beat := t * TAU * 2.0
+	p.pos = Vector3(sin(t * TAU * 0.9) * 0.13, absf(sin(beat)) * 0.035, 0.0)
+	p.rot = _y(YAW + sin(t * TAU * 0.9) * 25.0) * _z(sin(beat) * 6.0)
+	p.ala_izq = _ala_izq(45.0 + 30.0 * sin(beat), 10.0 * sin(beat))
+	p.ala_der = _ala_der(45.0 - 30.0 * sin(beat), -10.0 * sin(beat))
+	p.cabeza = _y(20.0 * sin(beat)) * _x(14.0 * sin(beat * 2.0))
+	p.pata_izq = _x(-25.0 * maxf(sin(beat), 0.0))
+	p.pata_der = _x(-25.0 * maxf(-sin(beat), 0.0))
+	p.cola = _y(18.0 * sin(beat))
+	return p
+
+
+## De espaldas, girando como un "windmill" y pateando al aire con las alas abiertas en el piso.
+static func _break_suelo(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var giro := 3.0 * 360.0 * smoothstep(1.1, 4.7, t)    # Tres vueltas que arrancan y frenan suave
+	p.rot = _y(YAW + giro) * _z(180.0)
+	p.pos = Vector3(0.0, -0.07 + 0.015 * sin(t * TAU * 3.0), 0.0)
+	p.pata_izq = _x(-30.0 - 40.0 * sin(t * 13.0))
+	p.pata_der = _x(-30.0 - 40.0 * sin(t * 13.0 + PI))
+	p.ala_izq = _ala_izq(78.0 + 8.0 * sin(t * 9.0))
+	p.ala_der = _ala_der(78.0 + 8.0 * sin(t * 9.0 + 1.0))
+	p.cabeza = _x(-20.0)
+	p.cola = _x(-15.0)
+	return p
+
+
+## Pose congelada de costado, con un ala arriba, una abajo, una pata en el aire y un temblor.
+static func _break_freeze(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	p.rot = _y(-15.0) * _z(38.0 + sin(t * 30.0) * 1.2)
+	p.pos = Vector3(0.0, 0.03, 0.0)
+	p.ala_izq = _ala_izq(95.0, 75.0)
+	p.ala_der = _ala_der(40.0, -25.0)
+	p.cabeza = _y(35.0) * _z(-30.0)
+	p.pata_der = _x(-70.0)
+	p.cola = _x(35.0)
+	return p
+
+
+# ---------------------------------------------------------------- 2. Moonwalk (La Tana)
+
+## De perfil, desliza para atrás con los pasos para adelante; al final un giro y la pose del sombrero.
+static func _moonwalk(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var fase := t * TAU * 1.6
+	var desliza := smoothstep(0.2, 3.6, t)
+	p.pos = Vector3(lerpf(0.4, -0.4, desliza), 0.012 + 0.02 * maxf(sin(fase * 2.0), 0.0), 0.0)
+	p.rot = _y(90.0) * _x(5.0)
+	p.pata_izq = _x(-32.0 * sin(fase))
+	p.pata_der = _x(-32.0 * sin(fase + PI))
+	p.ala_izq = _ala_izq(25.0 + 15.0 * sin(fase), 6.0 * sin(fase))
+	p.ala_der = _ala_der(25.0 + 15.0 * sin(fase + PI), 6.0 * sin(fase + PI))
+	p.cabeza = _x(8.0 * sin(fase * 2.0)) * _y(-10.0 * sin(fase))
+	p.cola = _y(10.0 * sin(fase))
+
+	var f := PoseBaile.new()
+	f.rot = _y(90.0 + 360.0 * smoothstep(3.7, 4.4, t))
+	f.pos = Vector3(-0.4, 0.045, 0.0)
+	f.ala_izq = _ala_izq(55.0, 105.0)       # Se toca el "sombrero" con el ala
+	f.ala_der = _ala_der(20.0, -10.0)
+	f.cabeza = _x(20.0) * _z(12.0)
+	f.pata_izq = _x(-12.0)
+	f.pata_der = _x(-12.0)
+	return p.mezclar(f, smoothstep(3.5, 3.9, t))
+
+
+# ---------------------------------------------------------------- 3. Disco (El Ruso)
+
+## El dedo al cielo de Fiebre de sábado por la noche, de un lado y del otro, con cadera y pasitos.
+static func _disco(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var beat := t * TAU * 1.0
+	var s := sin(beat)
+	var izq := smoothstep(-0.2, 0.5, s)        # 1 = ala izquierda arriba
+	var der := smoothstep(-0.2, 0.5, -s)
+	p.pos = Vector3(0.1 * s, 0.02 * absf(cos(beat)), 0.0)
+	p.rot = _y(YAW + 20.0 * s) * _z(10.0 * s)
+	p.ala_izq = _ala_izq(20.0 + 30.0 * izq, 70.0 * izq - 5.0)
+	p.ala_der = _ala_der(20.0 + 30.0 * der, 70.0 * der - 5.0)
+	p.cabeza = _z(15.0 * s) * _x(8.0 * sin(beat * 2.0))
+	p.pata_izq = _x(-25.0 * maxf(cos(beat), 0.0))
+	p.pata_der = _x(-25.0 * maxf(-cos(beat), 0.0))
+	p.cola = _x(20.0) * _y(15.0 * sin(beat * 2.0))
+	# Final: las dos alas arriba
+	var f := PoseBaile.new()
+	f.rot = _y(YAW)
+	f.pos = Vector3(0.0, 0.03, 0.0)
+	f.ala_izq = _ala_izq(40.0, 80.0)
+	f.ala_der = _ala_der(40.0, 80.0)
+	f.cabeza = _x(-10.0) * _z(10.0)
+	f.cola = _x(30.0)
+	return p.mezclar(f, smoothstep(4.2, 4.7, t))
+
+
+# ---------------------------------------------------------------- 4. Robot (Coqui)
+
+## Movimientos duros: cada medio segundo se "traba" en una pose distinta, con un chasquido rápido.
+## Cada pose: [giro del cuerpo, giro de la cabeza, ala izq (abrir, subir), ala der (abrir, subir), x, inclinación]
+const ROBOT_POSES := [
+	[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+	[30.0, 60.0, 90.0, 0.0, 0.0, 0.0, 0.08, 0.0],
+	[-30.0, -60.0, 0.0, 0.0, 90.0, 0.0, -0.08, 0.0],
+	[0.0, 0.0, 90.0, 90.0, 90.0, 90.0, 0.0, 0.0],
+	[0.0, 0.0, 90.0, -60.0, 90.0, -60.0, 0.0, 10.0],
+	[45.0, 0.0, 90.0, 45.0, 0.0, 0.0, 0.06, 0.0],
+	[-45.0, 0.0, 0.0, 0.0, 90.0, 45.0, -0.06, 0.0],
+	[0.0, 90.0, 90.0, 0.0, 90.0, 0.0, 0.0, 0.0],
+]
+
+
+static func _robot(t: float) -> PoseBaile:
+	var paso := t * 2.0
+	var i := int(floorf(paso))
+	# En el primer paso arranca desde la pose de firme (no desde la última, que está al otro lado)
+	var anterior := _robot_pose(ROBOT_POSES[maxi(i - 1, 0) % ROBOT_POSES.size()], t)
+	var actual := _robot_pose(ROBOT_POSES[i % ROBOT_POSES.size()], t)
+	return anterior.mezclar(actual, smoothstep(0.0, 0.2, paso - i))
+
+
+static func _robot_pose(d: Array, t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var tiembla := sin(t * 50.0) * 1.2          # Un temblorcito mecánico mientras está trabada
+	p.rot = _y(YAW + d[0]) * _x(d[7])
+	p.pos = Vector3(d[6], 0.0, 0.0)
+	p.cabeza = _y(d[1] + tiembla)
+	p.ala_izq = _ala_izq(d[2], d[3])
+	p.ala_der = _ala_der(d[4], d[5])
+	return p
+
+
+# ---------------------------------------------------------------- 5. Twist
+
+## La cadera gira para un lado y las alas para el otro, agachándose, y un giro de vuelta entera al final.
+static func _twist(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var beat := t * TAU * 2.5
+	p.pos = Vector3(0.0, 0.03 + 0.03 * cos(beat * 2.0), 0.0)
+	p.rot = _y(YAW + 55.0 * sin(beat)) * _z(8.0 * cos(beat))
+	p.ala_izq = _ala_izq(55.0 + 25.0 * sin(beat + PI), 25.0 * sin(beat))
+	p.ala_der = _ala_der(55.0 + 25.0 * sin(beat), -25.0 * sin(beat))
+	p.cola = _y(35.0 * sin(beat))
+	p.cabeza = _y(-35.0 * sin(beat))
+	p.pata_izq = _x(-14.0 * maxf(sin(beat), 0.0))
+	p.pata_der = _x(-14.0 * maxf(-sin(beat), 0.0))
+	var f := PoseBaile.new()
+	f.rot = _y(YAW + 720.0 * smoothstep(4.0, 4.9, t))
+	f.pos = Vector3(0.0, 0.03 + 0.1 * _campana(4.0, 4.9, t), 0.0)
+	f.ala_izq = _ala_izq(40.0, 80.0)
+	f.ala_der = _ala_der(40.0, 80.0)
+	f.cola = _x(30.0)
+	return p.mezclar(f, smoothstep(3.9, 4.2, t))
+
+
+# ---------------------------------------------------------------- 6. Saltos
+
+## Saltitos tipo "jumping jack": abre alas y patas en el aire, se agacha al caer y cada cuatro
+## saltos da una vuelta entera.
+static func _salto(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var periodo := 0.55
+	var n := int(floorf(t / periodo))
+	var fase := fmod(t, periodo) / periodo
+	var k := 4.0 * fase * (1.0 - fase)             # 0 en el piso, 1 arriba de todo
+	var aterriza := sin(clampf(fase / 0.14, 0.0, 1.0) * PI)     # Se agacha un instante al caer
+	var vuelta := 360.0 * fase if n % 4 == 3 else 0.0
+	p.pos = Vector3(0.1 * sin(t * 1.4), 0.32 * k - 0.045 * aterriza, 0.0)
+	p.rot = _y(YAW + vuelta) * _x(-6.0 * aterriza)
+	p.ala_izq = _ala_izq(20.0 + 70.0 * k, 70.0 * k)
+	p.ala_der = _ala_der(20.0 + 70.0 * k, 70.0 * k)
+	p.pata_izq = _x(-34.0 * k)
+	p.pata_der = _x(-34.0 * k)
+	p.cabeza = _x(-8.0 * k + 14.0 * aterriza)
+	p.cola = _x(24.0 * k)
+	return p
+
+
+# ---------------------------------------------------------------- 7. Pirueta
+
+## Ballet: gira sobre una pata con la otra levantada atrás, alas abiertas, y termina con una reverencia.
+static func _pirueta(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var arabesco := smoothstep(0.2, 0.9, t) * (1.0 - smoothstep(4.0, 4.5, t))
+	var giro := 3.0 * 360.0 * smoothstep(0.5, 4.1, t)
+	p.rot = _y(YAW + giro) * _x(16.0 * arabesco)
+	p.pos = Vector3(0.0, 0.03 * arabesco + 0.012 * sin(t * 6.0) * arabesco, 0.0)
+	p.ala_izq = _ala_izq(86.0, 14.0 * arabesco)
+	p.ala_der = _ala_der(86.0, 14.0 * arabesco)
+	p.pata_der = _x(55.0 * arabesco)
+	p.cabeza = _x(-16.0 * arabesco) * _z(10.0 * arabesco)
+	p.cola = _x(26.0 * arabesco)
+	# Reverencia final
+	var f := PoseBaile.new()
+	f.rot = _y(YAW) * _x(24.0)
+	f.pos = Vector3(0.0, -0.03, 0.0)
+	f.ala_izq = _ala_izq(70.0, -15.0)
+	f.ala_der = _ala_der(70.0, -15.0)
+	f.cabeza = _x(30.0)
+	f.cola = _x(35.0)
+	return p.mezclar(f, smoothstep(4.3, 4.8, t))
+
+
+# ---------------------------------------------------------------- 8. Cabeceo (rock)
+
+## Cabecea fuerte con la música, un ala arriba como puño (alternando), patadas y la cola temblando.
+static func _cabeceo(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var beat := t * TAU * 2.0
+	var puno_izq := smoothstep(-0.1, 0.4, sin(beat * 0.5))
+	var puno_der := 1.0 - puno_izq
+	p.pos = Vector3(0.0, 0.02 * absf(sin(beat)), 0.0)
+	p.rot = _y(YAW) * _x(14.0 * sin(beat))
+	p.cabeza = _x(10.0 + 35.0 * maxf(sin(beat), 0.0) - 10.0)
+	p.ala_izq = _ala_izq(25.0 + 25.0 * puno_izq, 80.0 * puno_izq)
+	p.ala_der = _ala_der(25.0 + 25.0 * puno_der, 80.0 * puno_der)
+	p.pata_izq = _x(-22.0 * maxf(sin(beat), 0.0))
+	p.pata_der = _x(-22.0 * maxf(-sin(beat), 0.0))
+	p.cola = _x(25.0) * _y(20.0 * sin(beat * 3.0))
+	return p
+
+
+# ---------------------------------------------------------------- 9. Salsa
+
+## Cadera que se mueve, un ala saludando y la otra en la cintura (cambian a la mitad), pasitos y giros de cabeza.
+static func _salsa(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var beat := t * TAU * 1.5
+	var cambio := smoothstep(2.3, 2.7, t)             # 0 = saluda con la izquierda, 1 = con la derecha
+	var saluda := 55.0 + 25.0 * sin(beat * 3.0)
+	p.pos = Vector3(0.08 * sin(beat), 0.015 * (1.0 + cos(beat * 2.0)), 0.0)
+	p.rot = _y(YAW + 25.0 * sin(beat)) * _z(14.0 * sin(beat))
+	p.ala_izq = _ala_izq(lerpf(70.0, 18.0, cambio), lerpf(saluda, -5.0, cambio))
+	p.ala_der = _ala_der(lerpf(18.0, 70.0, cambio), lerpf(-5.0, saluda, cambio))
+	p.pata_izq = _x(-30.0 * maxf(sin(beat * 2.0), 0.0))
+	p.pata_der = _x(-30.0 * maxf(-sin(beat * 2.0), 0.0))
+	p.cabeza = _y(30.0 * sin(beat + PI / 2.0)) * _z(10.0 * sin(beat))
+	p.cola = _y(20.0 * sin(beat * 2.0))
+	return p
+
+
+# ---------------------------------------------------------------- Final: la paloma flaca
+
+## El cierre de los créditos: saltitos, una vuelta de carnero hacia atrás, una pirueta con las alas
+## abiertas y la pose final con las alas arriba.
+static func _voltereta(t: float) -> PoseBaile:
+	var a := _salto(t * 1.15)
+	a.rot = _y(YAW + 360.0 * smoothstep(0.2, 1.6, t))
+	var b := _voltereta_aire(t)
+	var c := _pirueta_final(t)
+	var d := _pose_final(t)
+	var p := a.mezclar(b, smoothstep(1.45, 1.75, t))
+	p = p.mezclar(c, smoothstep(3.25, 3.55, t))
+	return p.mezclar(d, smoothstep(5.0, 5.4, t))
+
+
+static func _voltereta_aire(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var agacha := _campana(1.6, 2.0, t)               # Se agacha para tomar impulso...
+	var u := clampf((t - 2.0) / 1.0, 0.0, 1.0)         # ...salta y da la vuelta entera en un segundo
+	var cae := _campana(3.0, 3.35, t)                 # y amortigua al caer
+	p.pos = Vector3(0.0, 0.62 * 4.0 * u * (1.0 - u) - 0.07 * agacha - 0.06 * cae, 0.0)
+	p.rot = _y(YAW) * _x(-360.0 * smoothstep(0.0, 1.0, u))
+	var recogida := sin(clampf(u, 0.0, 1.0) * PI)       # Alas y patas recogidas en el aire
+	p.ala_izq = _ala_izq(20.0 - 18.0 * recogida + 60.0 * agacha, -10.0 * agacha)
+	p.ala_der = _ala_der(20.0 - 18.0 * recogida + 60.0 * agacha, -10.0 * agacha)
+	p.pata_izq = _x(-60.0 * recogida)
+	p.pata_der = _x(-60.0 * recogida)
+	p.cabeza = _x(30.0 * recogida + 12.0 * agacha)
+	return p
+
+
+static func _pirueta_final(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var giro := 2.0 * 360.0 * smoothstep(3.3, 5.1, t)
+	p.rot = _y(YAW + giro) * _x(12.0)
+	p.pos = Vector3(0.0, 0.03 + 0.05 * _campana(3.3, 5.1, t), 0.0)
+	p.ala_izq = _ala_izq(88.0, 12.0)
+	p.ala_der = _ala_der(88.0, 12.0)
+	p.pata_der = _x(45.0)
+	p.cabeza = _x(-14.0) * _z(8.0)
+	p.cola = _x(30.0)
+	return p
+
+
+static func _pose_final(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	p.rot = _y(YAW) * _z(sin(t * 4.0) * 3.0)
+	p.pos = Vector3(0.0, 0.04 + 0.025 * absf(sin(t * TAU * 1.2)), 0.0)
+	p.ala_izq = _ala_izq(45.0, 85.0)
+	p.ala_der = _ala_der(45.0, 85.0)
+	p.cabeza = _x(-12.0) * _z(10.0)
+	p.cola = _x(32.0) * _y(12.0 * sin(t * 8.0))
+	p.pata_izq = _x(-10.0)
+	p.pata_der = _x(-10.0)
+	return p

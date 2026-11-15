@@ -156,6 +156,7 @@ const MAPA := {
 	"LA BANDADA": "THE FLOCK",
 	"VOLVER AL MENÚ": "BACK TO MENU",
 	"y la paloma flaca que empezó todo": "and the skinny pigeon who started it all",
+	"La paloma flaca": "The skinny pigeon",
 	"Hecho con Godot para una game jam\nNinguna medialuna fue desperdiciada":
 		"Made with Godot for a game jam\nNot a single croissant was wasted",
 }

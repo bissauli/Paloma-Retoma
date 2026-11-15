@@ -47,6 +47,10 @@ func _ready() -> void:
 	_capturar("f3_victoria")
 	await _frames(360)
 	_capturar("f4_creditos")
+	await _frames(180)
+	_capturar("f5_baile_suelo")
+	await _frames(240)
+	_capturar("f6_baile_siguiente")
 	print("RESULTADO: ", "OK" if GameState.partida_terminada and GameState.bandada >= 30 else "FALLA")
 	get_tree().quit(0 if GameState.partida_terminada else 1)
 

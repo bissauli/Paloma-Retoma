@@ -7,6 +7,9 @@ extends CanvasLayer
 
 const ESCENA_MENU := "res://main.tscn"
 const NOMBRES_FIJOS := ["Carlos", "La Tana", "El Ruso", "Coqui"]
+## Cada paloma de los créditos tiene su baile (ver Coreografia.ORDEN): el primero es el break dance de
+## Carlos y la paloma flaca cierra con el suyo.
+const CANTIDAD_BAILARINAS := 9
 
 @export var radio_camara := 20.0
 @export var altura_camara := 9.0
@@ -108,12 +111,16 @@ func _process(delta: float) -> void:
 
 func _mostrar_creditos() -> void:
 	var nombres: Array[String] = []
-	nombres.assign(NOMBRES_FIJOS)
+	var colores: Array[String] = []        # Cada una baila con el color que tiene en la plaza
+	for n in NOMBRES_FIJOS:
+		nombres.append(n)
+		colores.append(ModeloPaloma.variante_al_azar())
 	for n in get_tree().get_nodes_in_group("palomas_npc"):
 		var p := n as PalomaNPC
 		if p and not nombres.has(p.nombre):
 			nombres.append(p.nombre)
-		if nombres.size() >= 12:
+			colores.append(p.modelo.variante)
+		if nombres.size() >= CANTIDAD_BAILARINAS:
 			break
 	var lineas: Array[String] = []
 	for i in range(0, nombres.size(), 3):
@@ -135,3 +142,20 @@ func _mostrar_creditos() -> void:
 	tw.tween_property(botones, "offset_left", botones.offset_left - 160.0, 0.5).set_delay(0.5)
 	tw.tween_property(botones, "offset_right", botones.offset_right - 160.0, 0.5).set_delay(0.5)
 	%VolverTitulo.grab_focus()
+	_bailar_creditos(nombres, colores)
+
+
+## Una paloma por vez, a la izquierda: aparece, baila su baile y se va con un fundido. Cuando
+## pasaron todas baila la paloma flaca y vuelve a empezar desde Carlos.
+func _bailar_creditos(nombres: Array[String], colores: Array[String]) -> void:
+	var escenario := Bailarina.new()
+	escenario.name = "Bailarina"
+	escenario.anchor_left = 0.05
+	escenario.anchor_right = 0.47
+	escenario.anchor_top = 0.1
+	escenario.anchor_bottom = 0.9
+	%Raiz.add_child(escenario)
+	while is_inside_tree():
+		for i in nombres.size():
+			await escenario.presentar(nombres[i], colores[i], Coreografia.ORDEN[i % Coreografia.ORDEN.size()])
+		await escenario.presentar(tr("La paloma flaca"), "Original", Coreografia.FINAL)
