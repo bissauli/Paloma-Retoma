@@ -21,6 +21,8 @@ botones DESPEGAR/ALETEAR (mantener), PICADA (mantener), PICOTEAR y ARRULLAR · I
 - Build web en `docs/` (exportado con el preset "Web", sin threads para que funcione en GitHub Pages).
 - Para regenerarla: Godot → Proyecto → Exportar → Web, o
   `godot --headless --export-release "Web" docs/index.html`.
+- Antes de exportar, y después del último commit, actualizar la versión que muestra el menú (`v0.<commits> (autor del último commit)`):
+  `godot --headless --path . --script tools/generar_version.gd`. En el editor se lee de git en el momento.
 - Una sola build para PC y teléfonos: en la web `Ajustes.movil` se activa con las features `web_android` /
   `web_ios` (controles táctiles de `ui/controles_tactiles.gd`; la versión de PC no los carga). Así el motor
   (`index.wasm`, lo que más pesa) se descarga y se cachea una sola vez.

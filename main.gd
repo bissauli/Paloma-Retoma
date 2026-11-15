@@ -8,8 +8,6 @@ extends Node3D
 ## una cinemática (world/tutorial.gd): el control y el HUD vuelven cuando termina.
 ## También detecta la victoria (posarse en el balcón de la Casa Rosada con 30 palomas o más).
 
-const RADIO_BALCON := 3.4
-
 ## Muestra el menú aunque la escena esté adentro de otra (lo usa tests/captura_menu.tscn).
 @export var forzar_menu := false
 
@@ -140,7 +138,7 @@ func _physics_process(delta: float) -> void:
 	if _jugador.estado != PalomaJugador.Estado.SUELO:
 		return
 	var d := _jugador.global_position - _balcon.global_position
-	if absf(d.y) > 1.0 or Vector2(d.x, d.z).length() > RADIO_BALCON:
+	if absf(d.y) > 1.0 or Vector2(d.x, d.z).length() > Config.RADIO_BALCON:
 		return
 	if GameState.bandada >= Config.UMBRAL_BALCON:
 		GameState.ganar()

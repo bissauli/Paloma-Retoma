@@ -182,3 +182,15 @@ Elegí siempre la opción más simple y divertida cuando algo era ambiguo. Las a
 - **Los tramos largos se mezclan** con `PoseBaile.mezclar`, pero el giro del cuerpo del break dance no se mezcla con slerp: entre "de pie" y "de espaldas" hay casi 180° y el camino más corto cambia de lado de golpe (se veía como un tirón de 174° en un cuadro). Se mezclan el rumbo y el vuelco por separado.
 - **Pruebas**: `tests/test_bailes.tscn` recorre cada baile a 60 cuadros por segundo y revisa que no haya números inválidos, giros bruscos (más de 40° por cuadro) ni saltos de posición; así encontró el tirón del break dance y el del arranque del robot. `tests/captura_bailes.tscn` saca una imagen por baile con la paloma en 8 instantes, para afinar sin esperar en tiempo real.
 - Para sumar un baile: escribir su función en `Coreografia`, agregarlo a `DURACION` y a `pose()`, y a `ORDEN` si va en los créditos.
+
+## Flecha sobre el balcón (noviembre 2026)
+- **`FlechaObjetivo`** (`world/flecha_objetivo.gd`): el cono amarillo que flota, sube y baja y gira sobre un lugar, sacado del tutorial para reutilizarlo. Aparece y desaparece achicándose, y puede agrandarse con la distancia a la cámara para leerse desde toda la plaza. Una subclase decide cuándo se ve sobreescribiendo `_quiere_verse()`.
+- **`GuiaBalcon`** (`world/guia_balcon.gd`): la misma flecha sobre el balcón de la Casa Rosada. Se ve cuando la bandada llega a 30 palomas y hasta que se está sobre el balcón (a menos de `Config.RADIO_BALCON` en el plano) o se gana, así no estorba en los créditos con los bailes. Si bajás de 30 palomas se esconde. La crea `plaza.gd` junto a la meta; la flecha del tutorial (migas de Doña Rosa) usa la misma clase.
+- `RADIO_BALCON` pasó de `main.gd` a `Config`, porque lo usan la escena principal y la flecha.
+- Prueba: `tests/test_guia_balcon.tscn` (con 10 palomas no se ve; con 30 y lejos sí; sobre el balcón se esconde; al alejarse vuelve; al ganar no se ve).
+
+## Versión en el menú (noviembre 2026)
+- Debajo de las banderas del menú principal va, chiquita, la versión: `v0.12 (Manuel)`. El número es la cantidad de commits (`Version.BASE` es la versión mayor) y entre paréntesis va quién hizo el último commit: **Manuel** o **Nahuel** (se reconoce por el nombre o el correo del commit, ver `Version.AUTORES`: bissauli es Nahuel; otro autor muestra su primer nombre).
+- **En el editor** se lee de git en el momento (`OS.execute("git", ...)`), así que siempre está al día. **En una build exportada** no hay git (ni en la web ni en el teléfono): usa `autoload/info_version.gd`, que escribe `tools/generar_version.gd`. Hay que correrlo antes de exportar y después del último commit (está en el README); si no, la build muestra el número del último momento en que se generó.
+- Se eligió un script `.gd` generado y no un `.json` porque los scripts siempre entran en la exportación.
+- Prueba: `tests/test_version.tscn` (el número, el reconocimiento de Manuel y Nahuel, otro autor y la lectura de git).

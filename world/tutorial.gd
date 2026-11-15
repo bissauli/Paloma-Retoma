@@ -39,7 +39,7 @@ var con_cinematicas := false      ## Lo prende main.gd en el juego de verdad
 var paso := -1
 
 var _cartel: Label3D
-var _flecha: MeshInstance3D       ## Marca las migas de Doña Rosa en los primeros pasos
+var _flecha: FlechaObjetivo       ## Marca las migas de Doña Rosa en los primeros pasos
 var _jugador: PalomaJugador
 var _migas: Node3D                ## El generador de migas de Doña Rosa
 var _hud: CanvasLayer
@@ -137,9 +137,7 @@ func _process(delta: float) -> void:
 	var objetivo := _jugador.global_position + Vector3(0, 1.5 + sin(_t * 2.0) * 0.05, 0)
 	_cartel.global_position = _cartel.global_position.lerp(objetivo, minf(delta * 4.0, 1.0)) if _t > 0.1 else objetivo
 	if _flecha:
-		_flecha.visible = not _en_cinematica and paso <= Paso.ARRULLAR
-		_flecha.position = _migas.global_position + Vector3.UP * (1.8 + sin(_t * 4.0) * 0.15)
-		_flecha.rotation.y += delta * 1.5
+		_flecha.activa = not _en_cinematica and paso <= Paso.ARRULLAR
 	if _en_cinematica or paso < 0:
 		return
 
@@ -207,24 +205,9 @@ func _terminar() -> void:
 func _crear_flecha() -> void:
 	if _migas == null:
 		return
-	var cono := CylinderMesh.new()
-	cono.top_radius = 0.3
-	cono.bottom_radius = 0.0
-	cono.height = 0.55
-	cono.radial_segments = 4
-	cono.rings = 1
-	# Transparente y sin luz: la misma variante de shader que el anillo del arrullo, que ya se
-	# compiló con el menú (ver ui/menu/precalentar_shaders.gd)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(1.0, 0.86, 0.3, 0.92)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_flecha = MeshInstance3D.new()
-	_flecha.mesh = cono
-	_flecha.material_override = mat
-	_flecha.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_flecha.top_level = true
-	_flecha.visible = false
+	_flecha = FlechaObjetivo.new()
+	_flecha.destino = _migas
+	_flecha.activa = false
 	add_child(_flecha)
 
 

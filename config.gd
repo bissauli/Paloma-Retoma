@@ -10,6 +10,7 @@ const UMBRAL_CHORIPAN := 5         ## Palomas necesarias para levantar el chorip
 const UMBRAL_TURISTAS := 15        ## Palomas para asustar grupos de turistas
 const UMBRAL_HALCON := 15          ## Al llegar a esta bandada aparece el halcón
 const UMBRAL_BALCON := 30          ## Palomas para distraer granaderos y tomar el balcón
+const RADIO_BALCON := 3.4          ## Metros (en el plano) alrededor del balcón que cuentan como "estar sobre él"
 
 # --- Stamina ---
 const STAMINA_MAX := 100.0

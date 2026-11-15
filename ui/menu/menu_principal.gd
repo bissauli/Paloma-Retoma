@@ -44,9 +44,18 @@ func _ready() -> void:
 	_cargar.cargar.connect(func(datos: Dictionary) -> void: _arrancar(continuar.emit.bind(datos)))
 
 	# Banderas para cambiar de idioma, abajo a la izquierda
+	# ...y debajo, chiquita, la versión con quién hizo el último commit
+	var esquina := VBoxContainer.new()
+	esquina.name = "Esquina"
+	esquina.add_theme_constant_override("separation", 5)
+	esquina.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	raiz.add_child(esquina)
 	_idiomas = SelectorIdioma.new()
-	raiz.add_child(_idiomas)
-	_idiomas.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 26)
+	esquina.add_child(_idiomas)
+	var version := EstiloUI.texto(esquina, &"TextoChico", 12, Version.texto())
+	version.name = "Version"
+	version.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
+	esquina.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 26)
 
 
 ## Muestra el menú con una entrada suave (el título baja y los botones entran desde la derecha).

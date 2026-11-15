@@ -207,6 +207,10 @@ func _crear_balcon_meta() -> void:
 	m.add_to_group("balcon")
 	add_child(m)
 	m.position = posicion_balcon
+	# La flecha amarilla sobre el balcón cuando ya hay 30 palomas (ver GuiaBalcon)
+	var guia := GuiaBalcon.new()
+	guia.destino = m
+	add_child(guia)
 
 
 func _crear_comida(mesas: Array[Vector3]) -> void:
