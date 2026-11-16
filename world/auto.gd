@@ -91,11 +91,24 @@ func _cuerpo_fisico() -> void:
 	cuerpo.sync_to_physics = false
 	cuerpo.collision_layer = CAPA_GENTE
 	cuerpo.collision_mask = 0
+	var superficies := Kit.superficies_auto(modelo)
 	var cs := CollisionShape3D.new()
 	var forma := BoxShape3D.new()
-	forma.size = Vector3(largo, alto - 0.15, ancho)
+	if superficies.is_empty():
+		forma.size = Vector3(largo, alto - 0.15, ancho)
+		cs.position.y = 0.15 + (alto - 0.15) / 2.0
+	else:
+		# Carrocería baja (los costados) y, aparte, techo y capó donde se puede posar la paloma
+		forma.size = Vector3(largo, 0.6, ancho)
+		cs.position.y = 0.45
+		for sup: Array in superficies:
+			var cs2 := CollisionShape3D.new()
+			var f2 := BoxShape3D.new()
+			f2.size = sup[1]
+			cs2.shape = f2
+			cs2.position = sup[0]
+			cuerpo.add_child(cs2)
 	cs.shape = forma
-	cs.position.y = 0.15 + (alto - 0.15) / 2.0
 	cuerpo.add_child(cs)
 	add_child(cuerpo)
 

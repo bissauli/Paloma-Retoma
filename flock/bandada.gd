@@ -36,6 +36,8 @@ var _palomas: Array[PalomaNPC] = []
 var _frame := 0
 var _timer_llegada := 0.0
 var _aviso_sin_comida := 0.0
+var descansando := false     ## La jugadora está descansando: las seguidoras se sientan a su lado
+var _rumbo_descanso := 0.0
 
 
 func _ready() -> void:
@@ -46,6 +48,7 @@ func _ready() -> void:
 		if n is PalomaNPC:
 			_palomas.erase(n as PalomaNPC)
 			seguidoras.erase(n as PalomaNPC))
+	add_to_group("bandada")
 	GameState.arrullo.connect(_al_arrullar)
 	GameState.cortejo.connect(_al_cortejar)
 	GameState.perder_palomas.connect(_al_perder)
@@ -199,6 +202,47 @@ func _al_ganar() -> void:
 			p.festejar()
 
 
+## La jugadora descansa: cada seguidora vuela al puesto libre más cercano (los puestos vienen de
+## Descanso.puestos) y se sienta mirando hacia "rumbo". Las que no tengan puesto siguen volando.
+func descansar(puestos: Array[Vector3], rumbo: float) -> void:
+	descansando = true
+	_rumbo_descanso = rumbo
+	var libres: Array[Vector3] = puestos.duplicate()
+	var jpos := _jugador.global_position if _jugador else Vector3.ZERO
+	var orden: Array[PalomaNPC] = seguidoras.duplicate()
+	orden.sort_custom(func(a: PalomaNPC, b: PalomaNPC) -> bool:
+		return a.global_position.distance_squared_to(jpos) < b.global_position.distance_squared_to(jpos))
+	for p in orden:
+		if libres.is_empty():
+			break
+		var mejor := 0
+		var mejor_d := INF
+		for k in libres.size():
+			var d := p.global_position.distance_squared_to(libres[k])
+			if d < mejor_d:
+				mejor_d = d
+				mejor = k
+		p.puesto = libres[mejor]
+		p.sentada = false
+		libres.remove_at(mejor)
+
+
+## La jugadora se levanta: todas retoman el vuelo con ella.
+func levantarse() -> void:
+	descansando = false
+	for p in seguidoras:
+		if p.tiene_puesto():
+			p.levantar()
+
+
+## La jugadora golpeó a una seguidora: se va de la bandada llorando.
+func expulsar(p: PalomaNPC, desde: Vector3) -> void:
+	if not seguidoras.has(p):
+		return
+	seguidoras.erase(p)
+	p.llorar(desde, _zona_al_azar())
+
+
 func _zona_al_azar() -> Marker3D:
 	if _zonas.is_empty():
 		return null
@@ -311,7 +355,7 @@ func _resolver_choques() -> void:
 	# Las correcciones también se chequean contra las paredes: si la bandada se aprieta contra
 	# un edificio, ninguna queda empujada adentro. Las de menos de 1 mm no hacen falta.
 	for i in cant:
-		if corr[i].length_squared() > 0.000001:
+		if corr[i].length_squared() > 0.000001 and not _palomas[i].sentada:
 			_palomas[i].mover_con_choques(corr[i])
 
 
@@ -402,6 +446,9 @@ func _mover_seguidoras(delta: float) -> void:
 
 	for i in cant:
 		var p := seguidoras[i]
+		if descansando and p.tiene_puesto():
+			p.paso_posada(delta, _rumbo_descanso)
+			continue
 		var pos_i := pos[i]
 		var dist_j := pos_i.distance_to(jpos)
 		# Las lejanas se actualizan 1 de cada 3 frames (con delta triple)

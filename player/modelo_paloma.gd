@@ -36,6 +36,7 @@ const MEZCLA := 0.15   ## Segundos de transición entre animaciones
 @export var es_jugador := false   ## La jugadora picotea más rápido (el picoteo es una acción del juego)
 
 var carga_visual: Node3D
+var sombrero_visual: Node3D    ## Dónde se cuelga el sombrero que se le sacó a un humano
 
 var _congelada := false   ## Ver congelar()
 var _aletazo: AletazoPaloma
@@ -105,6 +106,12 @@ func _armar() -> void:
 	var cabeza_rest := _skel.get_bone_global_rest(_skel.find_bone("head"))
 	carga_visual.transform = cabeza_rest.affine_inverse() * Transform3D(Basis(), skel_en_glb.affine_inverse() * PUNTO_PICO)
 
+	# Lugar del sombrero "robado" a la gente (ver poner_sombrero): sigue al hueso de la cabeza
+	sombrero_visual = Node3D.new()
+	sombrero_visual.name = "Sombrero"
+	adjunto.add_child(sombrero_visual)
+	sombrero_visual.transform = cabeza_rest.affine_inverse() * skel_en_glb.affine_inverse()
+
 	# Sólo la paloma de la jugadora se personaliza (colores por zona y accesorios)
 	if es_jugador:
 		var perfil := PerfilPaloma.actual()
@@ -127,6 +134,31 @@ func _armar() -> void:
 		_anim_accion.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 		_anim_desfase = randi() % 16
 	set_process(not es_jugador)
+
+
+## Se pone en la cabeza un "sombrero" o una "gorra" (de un humano) del color dado. Reemplaza al anterior.
+func poner_sombrero(tipo_sombrero: String, color_sombrero: Color) -> void:
+	if sombrero_visual == null:
+		return
+	quitar_sombrero()
+	var raiz := Node3D.new()
+	raiz.name = "Pieza"
+	if tipo_sombrero == "sombrero":
+		AccesoriosPaloma._cilindro(raiz, 0.16, 0.16, 0.014, Vector3(0.0, 0.507, 0.09), color_sombrero)
+		AccesoriosPaloma._cilindro(raiz, 0.085, 0.095, 0.1, Vector3(0.0, 0.565, 0.09), color_sombrero)
+		AccesoriosPaloma._cilindro(raiz, 0.097, 0.097, 0.02, Vector3(0.0, 0.53, 0.09), color_sombrero.darkened(0.45))
+	else:
+		AccesoriosPaloma._caja(raiz, Vector3(0.215, 0.05, 0.215), Vector3(0.0, 0.525, 0.1), color_sombrero)
+		AccesoriosPaloma._caja(raiz, Vector3(0.17, 0.014, 0.1), Vector3(0.0, 0.512, 0.255), color_sombrero.darkened(0.25))
+	sombrero_visual.add_child(raiz)
+
+
+func quitar_sombrero() -> void:
+	if sombrero_visual == null:
+		return
+	for n in sombrero_visual.get_children():
+		sombrero_visual.remove_child(n)
+		n.queue_free()
 
 
 ## Aplica una configuración de colores y accesorios (ver PerfilPaloma). Con un perfil vacío o null

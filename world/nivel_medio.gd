@@ -142,27 +142,31 @@ static func balcon(n: Node3D, x: float, y: float, rng: RandomNumberGenerator, an
 	for i in m:
 		var px := x + (i - (m - 1) / 2.0) * minf(0.7, (ancho - 0.5) / m)
 		maceta(n, Vector3(px, yb, salida - 0.32), rng)
+	# Marcador para que las palomas de la bandada se sienten (ver player/descanso.gd)
+	var marca := Marker3D.new()
+	marca.position = Vector3(x, y + BALCON.y / 2.0, salida / 2.0)
+	marca.set_meta("ancho", ancho)
+	marca.set_meta("salida", salida)
+	marca.add_to_group("balcones_percha")
+	n.add_child(marca)
 	contar("balcon")
 	contar("maceta", m)
 
 
 ## Maceta con su planta (y a veces flores), apoyada en "pos". Sin colisión.
 static func maceta(n: Node3D, pos: Vector3, rng: RandomNumberGenerator) -> void:
-	var r := rng.randf_range(0.13, 0.18)
-	var alto := rng.randf_range(0.22, 0.32)
-	var mi := Construir.cilindro(n, pos + Vector3(0, alto / 2.0, 0), r * 0.8, alto,
-		c(COLORES_MACETA[rng.randi() % COLORES_MACETA.size()]), false, 8, r)
-	_detalle(mi)
+	# Una maceta que se tira de un aletazo (ver Golpeable)
 	var planta: Array = PLANTAS[rng.randi() % PLANTAS.size()]
-	var rp := r * rng.randf_range(1.2, 1.6)
-	var hoja := Construir.esfera(n, pos + Vector3(0, alto + rp * 0.6, 0), rp, c(planta[0]), Vector3(1, 0.85, 1), 6)
-	_detalle(hoja)
+	var g := Golpeable.new()
+	g.tipo = "maceta"
+	g.color = c(COLORES_MACETA[rng.randi() % COLORES_MACETA.size()])
+	g.escala = rng.randf_range(0.9, 1.15)
+	g.color_hojas = c(planta[0])
 	if planta[1] != "":
-		for k in 3:
-			var a := TAU * k / 3.0 + rng.randf() * 0.8
-			var f := Construir.esfera(n, pos + Vector3(cos(a) * rp * 0.6, alto + rp * 1.05, sin(a) * rp * 0.6), 0.06,
-				c(planta[1]), Vector3.ONE, 6)
-			_detalle(f)
+		g.color_flor = c(planta[1])
+	n.add_child(g)
+	g.position = pos
+	g.fijar_origen.call_deferred()
 
 
 ## Toldo a rayas sobre una ventana: arranca contra la pared (z = 0 del marco) a la altura "y" y baja

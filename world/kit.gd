@@ -302,11 +302,33 @@ static func _sombra(padre: Node3D, forma: PrimitiveMesh, t: Transform3D, rango: 
 	mi.transform = t
 
 
+## Superficies donde la paloma se puede posar en un auto: techo, capó y baúl. Cada una es
+## [centro, tamaño] en el espacio del modelo (la trompa mira a +X). Vacío si no es un auto común
+## (colectivos y el auto abandonado no tienen).
+static func superficies_auto(nombre: String) -> Array:
+	var tapas: Array   # [x desde, x hasta, altura de arriba]
+	if nombre.begins_with("auto_hatch"):
+		tapas = [[-1.4, 0.45, 1.48], [0.6, 1.85, 0.85]]
+	elif nombre.begins_with("auto_sedan") or nombre == "taxi" or nombre == "patrullero":
+		tapas = [[-0.95, 0.4, 1.5 if nombre == "patrullero" else 1.45], [0.65, 1.9, 0.88], [-2.4, -1.15, 0.88]]
+	else:
+		return []
+	var res: Array = []
+	for tp: Array in tapas:
+		var largo_tapa: float = tp[1] - tp[0]
+		res.append([Vector3((tp[0] + tp[1]) / 2.0, tp[2] - 0.06, 0.0), Vector3(largo_tapa, 0.12, 1.4)])
+	return res
+
+
 ## Suma a "cuerpo" las formas de colisión de la pieza, transformadas por "t".
 static func colisiones(nombre: String, t: Transform3D, cuerpo: StaticBody3D) -> void:
 	var d := datos(nombre)
 	if d.has("base"):
 		colisiones(d["base"], t, cuerpo)
+	for s: Array in superficies_auto(nombre):
+		var forma_s := BoxShape3D.new()
+		forma_s.size = s[1]
+		_forma(cuerpo, forma_s, Transform3D(t.basis.orthonormalized(), t * (s[0] as Vector3)))
 	for c: Array in d.get("cajas", []):
 		var b := Basis.IDENTITY
 		if c.size() >= 15:

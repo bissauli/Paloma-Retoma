@@ -274,7 +274,7 @@ func _conducir(a: Auto, adelante: Auto, delta: float, gente: Array[Node3D]) -> v
 
 
 ## Bocinazo si la paloma está en el carril adelante; si la toca, la manda a volar (sin perder palomas).
-func _revisar_jugador(a: Auto, j: Node3D, _delta: float) -> void:
+func _revisar_jugador(a: Auto, j: Node3D, _delta: float) -> void:   # _delta: lo usa el paseo sobre el techo
 	var p := j.global_position
 	if p.y > a.alto + 0.4:
 		return
@@ -284,6 +284,12 @@ func _revisar_jugador(a: Auto, j: Node3D, _delta: float) -> void:
 	var a_lo_largo := rel.dot(fw)
 	var lateral := rel.dot(lado)
 	if absf(lateral) > a.ancho / 2.0 + 0.35:
+		return
+	# Posada sobre el techo o el capó: el auto no la pisa y la lleva de paseo
+	if rel.y > 0.6 and j is PalomaJugador and absf(a_lo_largo) <= a.largo / 2.0 + 0.2:
+		var pj := j as PalomaJugador
+		if pj.estado == PalomaJugador.Estado.SUELO and pj.get_platform_velocity().length() < 0.1:
+			pj.global_position += fw * a.velocidad * _delta
 		return
 	if a_lo_largo > a.largo / 2.0 and a_lo_largo < a.largo / 2.0 + 10.0 and a.velocidad > 3.0:
 		if a.bocina_enfriamiento <= 0.0:

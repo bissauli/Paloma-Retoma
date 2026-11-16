@@ -6,7 +6,7 @@ extends Node3D
 ## Para no atravesar paredes, cada movimiento se chequea con un rayo contra el mundo (capa 1)
 ## y si choca se desliza a lo largo de la pared (ver mover_con_choques).
 
-enum Modo { SUELTA, SIGUIENDO, HUYENDO, FESTEJANDO }
+enum Modo { SUELTA, SIGUIENDO, HUYENDO, FESTEJANDO, LLORANDO }
 
 const NOMBRES := ["Carlos", "La Tana", "El Ruso", "Coqui", "Pocha", "Tito", "Mirta", "El Flaco",
 	"Chiche", "La Negra", "Cacho", "Beba", "Pipo", "Nené", "Lalo", "Toto", "Chola", "Fito",
@@ -26,6 +26,7 @@ var altura_suelo := 0.0
 var modo_anim := 0                   ## Lo usa la bandada para animar
 
 var _rumbo := 0.0
+var _dir_corrida := Vector3.ZERO
 var _destino := Vector3.ZERO
 var _timer_paseo := 0.0
 var _timer_suelo := 0.0
@@ -82,6 +83,8 @@ func reclutar() -> void:
 func soltar(desde: Vector3) -> void:
 	if modo == Modo.SIGUIENDO:
 		GameState.registrar_seguidora(-1)
+	puesto = Vector3.INF
+	sentada = false
 	modo = Modo.HUYENDO
 	en_suelo = false
 	var lejos := (global_position - desde)
@@ -137,6 +140,8 @@ func _physics_process(delta: float) -> void:
 			_paso_huida(delta)
 		Modo.FESTEJANDO:
 			_paso_festejo(delta)
+		Modo.LLORANDO:
+			_paso_llanto(delta)
 		Modo.SIGUIENDO:
 			pass  # La mueve la bandada
 	if modo != Modo.SIGUIENDO:
@@ -312,6 +317,100 @@ func _mirar(v: Vector3, delta: float, rapidez: float) -> void:
 	if modo_anim != 0:
 		cabeceo = clampf(atan2(v.y, maxf(h.length(), 1.0)) * 0.6, -0.8, 0.6)
 	modelo.rotation = Vector3(cabeceo, _rumbo, 0.0)
+
+
+## La jugadora la golpeó: se va de la bandada llorando, volando o corriendo (al azar).
+func llorar(desde: Vector3, zona: Marker3D) -> void:
+	if modo == Modo.SIGUIENDO:
+		GameState.registrar_seguidora(-1)
+	puesto = Vector3.INF
+	sentada = false
+	var l := Label3D.new()
+	l.text = "T_T"
+	l.font_size = 96
+	l.modulate = Color(0.45, 0.7, 1.0)
+	l.outline_size = 12
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.pixel_size = 0.0028
+	l.position = Vector3(0, 0.7, 0)
+	add_child(l)
+	var tw := l.create_tween()
+	tw.tween_property(l, "position:y", 1.3, 3.0)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 1.0).set_delay(2.2)
+	tw.tween_callback(l.queue_free)
+	AudioManager.reproducir("picoteo", -2.0)
+	var lejos := global_position - desde
+	lejos.y = 0.0
+	if lejos.length() < 0.1:
+		lejos = Vector3(randf_range(-1, 1), 0, randf_range(-1, 1))
+	if randf() < 0.5:
+		modo = Modo.HUYENDO
+		en_suelo = false
+		velocidad = lejos.normalized() * 8.0 + Vector3.UP * 5.0
+		_timer_huida = randf_range(2.5, 4.0)
+		if zona:
+			ir_a_zona(zona.global_position, zona.get_meta("radio", 5.0))
+	else:
+		modo = Modo.LLORANDO
+		_dir_corrida = lejos.normalized()
+		_timer_huida = randf_range(3.0, 4.5)
+
+
+## Corre llorando alejándose del golpe; al rato se calma y pasea ahí cerca.
+func _paso_llanto(delta: float) -> void:
+	_timer_huida -= delta
+	velocidad = velocidad.lerp(_dir_corrida * 4.5, minf(delta * 6.0, 1.0))
+	mover_con_choques(velocidad * delta)
+	_actualizar_suelo(delta, 0.3)
+	global_position.y = lerpf(global_position.y, altura_suelo, minf(delta * 10.0, 1.0))
+	en_suelo = true
+	modo_anim = 0
+	_mirar(velocidad, delta, 10.0)
+	if _timer_huida <= 0.0:
+		modo = Modo.SUELTA
+		velocidad = Vector3.ZERO
+		configurar_zona(global_position, 4.0)
+
+
+## Descanso de la jugadora: lugar donde se sienta (INF = ninguno) y si ya llegó.
+var puesto := Vector3.INF
+var sentada := false
+
+
+func tiene_puesto() -> bool:
+	return puesto != Vector3.INF
+
+
+## Vuela hasta su puesto y se queda sentada mirando hacia "rumbo".
+func paso_posada(delta: float, rumbo: float) -> void:
+	var d := puesto - global_position
+	var dist := d.length()
+	if dist < 0.06:
+		global_position = puesto
+		velocidad = Vector3.ZERO
+		sentada = true
+		en_suelo = true
+		altura_suelo = puesto.y
+		modo_anim = 0
+		_rumbo = lerp_angle(_rumbo, rumbo, minf(8.0 * delta, 1.0))
+		modelo.rotation = Vector3(0.0, _rumbo, 0.0)
+		modelo.animar(delta, 0, 0.0)
+		return
+	sentada = false
+	var rapidez := clampf(dist * 3.0, 1.5, 10.0)
+	velocidad = d / dist * rapidez
+	global_position += velocidad * minf(delta, dist / rapidez)
+	modo_anim = 1 if dist > 0.4 else 0
+	_mirar(velocidad, delta, 8.0)
+	modelo.animar(delta, modo_anim, 0.0 if dist < 0.4 else rapidez)
+
+
+## Se levanta del puesto y vuelve a seguir a la bandada.
+func levantar() -> void:
+	puesto = Vector3.INF
+	sentada = false
+	_timer_suelo = 0.0
+	velocidad = Vector3(randf_range(-1.0, 1.0), 3.0, randf_range(-1.0, 1.0))
 
 
 ## Lo llama la bandada para mover a las seguidoras.

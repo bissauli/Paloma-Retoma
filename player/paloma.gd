@@ -57,6 +57,8 @@ var _velocidad_previa := Vector3.ZERO
 var _aleteo_auto := 0.0     ## Segundos de aleteo animado sin input (el salto del menú)
 var _aplastada := 0.0       ## Segundos que le quedan chata en el piso (la pisó un auto, ver aplastar)
 var _tween_aplastar: Tween
+var descansando := false    ## Descansando (Q): las palomas de la bandada se sientan al lado
+var _tween_descanso: Tween
 
 const DURACION_APLASTADA := 1.5
 const CAPA_GENTE := 4       ## Gente y autos (ver world/auto.gd): mientras está chata le pasan por encima
@@ -110,6 +112,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_revisar_contacto(delta)
 	_revisar_baile()
+	_revisar_descanso()
 	_orientar(delta)
 	_acciones(delta)
 	_animar(delta)
@@ -172,6 +175,58 @@ func _revisar_baile() -> void:
 		corta = Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras").length() > 0.1 			or Input.is_action_just_pressed("volar") or Input.is_action_just_pressed("picotear") 			or Input.is_action_just_pressed("arrullar") or Input.is_action_just_pressed("aletazo")
 	if corta:
 		modelo.dejar_de_bailar()
+
+
+# ---------------------------------------------------------------- Descansar (Q)
+
+## Q: se queda quieta descansando y las palomas de la bandada se sientan a su lado (en los cables,
+## balcones, bordes de fuentes... ver Descanso). Se levanta al moverse, volar, dar un aletazo o con Q.
+func _revisar_descanso() -> void:
+	if descansando:
+		var corta := estado == Estado.AIRE or not controlable or not GameState.en_partida \
+				or GameState.partida_terminada or _aplastada > 0.0
+		if not corta:
+			corta = Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras").length() > 0.1 \
+				or Input.is_action_just_pressed("volar") or Input.is_action_just_pressed("descansar") \
+				or Input.is_action_just_pressed("aletazo")
+		if corta:
+			levantarse()
+	elif controlable and Input.is_action_just_pressed("descansar") \
+			and (Ajustes.movil or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED):
+		descansar()
+
+
+func descansar() -> void:
+	if descansando or estado != Estado.SUELO or _aplastada > 0.0 or not GameState.en_partida \
+			or GameState.partida_terminada or GameState.menu_activo:
+		return
+	if modelo.bailando():
+		modelo.dejar_de_bailar()
+	descansando = true
+	velocity.x = 0.0
+	velocity.z = 0.0
+	if _tween_descanso:
+		_tween_descanso.kill()
+	_tween_descanso = create_tween()
+	_tween_descanso.tween_property(modelo, "scale", Vector3(1.1, 0.82, 1.1), 0.4).set_trans(Tween.TRANS_SINE)
+	var bandada := get_tree().get_first_node_in_group("bandada") as Bandada
+	if bandada and not bandada.seguidoras.is_empty():
+		var puestos: Array[Vector3] = Descanso.puestos(self, bandada.seguidoras.size())
+		bandada.descansar(puestos, _rumbo)
+
+
+func levantarse() -> void:
+	if not descansando:
+		return
+	descansando = false
+	if _tween_descanso:
+		_tween_descanso.kill()
+	if _aplastada <= 0.0:
+		_tween_descanso = create_tween()
+		_tween_descanso.tween_property(modelo, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_SINE)
+	var bandada := get_tree().get_first_node_in_group("bandada") as Bandada
+	if bandada:
+		bandada.levantarse()
 
 
 # ---------------------------------------------------------------- Movimiento
@@ -412,6 +467,12 @@ func _golpear_adelante() -> int:
 		if p and p.modo == PalomaNPC.Modo.SUELTA and _al_alcance(p.global_position, dir):
 			p.espantar(global_position)
 			tiradas += 1
+	var bandada := get_tree().get_first_node_in_group("bandada") as Bandada
+	if bandada:
+		for p in bandada.seguidoras.duplicate():
+			if _al_alcance(p.global_position, dir):
+				bandada.expulsar(p, global_position)
+				tiradas += 1
 	if tiradas > 0:
 		camara.sacudir(0.15)
 		AudioManager.reproducir("picoteo", -1.0)
@@ -421,10 +482,27 @@ func _golpear_adelante() -> int:
 	return tiradas
 
 
+## Si hay un sombrero o gorra tirado (que se le cayó a alguien) delante del pico, se lo pone.
+func _equipar_sombrero(punto: Vector3) -> bool:
+	for n in get_tree().get_nodes_in_group("golpeables"):
+		var g := n as Golpeable
+		if g == null or not g.desechable or not (g.tipo in ["sombrero", "gorra"]):
+			continue
+		if g.global_position.distance_to(punto) > radio_picoteo + 0.2 or absf(g.global_position.y - global_position.y) > 0.8:
+			continue
+		modelo.poner_sombrero(g.tipo, g.color)
+		g.queue_free()
+		AudioManager.ui("purchase", -12.0)
+		return true
+	return false
+
+
 ## Busca comida (grupo "comida") delante del pico y le avisa que fue picoteada.
 func _picotear_comida() -> void:
 	var adelante := Vector3(-sin(_rumbo), 0, -cos(_rumbo))
 	var punto := global_position + adelante * 0.45
+	if _equipar_sombrero(punto):
+		return
 	var mejor: Node3D = null
 	var mejor_d := radio_picoteo
 	for n in get_tree().get_nodes_in_group("comida"):

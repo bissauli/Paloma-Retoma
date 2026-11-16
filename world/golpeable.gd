@@ -19,7 +19,12 @@ const TIPOS := {
 	"florero": {"color": Color("4a6fd0"), "masa": 0.18},
 	"sombrero": {"color": Color("f2e6c9"), "masa": 0.25},
 	"gorra": {"color": Color("c43c3c"), "masa": 0.2},
+	"maceta": {"color": Color("b86a4a"), "masa": 0.6},
 }
+
+## Sólo para la "maceta": color de las hojas y de las flores ("" = sin flores).
+var color_hojas := Color("4a8a3a")
+var color_flor := Color.TRANSPARENT
 
 @export var tipo := "taza"
 @export var color := Color.WHITE
@@ -53,11 +58,14 @@ func _ready() -> void:
 	collision_mask = 1 | CAPA_OBJETOS     # El piso y los demás objetos
 	mass = float(TIPOS.get(tipo, TIPOS["taza"])["masa"])
 	can_sleep = true
+	if tipo in ["sombrero", "gorra"]:
+		linear_damp = 3.0      # Se frenan enseguida, fáciles de alcanzar
+		angular_damp = 6.0
 	freeze_mode = RigidBody3D.FREEZE_MODE_STATIC
 	freeze = true
 	var mat := PhysicsMaterial.new()
-	mat.bounce = 0.3
-	mat.friction = 0.7
+	mat.bounce = 0.1 if tipo in ["sombrero", "gorra"] else 0.3
+	mat.friction = 1.2 if tipo in ["sombrero", "gorra"] else 0.7
 	physics_material_override = mat
 	if color == Color.WHITE:
 		color = TIPOS.get(tipo, TIPOS["taza"])["color"]
@@ -106,7 +114,7 @@ func _al_chocar(_cuerpo: Node) -> void:
 	if _t_sonido > 0.0 or linear_velocity.length() < 0.8:
 		return
 	_t_sonido = 0.25
-	var nombre := "tintineo" if tipo in ["taza", "vaso", "azucarera", "florero"] else "picoteo"
+	var nombre := "tintineo" if tipo in ["taza", "vaso", "azucarera", "florero", "maceta"] else "picoteo"
 	AudioManager.reproducir_en(nombre, global_position, -6.0 if nombre == "tintineo" else -14.0)
 
 
@@ -153,6 +161,18 @@ func _armar() -> void:
 				var a := i * TAU / 3.0
 				_malla(_caja(Vector3(0.012, 0.1, 0.012) * k), Color("4a8a3a"), Vector3(sin(a) * 0.015 * k, 0.2 * k, cos(a) * 0.015 * k))
 				_malla(_esfera(0.025 * k), [Color("ff6fa5"), Color("ffd84a"), Color("ffffff")][i], Vector3(sin(a) * 0.03 * k, 0.26 * k, cos(a) * 0.03 * k))
+		"maceta":
+			var r := 0.15 * k
+			var alto := 0.27 * k
+			forma.shape = _cilindro_forma(r, alto)
+			forma.position.y = alto / 2.0
+			_malla(_cilindro(r, r * 0.8, alto), color, Vector3(0, alto / 2.0, 0))
+			var rp := r * 1.4
+			_malla(_esfera(rp), color_hojas, Vector3(0, alto + rp * 0.6, 0), Vector3(1, 0.85, 1))
+			if color_flor.a > 0.0:
+				for i in 3:
+					var a := TAU * i / 3.0 + 0.4
+					_malla(_esfera(0.06 * k), color_flor, Vector3(cos(a) * rp * 0.6, alto + rp * 1.05, sin(a) * rp * 0.6))
 		"sombrero":
 			forma.shape = _cilindro_forma(0.28 * k, 0.1 * k)
 			forma.position.y = 0.05 * k
@@ -160,9 +180,8 @@ func _armar() -> void:
 			_malla(_cilindro(0.13 * k, 0.15 * k, 0.16 * k), color, Vector3(0, 0.09 * k, 0))
 			_malla(_cilindro(0.152 * k, 0.152 * k, 0.03 * k), color.darkened(0.45), Vector3(0, 0.04 * k, 0))   # Cinta
 		"gorra":
-			forma.shape = SphereShape3D.new()
-			(forma.shape as SphereShape3D).radius = 0.14 * k
-			forma.position.y = 0.12 * k
+			forma.shape = _cilindro_forma(0.15 * k, 0.1 * k)   # Plana: no rueda como una esfera
+			forma.position.y = 0.05 * k
 			var cupula := _esfera(0.15 * k)
 			_malla(cupula, color, Vector3(0, 0.11 * k, 0), Vector3(1, 0.8, 1))
 			_malla(_caja(Vector3(0.22, 0.03, 0.18) * k), color.darkened(0.2), Vector3(0, 0.03 * k, -0.17 * k))   # Visera
