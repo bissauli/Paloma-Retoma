@@ -53,6 +53,11 @@ var _rumbo := 0.0           ## Hacia dónde mira la paloma (yaw)
 var _alabeo := 0.0
 var _velocidad_previa := Vector3.ZERO
 var _aleteo_auto := 0.0     ## Segundos de aleteo animado sin input (el salto del menú)
+var _aplastada := 0.0       ## Segundos que le quedan chata en el piso (la pisó un auto, ver aplastar)
+var _tween_aplastar: Tween
+
+const DURACION_APLASTADA := 1.5
+const CAPA_GENTE := 4       ## Gente y autos (ver world/auto.gd): mientras está chata le pasan por encima
 
 @onready var modelo: ModeloPaloma = $Modelo
 @onready var camara: CamaraOrbital = $CamaraOrbital
@@ -85,11 +90,15 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	var entrada := Vector2.ZERO
-	if controlable:
+	if controlable and _aplastada <= 0.0:
 		entrada = Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras")
 	var dir: Vector3 = camara.direccion_plana(entrada)
 	_velocidad_previa = velocity
 
+	if _aplastada > 0.0:
+		_aplastada -= delta
+		if _aplastada <= 0.0:
+			_reinflar()
 	if estado == Estado.SUELO:
 		_fisica_suelo(delta, dir)
 	else:
@@ -148,7 +157,7 @@ func _fisica_suelo(delta: float, dir: Vector3) -> void:
 	# En el piso la stamina se recarga, y cada vez más rápido cuanto más tiempo seguido estés
 	_tiempo_en_suelo += delta
 	GameState.set_stamina(GameState.stamina + Config.recarga_suelo(_tiempo_en_suelo) * delta)
-	if controlable and Input.is_action_just_pressed("volar"):
+	if controlable and _aplastada <= 0.0 and Input.is_action_just_pressed("volar"):
 		despegar()
 
 
@@ -300,7 +309,7 @@ func _animar(delta: float) -> void:
 func _acciones(delta: float) -> void:
 	_enfriamiento_arrullo = maxf(_enfriamiento_arrullo - delta, 0.0)
 	_enfriamiento_picoteo = maxf(_enfriamiento_picoteo - delta, 0.0)
-	if not controlable or (not Ajustes.movil and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED):
+	if not controlable or _aplastada > 0.0 or (not Ajustes.movil and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED):
 		return
 	if Input.is_action_just_pressed("picotear") and _enfriamiento_picoteo <= 0.0:
 		_enfriamiento_picoteo = 0.28
@@ -371,6 +380,11 @@ func _al_ser_atrapada(_motivo: String) -> void:
 ## Teletransporta la paloma al nido (penalización leve, sin game over).
 func volver_al_nido() -> void:
 	var destino := GameState.posicion_nido + Vector3(randf_range(-2, 2), 0.5, 4.5)
+	if _aplastada > 0.0:
+		_aplastada = 0.0
+		collision_mask |= CAPA_GENTE
+		_tween_aplastar.kill()
+		modelo.scale = Vector3.ONE
 	global_position = destino
 	velocity = Vector3.ZERO
 	estado = Estado.AIRE
@@ -393,6 +407,57 @@ func empujar(direccion: Vector3, fuerza: float) -> void:
 	velocity = d * fuerza + Vector3.UP * fuerza * 0.7
 	camara.sacudir(0.5)
 	AudioManager.reproducir("aleteo")
+
+
+## La pisó un auto: queda chata como una calcomanía en el piso (el auto le pasa por encima) y a los
+## DURACION_APLASTADA segundos se infla de golpe con un "boing" y sigue como si nada. No pierde palomas.
+func aplastar() -> void:
+	if _aplastada > 0.0:
+		return
+	_aplastada = DURACION_APLASTADA
+	# Si iba volando bajito, cae pegada al piso que tiene debajo
+	if estado == Estado.AIRE:
+		var q := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 0.3,
+			global_position + Vector3.DOWN * 4.0, Construir.CAPA_MUNDO)
+		var r := get_world_3d().direct_space_state.intersect_ray(q)
+		if not r.is_empty():
+			global_position.y = (r["position"] as Vector3).y
+		reset_physics_interpolation()
+	estado = Estado.SUELO
+	floor_snap_length = 0.25
+	en_picada = false
+	aleteando = false
+	velocity = Vector3.ZERO
+	collision_mask &= ~CAPA_GENTE
+	camara.sacudir(0.7)
+	AudioManager.reproducir("aplastar")
+	# Chata en un instante, con un rebotecito, y respirando apenas mientras espera
+	if _tween_aplastar:
+		_tween_aplastar.kill()
+	modelo.scale = Vector3.ONE
+	_tween_aplastar = create_tween()
+	_tween_aplastar.tween_property(modelo, "scale", Vector3(1.7, 0.05, 1.7), 0.06).set_ease(Tween.EASE_OUT)
+	_tween_aplastar.tween_property(modelo, "scale", Vector3(1.5, 0.07, 1.5), 0.16).set_trans(Tween.TRANS_SINE)
+	_tween_aplastar.tween_property(modelo, "scale", Vector3(1.55, 0.06, 1.55), 0.5).set_trans(Tween.TRANS_SINE)
+	_tween_aplastar.tween_property(modelo, "scale", Vector3(1.5, 0.07, 1.5), 0.5).set_trans(Tween.TRANS_SINE)
+
+
+## Se infla de golpe (se estira para arriba y se acomoda con un rebote elástico) y da un saltito.
+func _reinflar() -> void:
+	_aplastada = 0.0
+	collision_mask |= CAPA_GENTE
+	AudioManager.reproducir("boing")
+	if _tween_aplastar:
+		_tween_aplastar.kill()
+	_tween_aplastar = create_tween()
+	_tween_aplastar.tween_property(modelo, "scale", Vector3(0.7, 1.45, 0.7), 0.09).set_ease(Tween.EASE_OUT)
+	_tween_aplastar.tween_property(modelo, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	velocity.y = 3.2
+
+
+## ¿Está chata en el piso (la pisó un auto)?
+func esta_aplastada() -> bool:
+	return _aplastada > 0.0
 
 
 ## ¿Hay algo encima que la cubra (árbol, techo, galería)? Lo usa el halcón.

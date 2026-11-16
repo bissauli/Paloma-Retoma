@@ -55,7 +55,8 @@ func precalentar(jugador: Node3D, camara_juego: Camera3D) -> void:
 
 
 ## Materiales que no existen hasta que pasa algo en la partida (el anillo del arrullo, las rayas
-## de viento al volar): una copia de cada uno delante de la cámara de precalentado.
+## de viento al volar, y la lluvia, el rayo y el arcoíris del cielo): una copia de cada uno delante
+## de la cámara de precalentado.
 func _agregar_muestras(cam: Camera3D) -> Node3D:
 	var grupo := Node3D.new()
 	grupo.visible = false
@@ -66,8 +67,12 @@ func _agregar_muestras(cam: Camera3D) -> Node3D:
 	var viento := anillo.duplicate() as StandardMaterial3D
 	viento.vertex_color_use_as_albedo = true
 	viento.disable_receive_shadows = true
-	var x := -0.6
-	for m: StandardMaterial3D in [anillo, viento]:
+	var materiales: Array[Material] = [anillo, viento]
+	var sol := get_tree().get_first_node_in_group("sol")
+	if sol and sol.get_parent() is Cielo:
+		materiales.append_array((sol.get_parent() as Cielo).materiales_ocultos())
+	var x := -0.3 * (materiales.size() - 1)
+	for m: Material in materiales:
 		var mi := MeshInstance3D.new()
 		var caja := BoxMesh.new()
 		caja.size = Vector3.ONE * 0.2
@@ -76,5 +81,5 @@ func _agregar_muestras(cam: Camera3D) -> Node3D:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.position = Vector3(x, 0.0, -2.0)
 		grupo.add_child(mi)
-		x += 1.2
+		x += 0.6
 	return grupo

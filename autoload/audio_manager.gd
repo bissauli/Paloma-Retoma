@@ -3,14 +3,15 @@ extends Node
 ## Si existe res://audio/<nombre>.wav (o .ogg) se usa ese archivo.
 ## Si no, el sonido se sintetiza por código al arrancar (placeholder).
 ## Nombres previstos: arrullo, aleteo, picoteo, grito_nene, silbato,
-## chillido_halcon, ambiente, recoger, victoria, bocina.
+## chillido_halcon, ambiente, recoger, victoria, bocina, aplastar, boing, ladrido, trueno, lluvia.
 ## Cada sonido sale por un bus (ver default_bus_layout.tres): las voces (arrullo, grito, chillido)
 ## por "Voces", el ambiente y la música por "Musica" y el resto por "Efectos".
 ## Si existe res://audio/musica.ogg (o .wav) suena en bucle por el bus "Musica".
 
 const MEZCLA := 22050
 const NOMBRES := ["arrullo", "aleteo", "picoteo", "grito_nene", "silbato",
-	"chillido_halcon", "ambiente", "recoger", "victoria", "bocina"]
+	"chillido_halcon", "ambiente", "recoger", "victoria", "bocina", "aplastar", "boing", "ladrido",
+	"trueno", "lluvia"]
 const CANALES := 10
 const BUS_VOCES := ["arrullo", "grito_nene", "chillido_halcon"]
 
@@ -99,6 +100,11 @@ func iniciar_ambiente() -> void:
 		_musica.play()
 
 
+## El stream de un sonido, para reproducirlo con un player propio (la lluvia en loop de world/cielo.gd).
+func sonido(nombre: String) -> AudioStream:
+	return _sonidos.get(nombre)
+
+
 func detener_ambiente() -> void:
 	_ambiente.stop()
 	_musica.stop()
@@ -131,6 +137,11 @@ func _cargar_o_generar(nombre: String) -> AudioStream:
 		"recoger": return _gen_recoger()
 		"victoria": return _gen_victoria()
 		"bocina": return _gen_bocina()
+		"aplastar": return _gen_aplastar()
+		"boing": return _gen_boing()
+		"ladrido": return _gen_ladrido()
+		"trueno": return _gen_trueno()
+		"lluvia": return _gen_lluvia()
 	return _a_wav(PackedFloat32Array([0.0]))
 
 
@@ -251,6 +262,53 @@ func _gen_bocina() -> AudioStreamWAV:
 	return _a_wav(m)
 
 
+func _gen_aplastar() -> AudioStreamWAV:
+	# "¡Plaf!" de dibujito: un golpe grave que cae de tono y un chasquido de ruido encima.
+	var dur := 0.32
+	var m := _muestras(dur)
+	var fase := 0.0
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		fase += lerpf(170.0, 55.0, minf(t / 0.12, 1.0)) / MEZCLA
+		var golpe := sin(TAU * fase) * exp(-t * 14.0)
+		var chasquido := _rng.randf_range(-1.0, 1.0) * exp(-t * 55.0)
+		m[i] = (golpe * 0.75 + chasquido * 0.45) * minf(t / 0.003, 1.0)
+	return _a_wav(m)
+
+
+func _gen_boing() -> AudioStreamWAV:
+	# "¡Boing!": un resorte que sube de tono y vibra mientras se apaga.
+	var dur := 0.55
+	var m := _muestras(dur)
+	var fase := 0.0
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		var f := lerpf(140.0, 420.0, minf(t / 0.09, 1.0)) * (1.0 + 0.09 * sin(TAU * 17.0 * t) * exp(-t * 3.0))
+		fase += f / MEZCLA
+		var s := sin(TAU * fase) + 0.3 * sin(TAU * fase * 2.0)
+		m[i] = s * 0.33 * minf(t / 0.01, 1.0) * exp(-t * 5.5)
+	return _a_wav(m)
+
+
+func _gen_ladrido() -> AudioStreamWAV:
+	# "¡Guau, guau!": dos golpes de voz que bajan de tono, con algo de ruido (ronquera).
+	var dur := 0.62
+	var m := _muestras(dur)
+	var fase := 0.0
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		var v := 0.0
+		for c: float in [0.0, 0.3]:
+			var u := t - c
+			if u >= 0.0 and u < 0.2:
+				var f := lerpf(520.0, 290.0, u / 0.2)
+				fase += f / MEZCLA
+				var onda := sin(TAU * fase) + 0.5 * sin(TAU * fase * 2.0) + 0.25 * sin(TAU * fase * 3.0)
+				v += (onda * 0.8 + _rng.randf_range(-0.35, 0.35)) * minf(u / 0.012, 1.0) * exp(-u * 13.0)
+		m[i] = v * 0.32
+	return _a_wav(m)
+
+
 func _gen_chillido() -> AudioStreamWAV:
 	# "¡Kiiiaaa!" descendente.
 	var dur := 1.0
@@ -276,6 +334,42 @@ func _gen_ambiente() -> AudioStreamWAV:
 		var ola := 0.7 + 0.3 * sin(TAU * t / dur * 2.0)
 		m[i] = marron * 0.8 * ola
 	# Fundido en los bordes para que el loop no haga click
+	var borde := 2000
+	for i in borde:
+		var k := float(i) / borde
+		m[i] *= k
+		m[m.size() - 1 - i] *= k
+	return _a_wav(m, true)
+
+
+func _gen_trueno() -> AudioStreamWAV:
+	# Un chasquido corto y un retumbo grave que se va apagando con ondas lentas.
+	var dur := 3.2
+	var m := _muestras(dur)
+	var marron := 0.0
+	var crujido := 0.0
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		marron = clampf(marron + _rng.randf_range(-0.035, 0.035), -1.0, 1.0) * 0.997
+		crujido = lerpf(crujido, _rng.randf_range(-1.0, 1.0), 0.35)
+		var golpe := crujido * exp(-t * 9.0) * 0.6
+		var retumbo := marron * 1.6 * exp(-t * 1.1) * (0.75 + 0.25 * sin(TAU * t * 2.3))
+		m[i] = (golpe + retumbo) * minf(t / 0.01, 1.0)
+	return _a_wav(m)
+
+
+func _gen_lluvia() -> AudioStreamWAV:
+	# Siseo de lluvia: ruido blanco suavizado con gotitas sueltas. Se repite en loop.
+	var dur := 3.0
+	var m := _muestras(dur)
+	var suave := 0.0
+	var gota := 0.0
+	for i in m.size():
+		suave = lerpf(suave, _rng.randf_range(-1.0, 1.0), 0.45)
+		if _rng.randf() < 0.0012:
+			gota = _rng.randf_range(0.3, 0.7)
+		gota *= 0.992
+		m[i] = suave * 0.32 + _rng.randf_range(-1.0, 1.0) * gota * 0.4
 	var borde := 2000
 	for i in borde:
 		var k := float(i) / borde

@@ -32,6 +32,8 @@ var comida := 0
 var carga := ""                 ## Comida pesada que lleva la paloma
 var stamina := Config.STAMINA_MAX
 var progreso_dia := 0.0
+var hora_dia := Config.HORA_INICIO   ## Hora del reloj del cielo (0-24), ver world/cielo.gd
+var clima := 0                        ## Clima actual (Cielo.Clima)
 var tiempo_jugado := 0.0
 var en_partida := false
 var partida_terminada := false
@@ -85,6 +87,8 @@ func reiniciar(datos: Dictionary = {}) -> void:
 	carga = ""
 	stamina = Config.STAMINA_MAX
 	progreso_dia = float(datos.get("progreso_dia", 0.0))
+	hora_dia = float(datos.get("hora_dia", Config.HORA_INICIO))
+	clima = int(datos.get("clima", 0))
 	tiempo_jugado = float(datos.get("tiempo_jugado", 0.0))
 	partida_terminada = false
 	halcon_activo = false
@@ -137,6 +141,8 @@ func guardar_partida() -> void:
 	cfg.set_value("partida", "comida", comida)
 	cfg.set_value("partida", "tiempo_jugado", tiempo_jugado)
 	cfg.set_value("partida", "progreso_dia", progreso_dia)
+	cfg.set_value("partida", "hora_dia", hora_dia)
+	cfg.set_value("partida", "clima", clima)
 	cfg.set_value("partida", "tutorial_hecho", tutorial_hecho)
 	cfg.set_value("partida", "migas_comidas", migas_comidas)
 	cfg.set_value("partida", "umbrales", _umbrales.keys())

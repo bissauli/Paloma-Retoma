@@ -1,18 +1,17 @@
 extends Node3D
-## Construye la Plaza de Mayo con primitivas al iniciar.
-## Coordenadas: X = este (+) / oeste (-), Z = sur (+) / norte (-). El mapa mide 120 x 80 m.
+## Construye la Plaza de Mayo con primitivas al iniciar, y la ciudad que la rodea (world/ciudad.gd).
+## Coordenadas: X = este (+) / oeste (-), Z = sur (+) / norte (-). La plaza mide 120 x 80 m y la
+## ciudad entera unos 394 x 222 m (ver Ciudad.X_MIN...).
 
 const ANCHO := 120.0
 const LARGO := 80.0
 
 # Paleta
-const C_PISO := Color("a8a59d")
-const C_JUNTA := Color("85827c")
-const C_ASFALTO := Color("4a4a4f")
-const C_VEREDA := Color("a39f97")
+const C_ASFALTO := Color("76787a")
 
 var sol: DirectionalLight3D
 var entorno: Environment
+var cielo: Cielo
 
 
 func _ready() -> void:
@@ -20,82 +19,19 @@ func _ready() -> void:
 	_crear_piso()
 	_crear_limites()
 	_crear_zonas()
-	GameState.fase_dia_cambio.connect(_al_cambiar_fase)
-	_al_cambiar_fase(0.0)
 	# Miles de piezas fijas (edificios, árboles, bancos...) pasan a ser unas pocas mallas grandes
 	Construir.fusionar_estaticas(self)
 
 
 # ---------------------------------------------------------------- Luz y cielo
 
+## El cielo, el sol (y la luna), el día y la noche y el clima los arma world/cielo.gd.
 func _crear_ambiente() -> void:
-	var cielo_mat := ProceduralSkyMaterial.new()
-	cielo_mat.sky_top_color = Color("5fa8e8")
-	cielo_mat.sky_horizon_color = Color("bfe0f5")
-	cielo_mat.ground_horizon_color = Color("bfe0f5")
-	cielo_mat.ground_bottom_color = Color("8a8f96")
-	var cielo := Sky.new()
-	cielo.sky_material = cielo_mat
-
-	entorno = Environment.new()
-	entorno.background_mode = Environment.BG_SKY
-	entorno.sky = cielo
-	entorno.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	entorno.ambient_light_color = Color(0.55, 0.6, 0.7)
-	entorno.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
-	entorno.ambient_light_energy = 0.5
-	entorno.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	entorno.fog_enabled = true
-	entorno.fog_light_color = Color("cfe3f0")
-	entorno.fog_density = 0.0035
-	entorno.fog_sky_affect = 0.15
-
-	var we := WorldEnvironment.new()
-	we.name = "WorldEnvironment"
-	we.environment = entorno
-	we.add_to_group("entorno")
-	add_child(we)
-	Ajustes.aplicar_brillo(entorno)  # Opciones > Pantalla > Brillo
-
-	sol = DirectionalLight3D.new()
-	sol.name = "Sol"
-	sol.shadow_enabled = true
-	sol.light_energy = 0.65
-	sol.add_to_group("sol")
-	add_child(sol)
-	# Distancia y calidad de las sombras según el preset gráfico (Opciones > Gráficos)
-	Ajustes.aplicar_sombras(sol)
-
-
-## Ciclo de día: t = 0 mañana, t = 1 atardecer.
-func _al_cambiar_fase(t: float) -> void:
-	if sol == null:
-		return
-	# El sol sale por el este (sobre el Río de la Plata) y se pone por el oeste
-	var elevacion: float = lerpf(-30.0, -60.0, t * 2.0) if t < 0.5 else lerpf(-60.0, -12.0, (t - 0.5) * 2.0)
-	var azimut := lerpf(110.0, 250.0, t)
-	sol.rotation_degrees = Vector3(elevacion, azimut, 0.0)
-	var color_maniana := Color("fff1d6")
-	var color_mediodia := Color("ffffff")
-	var color_atardecer := Color("ffa565")
-	var c: Color
-	if t < 0.5:
-		c = color_maniana.lerp(color_mediodia, t * 2.0)
-	else:
-		c = color_mediodia.lerp(color_atardecer, (t - 0.5) * 2.0)
-	sol.light_color = c
-	sol.light_energy = lerpf(0.65, 0.5, maxf(t - 0.5, 0.0) * 2.0)
-	var cielo_mat := entorno.sky.sky_material as ProceduralSkyMaterial
-	var arriba_dia := Color("5fa8e8")
-	var arriba_tarde := Color("5a6fb8")
-	var horiz_dia := Color("bfe0f5")
-	var horiz_tarde := Color("f6b48a")
-	var k: float = clampf((t - 0.55) / 0.45, 0.0, 1.0)
-	cielo_mat.sky_top_color = arriba_dia.lerp(arriba_tarde, k)
-	cielo_mat.sky_horizon_color = horiz_dia.lerp(horiz_tarde, k)
-	cielo_mat.ground_horizon_color = cielo_mat.sky_horizon_color
-	entorno.fog_light_color = Color("cfe3f0").lerp(Color("f2b892"), k)
-	entorno.ambient_light_color = Color(0.55, 0.6, 0.7).lerp(Color(0.62, 0.5, 0.55), k)
+	cielo = Cielo.new()
+	cielo.name = "Cielo"
+	add_child(cielo)
+	sol = cielo.sol
+	entorno = cielo.entorno
 
 
 # ---------------------------------------------------------------- Piso y límites
@@ -104,28 +40,46 @@ func _crear_piso() -> void:
 	var piso := Node3D.new()
 	piso.name = "Piso"
 	add_child(piso)
-	# Plaza de baldosas grises
-	var baldosas := Construir.material_baldosas(C_PISO, C_JUNTA, Vector2(0.34, 0.34))
-	Construir.caja_mat(piso, Vector3(0, -0.5, -4), Vector3(ANCHO + 40, 1.0, LARGO + 32), baldosas)
-	# Avenida al sur (asfalto con líneas)
-	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(ANCHO + 40, 0.01, 8), C_ASFALTO, false)
-	for i in range(-8, 9):
-		Construir.caja(piso, Vector3(i * 9.0, 0.012, 30), Vector3(4.0, 0.01, 0.25), Color("e8e4d0"), false)
-	# Vereda del lado de los cafés
-	Construir.caja(piso, Vector3(0, 0.08, 37), Vector3(ANCHO + 40, 0.16, 6), C_VEREDA)
+	# Plaza de baldosas grises: sólo su manzana (alrededor están las calles y veredas de la ciudad,
+	# ver world/ciudad.gd)
+	var baldosas := Construir.material_lajas("lajas_plaza", 5.0)
+	# Con el hueco de la escalera del subte (las lajas van en coordenadas del mundo: no se notan los cortes)
+	for r: Rect2 in Edificios.partir(Ciudad.PLAZA, Edificios.hueco_subte(true)):
+		Construir.caja_mat(piso, Vector3(r.get_center().x, -0.5, r.get_center().y), Vector3(r.size.x, 1.0, r.size.y), baldosas)
+	# La tira de piso donde sale la rampa de la escalera: sólo se ve
+	var h := Edificios.hueco_subte()
+	var tira := Rect2(h.position.x, h.end.y, h.size.x, Edificios.hueco_subte(true).end.y - h.end.y)
+	Construir.caja_mat(piso, Vector3(tira.get_center().x, -0.5, tira.get_center().y), Vector3(tira.size.x, 1.0, tira.size.y),
+		baldosas, false)
+	var r := Ciudad.PLAZA
+	# Avenida al sur (asfalto con líneas): cruza la manzana y llega hasta Bolívar y Paseo Colón
+	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(128, 0.01, 8), C_ASFALTO, false)
+	for i in range(-6, 7):
+		Construir.caja(piso, Vector3(i * 9.0, 0.012, 30), Vector3(4.0, 0.01, 0.25), Color("f4f3ee"), false)
+	# Vereda del lado de los cafés (las mismas lajas que el resto de las veredas)
+	Construir.caja_mat(piso, Vector3(0, 0.08, 37), Vector3(r.size.x, 0.16, 6), Construir.material_lajas("lajas_vereda", 4.0))
 
 
-## Paredes invisibles alrededor del mapa (y un techo para no irse al espacio).
+## Paredes invisibles en el borde de la ciudad (y un techo para no irse al espacio).
 func _crear_limites() -> void:
 	var lim := Node3D.new()
 	lim.name = "Limites"
 	add_child(lim)
-	var alto := 60.0
-	Construir.pared_invisible(lim, Vector3(0, alto / 2, -LARGO / 2 - 1), Vector3(ANCHO + 4, alto, 2))
-	Construir.pared_invisible(lim, Vector3(0, alto / 2, LARGO / 2 + 1), Vector3(ANCHO + 4, alto, 2))
-	Construir.pared_invisible(lim, Vector3(-ANCHO / 2 - 1, alto / 2, 0), Vector3(2, alto, LARGO + 4))
-	Construir.pared_invisible(lim, Vector3(ANCHO / 2 + 1, alto / 2, 0), Vector3(2, alto, LARGO + 4))
-	Construir.pared_invisible(lim, Vector3(0, 36, 0), Vector3(ANCHO + 4, 2, LARGO + 4))
+	var alto := 90.0
+	var x0 := Ciudad.X_MIN
+	var x1 := Ciudad.X_MAX
+	var z0 := Ciudad.Z_MIN
+	var z1 := Ciudad.Z_MAX
+	var ancho := x1 - x0
+	var largo := z1 - z0
+	var cx := (x0 + x1) / 2.0
+	var cz := (z0 + z1) / 2.0
+	Construir.pared_invisible(lim, Vector3(cx, alto / 2, z0 - 1), Vector3(ancho + 4, alto, 2))
+	Construir.pared_invisible(lim, Vector3(cx, alto / 2, z1 + 1), Vector3(ancho + 4, alto, 2))
+	Construir.pared_invisible(lim, Vector3(x0 - 1, alto / 2, cz), Vector3(2, alto, largo + 4))
+	Construir.pared_invisible(lim, Vector3(x1 + 1, alto / 2, cz), Vector3(2, alto, largo + 4))
+	# El techo queda por encima de las azoteas más altas, así se puede aterrizar en todas
+	Construir.pared_invisible(lim, Vector3(cx, Ciudad.TECHO + 1.0, cz), Vector3(ancho + 4, 2, largo + 4))
 
 
 # ---------------------------------------------------------------- Zonas
@@ -142,9 +96,16 @@ func _crear_zonas() -> void:
 	Edificios.cabildo(edif)
 	Edificios.catedral(edif)
 	Edificios.alrededores(edif)
-	Edificios.subte(edif, Vector3(34, 0, -22))
+	Edificios.subte(edif, Edificios.SUBTE)
 	posicion_balcon = Edificios.casa_rosada(edif)
 	var mesas := Edificios.cafes(edif)
+	# Nivel inferior (Fase 1): pasajes entre los cafés, galería del Cabildo y mercado
+	NivelInferior.armar(self)
+	# La ciudad alrededor de la plaza (mapa V2): arma y fusiona sus propias piezas
+	add_child(Ciudad.new())
+	# Nivel medio (Fase 2): toldos de los cafés, balcones alrededor, columnas de farol y árboles altos
+	# (después de la ciudad: al armarse, la ciudad pone en cero las cuentas que miran las pruebas)
+	NivelMedio.plaza(self)
 	add_child(Transito.new())
 
 	_crear_jardines()
@@ -306,7 +267,7 @@ func _crear_puntos() -> void:
 		"PuntoEscolares": Vector3(-34, 0, 12),
 		"PuntoSenoras": Vector3(0, 0, -18),
 		"PuntoCafes": Vector3(0, 0.16, 35.7),   # Entre las mesas y las vidrieras
-		"PuntoSubte": Vector3(34, 0, -22),
+		"PuntoSubte": Edificios.SUBTE,
 		"PuntoGranaderos": Vector3(40.5, 0, 0),
 		"PuntoCatedral": Vector3(0, 0, -14),      # Marca la brújula
 		"PuntoChoripan": Vector3(23, 0.16, 35.2),   # El carrito (ver _carrito_choripan)
