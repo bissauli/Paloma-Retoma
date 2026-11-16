@@ -43,8 +43,15 @@ func _crear_piso() -> void:
 	# Plaza de baldosas grises: sólo su manzana (alrededor están las calles y veredas de la ciudad,
 	# ver world/ciudad.gd)
 	var baldosas := Construir.material_lajas("lajas_plaza", 5.0)
+	# Con el hueco de la escalera del subte (las lajas van en coordenadas del mundo: no se notan los cortes)
+	for r: Rect2 in Edificios.partir(Ciudad.PLAZA, Edificios.hueco_subte(true)):
+		Construir.caja_mat(piso, Vector3(r.get_center().x, -0.5, r.get_center().y), Vector3(r.size.x, 1.0, r.size.y), baldosas)
+	# La tira de piso donde sale la rampa de la escalera: sólo se ve
+	var h := Edificios.hueco_subte()
+	var tira := Rect2(h.position.x, h.end.y, h.size.x, Edificios.hueco_subte(true).end.y - h.end.y)
+	Construir.caja_mat(piso, Vector3(tira.get_center().x, -0.5, tira.get_center().y), Vector3(tira.size.x, 1.0, tira.size.y),
+		baldosas, false)
 	var r := Ciudad.PLAZA
-	Construir.caja_mat(piso, Vector3(r.get_center().x, -0.5, r.get_center().y), Vector3(r.size.x, 1.0, r.size.y), baldosas)
 	# Avenida al sur (asfalto con líneas): cruza la manzana y llega hasta Bolívar y Paseo Colón
 	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(128, 0.01, 8), C_ASFALTO, false)
 	for i in range(-6, 7):
@@ -89,11 +96,16 @@ func _crear_zonas() -> void:
 	Edificios.cabildo(edif)
 	Edificios.catedral(edif)
 	Edificios.alrededores(edif)
-	Edificios.subte(edif, Vector3(34, 0, -22))
+	Edificios.subte(edif, Edificios.SUBTE)
 	posicion_balcon = Edificios.casa_rosada(edif)
 	var mesas := Edificios.cafes(edif)
+	# Nivel inferior (Fase 1): pasajes entre los cafés, galería del Cabildo y mercado
+	NivelInferior.armar(self)
 	# La ciudad alrededor de la plaza (mapa V2): arma y fusiona sus propias piezas
 	add_child(Ciudad.new())
+	# Nivel medio (Fase 2): toldos de los cafés, balcones alrededor, columnas de farol y árboles altos
+	# (después de la ciudad: al armarse, la ciudad pone en cero las cuentas que miran las pruebas)
+	NivelMedio.plaza(self)
 	add_child(Transito.new())
 
 	_crear_jardines()
@@ -255,7 +267,7 @@ func _crear_puntos() -> void:
 		"PuntoEscolares": Vector3(-34, 0, 12),
 		"PuntoSenoras": Vector3(0, 0, -18),
 		"PuntoCafes": Vector3(0, 0.16, 35.7),   # Entre las mesas y las vidrieras
-		"PuntoSubte": Vector3(34, 0, -22),
+		"PuntoSubte": Edificios.SUBTE,
 		"PuntoGranaderos": Vector3(40.5, 0, 0),
 		"PuntoCatedral": Vector3(0, 0, -14),      # Marca la brújula
 		"PuntoChoripan": Vector3(23, 0.16, 35.2),   # El carrito (ver _carrito_choripan)

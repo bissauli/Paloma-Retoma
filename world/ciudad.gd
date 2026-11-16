@@ -22,7 +22,7 @@ const X_MIN := -197.0
 const X_MAX := 197.0
 const Z_MIN := -112.0
 const Z_MAX := 110.0
-const TECHO := 41.0
+const TECHO := NivelAlto.TECHO   ## 70 m desde la Fase 3 (antes 41): se llega arriba de las torres
 
 const VEREDA := 3.0
 const Y_VEREDA := 0.16
@@ -108,6 +108,9 @@ var _locales: Array = []
 var _oficinas: Array = []
 var autos_estacionados := 0         ## Cuántos autos y motos estacionados hay (lo miran las pruebas)
 var lotes := 0                      ## Cuántos lotes hay en los corazones de manzana
+var mobiliario := {}                ## Pieza -> cuántas puso _mobiliario (lo miran las pruebas)
+var _ocupado := {}                  ## Celda de 4 m -> huellas (Rect2 en X/Z) de lo que ya hay en las veredas
+var _reservado: Array[Rect2] = []   ## Huellas que no son piezas del kit (la obra de la cuadra)
 
 
 func _ready() -> void:
@@ -115,6 +118,7 @@ func _ready() -> void:
 	var t0 := Time.get_ticks_msec()
 	_rng.seed = 20261115
 	_rng_flores.seed = 4242
+	NivelAlto.reiniciar()
 	_mat_vereda = Construir.material_lajas("lajas_vereda", 4.0)
 	_mat_peatonal = Construir.material_lajas("lajas_peatonal", 4.0)
 	_locales = LOCALES.duplicate()
@@ -123,7 +127,7 @@ func _ready() -> void:
 	# (más o menos piezas al azar), las demás quedan igual
 	var etapas: Array[String] = []
 	for etapa: Callable in [_suelos, _manzanas, _parque, _barrio, _peatonal, _pasaje, _props_veredas, _estacionamientos,
-			_obras, _fondo, _puntos_de_juego]:
+			_obras, _obra_cuadra, _mobiliario, _nivel_medio, _nivel_alto, _fondo, _puntos_de_juego]:
 		var t := Time.get_ticks_usec()
 		_rng.seed = 20261115 + hash(etapa.get_method())
 		etapa.call()
@@ -219,7 +223,9 @@ func _senda(cx: float, cz: float, cruza_x: bool, largo: float, ancho := 3.0) -> 
 
 func _suelos() -> void:
 	# Base de asfalto debajo de todo (por si queda algún hueco) y bien lejos
-	_losa(-330, -270, 330, 270, -0.03, 0.3, C_ASFALTO.darkened(0.1))
+	# (con el hueco de la escalera del subte, ver Edificios.subte)
+	for r: Rect2 in Edificios.partir(Rect2(-330, -270, 660, 540), Edificios.hueco_subte(true)):
+		_losa(r.position.x, r.position.y, r.end.x, r.end.y, -0.03, 0.3, C_ASFALTO.darkened(0.1))
 	# Calzadas
 	for c: Array in [BOLIVAR, PASEO_COLON, RIVADAVIA, AV_DE_MAYO, RECONQUISTA]:
 		_calzada(c)
@@ -391,13 +397,13 @@ func _manzana(r: Rect2, lados: String, pool: Array, esquinas: Array, patio := tr
 	var so := lados.contains("S") and lados.contains("O")
 	var se := lados.contains("S") and lados.contains("E")
 	if so:
-		_poner(esquinas[_rng.randi() % esquinas.size()], Vector3(x0, 0, z1), 0.0)
+		_esquina(esquinas[_rng.randi() % esquinas.size()], Vector3(x0, 0, z1), 0.0)
 	if se:
-		_poner(esquinas[_rng.randi() % esquinas.size()], Vector3(x1, 0, z1), PI / 2.0)
+		_esquina(esquinas[_rng.randi() % esquinas.size()], Vector3(x1, 0, z1), PI / 2.0)
 	if ne:
-		_poner(esquinas[_rng.randi() % esquinas.size()], Vector3(x1, 0, z0), PI)
+		_esquina(esquinas[_rng.randi() % esquinas.size()], Vector3(x1, 0, z0), PI)
 	if no:
-		_poner(esquinas[_rng.randi() % esquinas.size()], Vector3(x0, 0, z0), -PI / 2.0)
+		_esquina(esquinas[_rng.randi() % esquinas.size()], Vector3(x0, 0, z0), -PI / 2.0)
 	if lados.contains("S"):
 		var a := x0 + (FONDO if so else 0.0)
 		_fila(Vector3(a, 0, z1), Vector3.RIGHT, x1 - (FONDO if se else 0.0) - a, 0.0, pool, true, true, false, fijos.get("S", []))
@@ -412,6 +418,17 @@ func _manzana(r: Rect2, lados: String, pool: Array, esquinas: Array, patio := tr
 		_fila(Vector3(x0, 0, a), Vector3.BACK, z1 - (FONDO if so else 0.0) - a, -PI / 2.0, pool, true, true, false, fijos.get("O", []))
 	if patio:
 		_corazon_de_manzana(r.grow(-FONDO))
+
+
+## Pieza de esquina, o una torre hito si en esa esquina va una (Fase 3, ver NivelAlto). Con la torre se
+## sacan igual los nombres de los locales que hubiera usado la pieza: así el resto de la ciudad no cambia.
+func _esquina(nombre: String, pos: Vector3, rot: float) -> void:
+	if not NivelAlto.torre_en(self, pos):
+		_poner(nombre, pos, rot)
+		return
+	for c: Array in Kit.carteles(nombre, Transform3D(Basis.from_euler(Vector3(0, rot, 0)), pos)):
+		if c[4] == "local":
+			_nombre_local(nombre)
 
 
 # ---------------------------------------------------------------- Corazón de manzana
@@ -1339,6 +1356,232 @@ func _obras() -> void:
 	_obra(Vector3(20, 0, -54.6), 0.0)          # vereda norte de Rivadavia
 	_obra(Vector3(-150, 0, 4.6), 0.0)          # vereda de la Av. de Mayo, frente a las comerciales
 	_obra(Vector3(76.6, 0, 70), PI / 2.0)      # Paseo Colón, frente al barrio
+
+
+# ---------------------------------------------------------------- Nivel inferior: obra y mobiliario
+# Fase 1 del mapa (ver DECISIONES.md, "Nivel inferior (mapa)"). Van después de los árboles, faroles y
+# carteles de las veredas y no se les encima nada: cada pieza mira primero si su lugar está libre.
+
+## Piezas que no ocupan lugar en el piso de la vereda (los árboles cuentan por su cazuela).
+const SIN_HUELLA := ["arbol", "jacaranda", "pino", "tapa_cloaca", "guirnalda"]
+## Cuadra con la obra: la vereda este de la manzana norte, sobre Paseo Colón (del cordón hacia adentro)
+const OBRA_CUADRA := {"a": Vector3(64, 0, -115), "b": Vector3(64, 0, -53), "adentro": Vector3.LEFT,
+	"desde": 14.0, "hasta": 42.0}
+## Qué va en cada lugar libre de la vereda, en orden (se repite)
+const CICLO_MOBILIARIO := ["banco", "farola", "bebedero", "banco", "cesto", "farola"]
+
+
+## Junta las huellas en el piso de todo lo que ya hay (piezas del kit con su caja envolvente, sin los
+## edificios ni lo que está en el aire) más las zonas reservadas.
+func _mapear_ocupado() -> void:
+	_ocupado.clear()
+	for h in get_children():
+		var mi := h as MeshInstance3D
+		if mi == null or not mi.has_meta(&"pieza") or mi.mesh == null:
+			continue
+		var nombre := String(mi.get_meta(&"pieza"))
+		var sin := false
+		for pre: String in SIN_HUELLA:
+			sin = sin or nombre.begins_with(pre)
+		if sin:
+			continue
+		var a := mi.transform * mi.mesh.get_aabb()
+		if a.position.y > 2.0 or a.size.x > 8.0 or a.size.z > 8.0:
+			continue
+		_ocupar(Rect2(a.position.x, a.position.z, a.size.x, a.size.z))
+	for r: Rect2 in NivelInferior.reservas() + _reservado:
+		_ocupar(r)
+
+
+func _ocupar(r: Rect2) -> void:
+	for i in range(floori(r.position.x / 4.0), floori(r.end.x / 4.0) + 1):
+		for j in range(floori(r.position.y / 4.0), floori(r.end.y / 4.0) + 1):
+			var k := Vector2i(i, j)
+			if not _ocupado.has(k):
+				_ocupado[k] = []
+			(_ocupado[k] as Array).append(r)
+
+
+func _libre(r: Rect2) -> bool:
+	for i in range(floori(r.position.x / 4.0), floori(r.end.x / 4.0) + 1):
+		for j in range(floori(r.position.y / 4.0), floori(r.end.y / 4.0) + 1):
+			for o: Rect2 in _ocupado.get(Vector2i(i, j), []):
+				if o.intersects(r):
+					return false
+	return true
+
+
+## Huella de "largo" a lo largo de la vereda (dirección "dir") y "ancho" hacia adentro, centrada en "c".
+static func _huella(c: Vector3, dir: Vector3, largo: float, ancho: float) -> Rect2:
+	var t := Vector2(largo, ancho) if absf(dir.x) > 0.5 else Vector2(ancho, largo)
+	return Rect2(c.x - t.x / 2.0, c.z - t.y / 2.0, t.x, t.y)
+
+
+## Pone la pieza si su huella está libre (y la marca ocupada). Devuelve si la puso.
+func _poner_libre(nombre: String, pos: Vector3, rot: float, huella: Rect2, colision := true) -> bool:
+	if not _libre(huella):
+		return false
+	_poner(nombre, pos, rot, Vector3.ONE, colision)
+	_ocupar(huella)
+	return true
+
+
+## Obra en una cuadra (sólo para ver: nada tiene colisión): una fila de vallas a 1,95 m del cordón con
+## tramos de cinta de peligro entre conos, la cinta que vuelve hasta la pared en las dos puntas y,
+## adentro, tierra removida y montoncitos de arena.
+func _obra_cuadra() -> void:
+	_mapear_ocupado()
+	var a: Vector3 = OBRA_CUADRA["a"]
+	var dir: Vector3 = ((OBRA_CUADRA["b"] as Vector3) - a).normalized()
+	var adentro: Vector3 = OBRA_CUADRA["adentro"]
+	var desde: float = OBRA_CUADRA["desde"]
+	var hasta: float = OBRA_CUADRA["hasta"]
+	const LINEA := 1.95
+	const TRAMO := 1.6
+	var y := Vector3(0, Y_VEREDA, 0)
+	var rot_largo := atan2(-dir.z, dir.x)
+	var d := desde
+	var k := 0
+	while d + TRAMO <= hasta + 0.01:
+		var c := a + dir * (d + TRAMO / 2.0) + adentro * LINEA + y
+		if k % 4 == 3:
+			var p0 := a + dir * d + adentro * LINEA + y
+			var p1 := p0 + dir * TRAMO
+			for p: Vector3 in [p0, p1]:
+				_poner_libre("cono", p, _rng.randf() * TAU, _huella(p, dir, 0.45, 0.45), false)
+			_cinta(p0 + Vector3(0, 0.6, 0), p1 + Vector3(0, 0.6, 0))
+		else:
+			_poner_libre("valla_obra", c, rot_largo, _huella(c, dir, 1.62, 0.56), false)
+		d += TRAMO
+		k += 1
+	# Cinta de las puntas hasta la pared (la fachada está a 3 m del cordón)
+	for dd: float in [desde, d]:
+		var p := a + dir * dd + adentro * LINEA + y
+		_poner_libre("cono", p, _rng.randf() * TAU, _huella(p, dir, 0.45, 0.45), false)
+		_cinta(p + Vector3(0, 0.6, 0), a + dir * dd + adentro * (VEREDA - 0.02) + y + Vector3(0, 0.6, 0))
+	# Adentro: tierra removida y arena
+	var dt := desde + 2.0
+	while dt < d - 2.0:
+		var largo := _rng.randf_range(1.6, 3.0)
+		var c := a + dir * (dt + largo / 2.0) + adentro * (LINEA + 0.55) + y
+		var tam := Vector3(largo, 0.03, 0.75) if absf(dir.x) > 0.5 else Vector3(0.75, 0.03, largo)
+		Construir.caja(self, c + Vector3(0, 0.015, 0), tam, _c("tierra_obra"), false)
+		if _rng.randf() < 0.6:
+			Construir.esfera(self, c + Vector3(0, 0.03, 0) + dir * _rng.randf_range(-0.4, 0.4), 0.4, _c("arena"),
+				Vector3(1.0, 0.45, 1.0), 8)
+		dt += largo + _rng.randf_range(1.5, 3.0)
+	var r := _huella(a + dir * (desde + d) / 2.0 + adentro * (LINEA + VEREDA) / 2.0, dir, d - desde + 0.6, VEREDA - LINEA + 0.6)
+	_reservado.append(r)
+	_ocupar(r)
+
+
+## Cinta de peligro a rayas rojas y blancas de "p0" a "p1" (sin colisión).
+func _cinta(p0: Vector3, p1: Vector3) -> void:
+	var largo := p0.distance_to(p1)
+	var dir := (p1 - p0) / largo
+	var n := maxi(1, roundi(largo / 0.3))
+	var rot := atan2(-dir.z, dir.x)
+	for i in n:
+		var m := p0 + dir * (largo * (i + 0.5) / n)
+		Construir.caja(self, m, Vector3(largo / n, 0.05, 0.01), _c("valla_roja") if i % 2 == 0 else _c("blanco"), false, rot)
+
+
+## Bancos, bebederos, cestos y faroles en las veredas de las calles, en los lugares que dejan libres
+## los árboles, faroles curvos y demás (uno de cada dos huecos). Se posa en el asiento y el respaldo
+## del banco, arriba del bebedero, en el borde del cesto y en la cabeza del farol.
+func _mobiliario() -> void:
+	_mapear_ocupado()
+	var lineas := []   # [a, b, adentro]
+	var lados := {NORTE: "NSEO", SUR: "SEO", PARQUE: "NSEO", COMERCIAL_A: "NEO", COMERCIAL_B: "SEO", ESTE: "NSEO", BARRIO: "NSEO"}
+	for r: Rect2 in lados:
+		var e := r.grow(VEREDA)
+		var l: String = lados[r]
+		# Las veredas del borde quedan del otro lado de las paredes invisibles
+		if l.contains("N") and r.position.y > Z_MIN + 0.1:
+			lineas.append([Vector3(e.position.x, 0, e.position.y), Vector3(e.end.x, 0, e.position.y), Vector3.BACK])
+		if l.contains("S") and r.end.y < Z_MAX - 0.1:
+			lineas.append([Vector3(e.position.x, 0, e.end.y), Vector3(e.end.x, 0, e.end.y), Vector3.FORWARD])
+		if r.position.x > X_MIN + 0.1:
+			lineas.append([Vector3(e.position.x, 0, e.position.y), Vector3(e.position.x, 0, e.end.y), Vector3.RIGHT])
+		if r.end.x < X_MAX - 0.1:
+			lineas.append([Vector3(e.end.x, 0, e.position.y), Vector3(e.end.x, 0, e.end.y), Vector3.LEFT])
+	lineas.append([Vector3(-64, 0, -43), Vector3(-64, 0, 26), Vector3.RIGHT])
+	lineas.append([Vector3(64, 0, -43), Vector3(64, 0, 26), Vector3.LEFT])
+	lineas.append([Vector3(-64, 0, -43), Vector3(64, 0, -43), Vector3.BACK])
+	const PASO := 9.0   # el de las piezas de las veredas que no son del borde (ver _props_vereda)
+	var k := 0
+	for ln: Array in lineas:
+		var a: Vector3 = ln[0]
+		var b: Vector3 = ln[1]
+		var adentro: Vector3 = ln[2]
+		var largo := a.distance_to(b)
+		var dir := (b - a) / largo
+		var rot_calle := atan2(-adentro.x, -adentro.z)
+		var rot_adentro := atan2(adentro.x, adentro.z)
+		# Entre pieza y pieza de la vereda (que van cada 9 m desde los 6 m) queda un hueco a los 6,3 m
+		var d := 6.0 + 6.3
+		var hueco := 0
+		while d < largo - 4.0:
+			if hueco % 2 == 0:
+				var p := a + dir * d + Vector3(0, Y_VEREDA, 0)
+				_mueble(CICLO_MOBILIARIO[k % CICLO_MOBILIARIO.size()], p, dir, adentro, rot_calle, rot_adentro)
+				k += 1
+			d += PASO
+			hueco += 1
+
+
+## Un mueble de vereda en el punto "p" sobre el cordón.
+func _mueble(tipo: String, p: Vector3, dir: Vector3, adentro: Vector3, rot_calle: float, rot_adentro: float) -> void:
+	match tipo:
+		"banco":
+			var q := p + adentro * 2.35
+			if _poner_libre("banco_listones", q, rot_adentro + PI, _huella(q, dir, 2.0, 0.7)):
+				_contar("banco_listones")
+				var c := p + dir * 1.45 + adentro * 2.45
+				if _poner_libre("cesto", c, 0.0, _huella(c, dir, 0.6, 0.6)):
+					_cesto_colision(c)
+		"farola":
+			var q := p + adentro * 0.4
+			if _poner_libre("farola", q, rot_calle, _huella(q, dir, 0.5, 0.5)):
+				_contar("farola")
+				# Para posarse en la cabeza del farol (el poste ya trae su colisión)
+				var t := Transform3D(Basis.from_euler(Vector3(0, rot_calle, 0)), q)
+				var forma := BoxShape3D.new()
+				forma.size = Vector3(0.42, 0.2, 0.75)
+				Kit._forma(_cuerpo_en(q), forma, t * Transform3D(Basis.IDENTITY, Vector3(0, 7.05, 1.9)))
+		"bebedero":
+			var q := p + adentro * 2.5
+			if _poner_libre("bebedero", q, rot_adentro + PI, _huella(q, dir, 0.9, 0.9)):
+				_contar("bebedero")
+		"cesto":
+			var q := p + adentro * 0.55
+			if _poner_libre("cesto", q, rot_calle, _huella(q, dir, 0.6, 0.6)):
+				_cesto_colision(q)
+
+
+## El cesto del kit no trae colisión: un cilindro de su tamaño, para pararse en el borde.
+func _cesto_colision(q: Vector3) -> void:
+	_contar("cesto")
+	var forma := CylinderShape3D.new()
+	forma.radius = 0.245
+	forma.height = 0.95
+	Kit._forma(_cuerpo_en(q), forma, Transform3D(Basis.IDENTITY, q + Vector3(0, 0.475, 0)))
+
+
+func _contar(nombre: String) -> void:
+	mobiliario[nombre] = int(mobiliario.get(nombre, 0)) + 1
+
+
+# ---------------------------------------------------------------- Niveles medio y alto (Fases 2 y 3)
+
+## Balcones, toldos, cornisas, carteles salientes, faroles de la peatonal y árboles altos del parque.
+func _nivel_medio() -> void:
+	NivelMedio.ciudad(self)
+
+
+## Terrazas y antenas en los edificios altos, postes y cables (las torres hito van en _manzanas).
+func _nivel_alto() -> void:
+	NivelAlto.ciudad(self)
 
 
 # ---------------------------------------------------------------- Fondo (fuera del mapa jugable)

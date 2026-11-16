@@ -52,16 +52,26 @@ static func edificio(padre: Node3D, base: Vector3, tam: Vector3, color: Color, f
 		tam_corn = Vector3(0.8, 0.3, ancho_frente)
 	Construir.caja(padre, cara + frente * 0.35 + Vector3(0, y_cornisa, 0), tam_corn, color_cornisa)
 	# Ventanas
+	var tam_v := Vector3(1.1, 1.6, 0.12) if absf(frente.z) > 0.5 else Vector3(0.12, 1.6, 1.1)
+	for v: Vector2 in ventanas(tam, frente, pisos):
+		Construir.caja(padre, cara + tangente * v.x + frente * 0.03 + Vector3(0, v.y, 0), tam_v, C_VENTANA, false)
+
+
+## Ventanas de la fachada de un edificio(): (corrimiento a lo largo de la fachada, altura del centro).
+## Las ventanas miden 1,1 x 1,6 m. Las usa también NivelMedio (balcones y toldos sobre las ventanas).
+static func ventanas(tam: Vector3, frente: Vector3, pisos := -1) -> Array[Vector2]:
+	var ancho_frente := tam.x if absf(frente.z) > 0.5 else tam.z
+	var y_cornisa := tam.y * 0.45
 	var n_pisos := pisos if pisos > 0 else maxi(int(tam.y / 3.2), 1)
 	var n_col := maxi(int(ancho_frente / 3.0), 1)
-	var tam_v := Vector3(1.1, 1.6, 0.12) if absf(frente.z) > 0.5 else Vector3(0.12, 1.6, 1.1)
+	var out: Array[Vector2] = []
 	for p in n_pisos:
 		var y := 1.6 + p * (tam.y - 1.0) / n_pisos
 		if absf(y - y_cornisa) < 1.0:
 			y += 0.9
 		for c in n_col:
-			var off := (c - (n_col - 1) / 2.0) * (ancho_frente / n_col)
-			Construir.caja(padre, cara + tangente * off + frente * 0.03 + Vector3(0, y, 0), tam_v, C_VENTANA, false)
+			out.append(Vector2((c - (n_col - 1) / 2.0) * (ancho_frente / n_col), y))
+	return out
 
 
 static func jacaranda(padre: Node3D, pos: Vector3, escala := 1.0) -> void:
@@ -229,19 +239,22 @@ static func catedral(padre: Node3D) -> void:
 
 
 ## Sur: avenida con cafés, toldos, mesas en la vereda y nombres inventados.
+## Los cafés frente a la plaza (fachada en z = 38, mirando al norte). Los usa también NivelMedio.
+const CAFES := [
+	{"x": -30.0, "ancho": 18.0, "alto": 11.0, "color": Color("f6e2b0"), "toldo": Color("2f7d5b"), "nombre": "Café La Medialuna Feliz",
+		"remate": Color("4f9a64")},
+	{"x": -8.0, "ancho": 16.0, "alto": 13.0, "color": Color("e8a070"), "toldo": Color("b8423a"), "nombre": "Confitería El Buen Mozo",
+		"remate": Color("fbf1d8")},
+	{"x": 13.0, "ancho": 16.0, "alto": 10.0, "color": Color("a6d6f4"), "toldo": Color("2b4f8a"), "nombre": "Bar Los Vencejos",
+		"remate": Color("ffffff")},
+	{"x": 32.0, "ancho": 14.0, "alto": 14.0, "color": Color("dddbd3"), "toldo": Color("54585c"), "nombre": "Banco Austral Imaginario",
+		"remate": Color("4f7fc0")},
+]
+
+
 static func cafes(padre: Node3D) -> Array[Vector3]:
 	var mesas: Array[Vector3] = []
-	var negocios := [
-		{"x": -30.0, "ancho": 18.0, "alto": 11.0, "color": Color("f6e2b0"), "toldo": Color("2f7d5b"), "nombre": "Café La Medialuna Feliz",
-			"remate": Color("4f9a64")},
-		{"x": -8.0, "ancho": 16.0, "alto": 13.0, "color": Color("e8a070"), "toldo": Color("b8423a"), "nombre": "Confitería El Buen Mozo",
-			"remate": Color("fbf1d8")},
-		{"x": 13.0, "ancho": 16.0, "alto": 10.0, "color": Color("a6d6f4"), "toldo": Color("2b4f8a"), "nombre": "Bar Los Vencejos",
-			"remate": Color("ffffff")},
-		{"x": 32.0, "ancho": 14.0, "alto": 14.0, "color": Color("dddbd3"), "toldo": Color("54585c"), "nombre": "Banco Austral Imaginario",
-			"remate": Color("4f7fc0")},
-	]
-	for n: Dictionary in negocios:
+	for n: Dictionary in CAFES:
 		var x: float = n["x"]
 		var ancho: float = n["ancho"]
 		edificio(padre, Vector3(x, 0, 43.0), Vector3(ancho, n["alto"], 10), n["color"], Vector3(0, 0, -1), n["remate"])
@@ -274,22 +287,112 @@ static func mesa(padre: Node3D, pos: Vector3) -> void:
 		Construir.caja(padre, silla + Vector3(0.2 * lado, 0.75, 0), Vector3(0.05, 0.6, 0.45), C_MADERA, false)
 
 
-## Noreste: boca de subte con barandas y cartel.
+## Boca de subte (el punto de la brújula y de donde salen los oficinistas, ver plaza.gd).
+const SUBTE := Vector3(34, 0, -22)
+const SUBTE_PELDANOS := 10
+const SUBTE_ALZADA := 0.2
+const SUBTE_HUELLA := 0.5
+
+
+## Hueco de la escalera del subte en X/Z: ahí no hay piso de plaza ni base de asfalto (ver partir).
+## La escalera baja hacia el norte desde el borde sur del hueco (2 m más al sur que SUBTE).
+## "con_rampa": el hueco de las colisiones, media huella más largo hacia el sur. Ahí el piso es sólo
+## visual y se pisa la punta de la rampa invisible, que sale a ras del piso (como al pie de la
+## escalinata de la Catedral); si no, al subir quedaba un borde de 10 cm que la paloma no trepa.
+static func hueco_subte(con_rampa := false) -> Rect2:
+	var r := Rect2(SUBTE.x - 1.6, SUBTE.z - 4.0, 3.2, 6.0)
+	if con_rampa:
+		r.size.y += SUBTE_HUELLA * 0.5
+	return r
+
+
+## Parte "r" en hasta cuatro rectángulos que rodean "hueco" (si se tocan): norte, sur, oeste y este.
+static func partir(r: Rect2, hueco: Rect2) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var h := r.intersection(hueco)
+	if h.size.x <= 0.0 or h.size.y <= 0.0:
+		out.append(r)
+		return out
+	for q: Rect2 in [Rect2(r.position.x, r.position.y, r.size.x, h.position.y - r.position.y),
+			Rect2(r.position.x, h.end.y, r.size.x, r.end.y - h.end.y),
+			Rect2(r.position.x, h.position.y, h.position.x - r.position.x, h.size.y),
+			Rect2(h.end.x, h.position.y, r.end.x - h.end.x, h.size.y)]:
+		if q.size.x > 0.0 and q.size.y > 0.0:
+			out.append(q)
+	return out
+
+
+## Noreste: boca de subte con una escalera de verdad que baja 2 m (10 escalones de 20 cm, como la de
+## la Catedral pero hacia abajo: escalones macizos más una rampa invisible que pasa por la mitad de
+## cada contrahuella), un descanso abajo con la boca oscura del túnel, rejas decorativas (sin
+## colisión) en tres lados y el cartel. No hay subte: abajo se termina en el descanso.
 static func subte(padre: Node3D, pos: Vector3) -> void:
-	# Agujero de la escalera (oscuro) y escalones que bajan
-	Construir.caja(padre, pos + Vector3(0, 0.01, 0), Vector3(3.2, 0.02, 6), Color("1d1f24"), false)
-	for e in 5:
-		Construir.caja(padre, pos + Vector3(0, 0.03, -2.5 + e * 1.1), Vector3(3.0, 0.02, 0.15), Color("5a5d63"), false)
-	# Barandas verdes en tres lados
+	var hueco := hueco_subte()
+	var x0 := hueco.position.x
+	var x1 := hueco.end.x
+	var z_borde := hueco.end.y          # borde sur: arranca la escalera
+	var z_fondo := hueco.position.y     # pared del fondo (norte)
+	const FONDO := 2.2                  # Hasta dónde llegan las paredes y los escalones
+	const PARED := 0.2
+	var ancho := hueco.size.x - 2.0 * PARED
+	var cx := (x0 + x1) / 2.0
+	var azulejo := Color("f0ede4")
+	var franja := Color("5a96dc")
+	# Paredes de azulejos con una franja de color (con colisión) y la del fondo con el túnel
+	for x in [x0 + PARED / 2.0, x1 - PARED / 2.0]:
+		Construir.caja(padre, Vector3(x, -FONDO / 2.0, (z_borde + z_fondo) / 2.0), Vector3(PARED, FONDO, hueco.size.y), azulejo)
+		var adentro := 1.0 if x < cx else -1.0
+		Construir.caja(padre, Vector3(x + adentro * (PARED / 2.0 + 0.01), -0.9, (z_borde + z_fondo) / 2.0),
+			Vector3(0.02, 0.18, hueco.size.y), franja, false)
+	Construir.caja(padre, Vector3(cx, -FONDO / 2.0, z_fondo + PARED / 2.0), Vector3(ancho, FONDO, PARED), azulejo)
+	Construir.caja(padre, Vector3(cx, -1.15, z_fondo + PARED + 0.01), Vector3(1.8, 1.7, 0.02), Color("15171b"), false)
+	Construir.caja(padre, Vector3(cx, -0.2, z_fondo + PARED + 0.015), Vector3(2.4, 0.18, 0.02), franja, false)
+	# Escalones macizos (apoyados abajo, sin huecos). La colisión de cada uno queda 10 cm por debajo de
+	# la rampa (el último no: es el piso del descanso)
+	for e in SUBTE_PELDANOS:
+		var arriba := -SUBTE_ALZADA * (e + 1)
+		var z := z_borde - SUBTE_HUELLA * (e + 0.5)
+		var alto := FONDO + arriba
+		Construir.caja(padre, Vector3(cx, (arriba - FONDO) / 2.0, z), Vector3(ancho, alto, SUBTE_HUELLA),
+			Color("b9bab4").darkened((e % 2) * 0.05), false)
+		# Borde antideslizante amarillo (decorativo)
+		Construir.caja(padre, Vector3(cx, arriba + 0.012, z + SUBTE_HUELLA / 2.0 - 0.05), Vector3(ancho, 0.024, 0.08),
+			Color("ffd256"), false)
+		var arriba_col := arriba if e == SUBTE_PELDANOS - 1 else arriba - SUBTE_ALZADA * 0.5
+		var forma := BoxShape3D.new()
+		forma.size = Vector3(ancho, FONDO + arriba_col, SUBTE_HUELLA)
+		Construir.colision(padre, Vector3(cx, (arriba_col - FONDO) / 2.0, z), forma)
+	# Descanso de abajo (del último escalón a la pared del fondo)
+	var z_descanso := z_borde - SUBTE_HUELLA * SUBTE_PELDANOS
+	var prof_descanso := z_descanso - (z_fondo + PARED)
+	var y_abajo := -SUBTE_ALZADA * SUBTE_PELDANOS
+	Construir.caja(padre, Vector3(cx, (y_abajo - FONDO) / 2.0, z_descanso - prof_descanso / 2.0),
+		Vector3(ancho, FONDO + y_abajo, prof_descanso), Color("86888a"))
+	# Rampa invisible por la mitad de cada contrahuella: arriba sale a ras del piso media huella antes del
+	# borde (ahí el piso no tiene colisión, ver hueco_subte) y abajo termina en la mitad del último escalón
+	var za := z_borde + SUBTE_HUELLA * 0.5
+	var zb := za - SUBTE_HUELLA * SUBTE_PELDANOS
+	var largo := Vector2(za - zb, -y_abajo).length()
+	var ang := -atan2(-y_abajo, za - zb)
+	var normal := Vector3(0, cos(ang), sin(ang))
+	var rampa := BoxShape3D.new()
+	rampa.size = Vector3(ancho, 0.2, largo)
+	Construir.colision(padre, Vector3(cx, y_abajo / 2.0, (za + zb) / 2.0) - normal * 0.1, rampa, Vector3(ang, 0, 0))
+	# Rejas decorativas del kit en los dos costados y en el fondo (sin colisión)
+	for x in [x0 - 0.1, x1 + 0.1]:
+		for k in 2:
+			Kit.colocar(padre, "reja", Vector3(x, 0, z_borde - 1.5 - 3.0 * k), PI / 2.0)
+		Kit.colocar(padre, "reja_poste", Vector3(x, 0, z_borde), PI / 2.0)
+		Kit.colocar(padre, "reja_poste", Vector3(x, 0, z_fondo - 0.1), PI / 2.0)
+	Kit.colocar(padre, "reja", Vector3(cx, 0, z_fondo - 0.1), 0.0, Vector3((x1 - x0 + 0.2) / 3.0, 1, 1))
+	# Cartel en un poste, en la esquina sudoeste
 	var verde := Color("2f6b4a")
-	for lado in [-1.0, 1.0]:
-		Construir.caja(padre, pos + Vector3(1.7 * lado, 0.55, 0), Vector3(0.12, 1.1, 6.2), verde)
-	Construir.caja(padre, pos + Vector3(0, 0.55, -3.05), Vector3(3.5, 1.1, 0.12), verde)
-	# Cartel en un poste
-	Construir.cilindro(padre, pos + Vector3(2.3, 1.5, 3.2), 0.06, 3.0, Color("23282b"), true, 6)
-	Construir.caja(padre, pos + Vector3(2.3, 3.2, 3.2), Vector3(0.1, 0.8, 1.6), verde)
-	_rot(Construir.cartel(padre, pos + Vector3(2.2, 3.2, 3.2), "SUBTE\nLínea Ñ", Color.WHITE, 40), "y", -PI / 2.0)
-	_rot(Construir.cartel(padre, pos + Vector3(2.4, 3.2, 3.2), "SUBTE\nLínea Ñ", Color.WHITE, 40), "y", PI / 2.0)
+	var poste := Vector3(x0 - 0.7, 0, z_borde + 0.6)
+	Construir.cilindro(padre, poste + Vector3(0, 1.5, 0), 0.06, 3.0, Color("23282b"), true, 6)
+	Construir.caja(padre, poste + Vector3(0, 3.2, 0), Vector3(0.1, 0.8, 1.6), verde)
+	_rot(Construir.cartel(padre, poste + Vector3(-0.1, 3.2, 0), "SUBTE\nLínea Ñ", Color.WHITE, 40), "y", -PI / 2.0)
+	_rot(Construir.cartel(padre, poste + Vector3(0.1, 3.2, 0), "SUBTE\nLínea Ñ", Color.WHITE, 40), "y", PI / 2.0)
+	assert(pos.is_equal_approx(SUBTE))
 
 
 ## Este: la Casa Rosada con vallas y el balcón (la meta). Devuelve la posición del balcón.
@@ -328,16 +431,22 @@ static func casa_rosada(padre: Node3D) -> Vector3:
 	return balcon + Vector3(0, 0.15, 0)
 
 
+## Edificios bajos alrededor: [base, tamaño, color, frente, cornisa]. Al norte, a los costados de la
+## Catedral; al sur de la avenida, en las dos puntas (dejan la calle libre para los autos).
+const ALREDEDORES := [
+	[Vector3(-27, 0, -36), Vector3(18, 12, 8), Color("e3b764"), Vector3(0, 0, 1), Color("a85a3c")],
+	[Vector3(-44, 0, -35), Vector3(14, 10, 10), Color("9fd2ab"), Vector3(0, 0, 1), C_BLANCO],
+	[Vector3(26, 0, -36), Vector3(16, 13, 8), Color("e98a74"), Vector3(0, 0, 1), C_BLANCO],
+	[Vector3(46, 0, -35), Vector3(16, 11, 10), Color("92c4ea"), Vector3(0, 0, 1), Color("4f7fc0")],
+	[Vector3(-52, 0, 43), Vector3(12, 9, 12), Color("f0d27a"), Vector3(0, 0, -1), Color("a85a3c")],
+	[Vector3(50, 0, 43), Vector3(18, 12, 10), Color("d3bff0"), Vector3(0, 0, -1), C_BLANCO],
+]
+
+
 ## Edificios bajos alrededor (con techos y cornisas para posarse).
 static func alrededores(padre: Node3D) -> void:
-	# Norte, a los costados de la Catedral
-	edificio(padre, Vector3(-27, 0, -36), Vector3(18, 12, 8), Color("e3b764"), Vector3(0, 0, 1), Color("a85a3c"))
-	edificio(padre, Vector3(-44, 0, -35), Vector3(14, 10, 10), Color("9fd2ab"), Vector3(0, 0, 1))
-	edificio(padre, Vector3(26, 0, -36), Vector3(16, 13, 8), Color("e98a74"), Vector3(0, 0, 1))
-	edificio(padre, Vector3(46, 0, -35), Vector3(16, 11, 10), Color("92c4ea"), Vector3(0, 0, 1), Color("4f7fc0"))
-	# Al sur de la avenida, en las dos puntas (dejan la calle libre para los autos)
-	edificio(padre, Vector3(-52, 0, 43), Vector3(12, 9, 12), Color("f0d27a"), Vector3(0, 0, -1), Color("a85a3c"))
-	edificio(padre, Vector3(50, 0, 43), Vector3(18, 12, 10), Color("d3bff0"), Vector3(0, 0, -1))
+	for e: Array in ALREDEDORES:
+		edificio(padre, e[0], e[1], e[2], e[3], e[4])
 	# Carteles de comercios inventados, sobre una tabla pegada a la pared
 	Construir.letrero(padre, Vector3(-27, 4.85, -31.8), "Librería El Palomar", Color.WHITE, Color("5b3b2a"), 48,
 		Vector2(6.4, 0.6))
