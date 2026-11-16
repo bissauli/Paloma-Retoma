@@ -116,6 +116,7 @@ static func crear(padre: Node3D, base: Vector3, tam: Vector3, color: Color, nomb
 	_interior(casa, ce, w, d, esc)
 	ce.obstaculos = _obstaculos(casa, ce, tema)
 	ce.luz = _adornos(casa, ce, tema, esc["cartel"])
+	_mas_adornos(casa, ce, tema)
 	padre.add_child(ce)
 	ce.position = base
 	return ce
@@ -368,14 +369,79 @@ static func _hay_lugar(ce: CasaEnterable, ruta: PackedVector3Array, p: Vector3, 
 	return true
 
 
+## Pone un adorno si hay lugar: lejos de la ruta, de los obstáculos y de los otros adornos (que se
+## anotan en el meta "ocupado" de la casa: [x, z, radio]).
 static func _adorno(casa: Node3D, ce: CasaEnterable, ruta: PackedVector3Array, nombre: String, p: Vector3, rot: float, s := 1.0) -> bool:
 	var d: Dictionary = MueblesDatos.PIEZAS[nombre]
 	var tam: Vector3 = d["tam"]
 	var r := maxf(tam.x, tam.z) * s / 2.0
 	if not _hay_lugar(ce, ruta, p, r, float(d["y1"]) * s):
 		return false
+	var ocupado: Array = ce.get_meta(&"ocupado", [])
+	for o: Array in ocupado:
+		if Vector2(float(o[0]) - p.x, float(o[1]) - p.z).length() < r + float(o[2]) - 0.1:
+			return false
+	ocupado.append([p.x, p.z, r])
+	ce.set_meta(&"ocupado", ocupado)
 	Kit.colocar(casa, nombre, p, rot, Vector3.ONE * s)
 	return true
+
+
+## Lo que se pone contra las paredes de cada escenario, en orden (se repite si sobra pared).
+const DECO := {
+	"libreria": ["biblioteca", "silla", "lampara_pie", "biblioteca", "mesa_ratona", "maceta", "biblioteca", "cajas"],
+	"panaderia": ["estante_panes", "canasto_panes", "silla", "maceta", "estante_panes", "cajas", "mesa_ratona"],
+	"conventillo": ["torre_macetas", "silla", "jaula", "maceta", "mesa_mate", "lampara_pie", "torre_macetas", "cajas"],
+	"oficina": ["archivero", "silla", "maceta", "dispenser", "planta_alta", "lampara_pie", "archivero", "cajas"],
+	"fiambreria": ["barril", "heladera_vitrina", "cajas", "barril", "silla", "maceta", "estante_panes"],
+}
+const DECO_ALTO_MAX := 2.5   ## Lo alto se achica a esto: así no le tapa el cuarto a la cámara
+
+
+## Más decoración: recorre las cuatro paredes y llena cada hueco libre con un mueble del tema, de
+## espaldas a la pared (sin colisión, y sólo donde no tapa la ruta, las ventanas ni otros muebles).
+## Arriba, cuadros entre los estantes de las paredes de adelante y de atrás.
+static func _mas_adornos(casa: Node3D, ce: CasaEnterable, tema: String) -> void:
+	var hx := ce.ancho / 2.0 - CasaEnterable.ESPESOR
+	var hz := ce.fondo / 2.0 - CasaEnterable.ESPESOR
+	var ruta := _muestras(ce)
+	var lista: Array = DECO[tema]
+	var k := 0
+	# Cada pared: [punto inicial, dirección a lo largo, hacia adentro, largo, giro, x de su ventana]
+	var paredes := [
+		[Vector3(-hx, 0, -hz), Vector3(0, 0, 1), Vector3(1, 0, 0), hz * 2.0, PI / 2.0, INF],
+		[Vector3(hx, 0, hz), Vector3(0, 0, -1), Vector3(-1, 0, 0), hz * 2.0, -PI / 2.0, INF],
+		[Vector3(-hx, 0, hz), Vector3(1, 0, 0), Vector3(0, 0, -1), hx * 2.0, PI, ce.x_frente],
+		[Vector3(hx, 0, -hz), Vector3(-1, 0, 0), Vector3(0, 0, 1), hx * 2.0, 0.0, ce.x_fondo],
+	]
+	for pared: Array in paredes:
+		var a: Vector3 = pared[0]
+		var u: Vector3 = pared[1]
+		var n: Vector3 = pared[2]
+		var largo: float = pared[3]
+		var t := 1.0   # Los rincones ya tienen lo suyo
+		while t < largo - 1.0:
+			var nombre: String = lista[k % lista.size()]
+			var d: Dictionary = MueblesDatos.PIEZAS[nombre]
+			var tam: Vector3 = d["tam"]
+			var s := minf(1.0, DECO_ALTO_MAX / float(d["y1"]))
+			var centro := t + tam.x * s / 2.0
+			var p := a + u * centro + n * (tam.z * s / 2.0 + 0.06) + Vector3.UP * 0.02
+			# Ni delante de la ventana ni de sus cortinas
+			var lejos_ventana := is_inf(float(pared[5])) or absf(p.x - float(pared[5])) > CasaEnterable.VENTANA_ANCHO / 2.0 + 0.9 + tam.x * s / 2.0
+			if centro + tam.x * s / 2.0 < largo - 0.6 and lejos_ventana and _adorno(casa, ce, ruta, nombre, p, float(pared[4]), s):
+				k += 1
+				t += tam.x * s + 0.35
+			else:
+				t += 0.5
+	# Cuadros en las paredes de adelante y de atrás, entre los estantes y lejos de las ventanas
+	for lado in [-1.0, 1.0]:
+		var x_ventana := ce.x_frente if lado > 0.0 else ce.x_fondo
+		var x := -hx + 2.2
+		while x < hx - 1.0:
+			if absf(x - x_ventana) > 2.8:
+				Kit.colocar(casa, "cuadro", Vector3(x, 3.15, lado * (hz - 0.03)), PI if lado > 0.0 else 0.0, Vector3.ONE * 0.8)
+			x += 2.4
 
 
 ## Muebles de adorno contra las paredes y en los rincones (sin colisión: la paloma no se queda

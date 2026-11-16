@@ -9,6 +9,7 @@ var posiciones: Array[Vector3] = []
 var miradas: Array[Vector3] = []
 var distancias: Array[float] = []
 var camaras: Array[String] = []
+var visibles: Array[bool] = []
 var midiendo := false
 
 
@@ -26,6 +27,7 @@ func _ready() -> void:
 		miradas.clear()
 		distancias.clear()
 		camaras.clear()
+		visibles.clear()
 		paloma.global_position = casa.to_global(Vector3(casa.x_frente, CasaEnterable.Y_PASO + 0.3, casa.fondo / 2.0 + 9.0))
 		paloma.reset_physics_interpolation()
 		paloma.camara.yaw = casa.rotation.y
@@ -70,7 +72,18 @@ func _process(_delta: float) -> void:
 		miradas.append(-cam.global_transform.basis.z)
 		distancias.append(cam.global_position.distance_to(paloma.get_global_transform_interpolated().origin))
 		camaras.append(cam.get_class() + ("(cine)" if cam is CamaraCinematica else "(juego)"))
-
+		# ¿Se ve la paloma? (su centro adentro de la imagen, sin contar las barras de cine)
+		var pp := paloma.get_global_transform_interpolated().origin
+		var en_imagen := false
+		if not cam.is_position_behind(pp):
+			var px := cam.unproject_position(pp)
+			var tam := get_viewport().get_visible_rect().size
+			en_imagen = px.x > 0.0 and px.x < tam.x and px.y > tam.y * 0.11 and px.y < tam.y * 0.89
+		visibles.append(en_imagen)
+		if not en_imagen and OS.get_cmdline_user_args().has("fuera"):
+			for c in get_tree().get_nodes_in_group("casa_enterable"):
+				if (c as CasaEnterable).activa:
+					print("  FUERA cuadro %d s=%.1f (sale %.1f) dist %.2f" % [visibles.size(), c._s, c._s_sale, distancias[-1]])
 
 ## [aceleración media, pico de aceleración, pico de giro] de la cámara en esta pasada.
 func _analizar(nombre: String) -> Array:
@@ -102,6 +115,12 @@ func _analizar(nombre: String) -> Array:
 		media += a
 	media /= maxf(acel.size(), 1)
 	var p99: float = acel[int(acel.size() * 0.99)] if not acel.is_empty() else 0.0
-	print("FLUIDEZ %s: %d cuadros, aceleración media %.1f m/s², pico (p99) %.1f m/s², giro máx %.0f°/s" %
-		[nombre, posiciones.size(), media, p99, giro_max])
+	# Qué tan cerca queda la cámara de la paloma (muy cerca = no se la ve bien)
+	var ds := distancias.duplicate()
+	ds.sort()
+	var d_min: float = ds[0] if not ds.is_empty() else 0.0
+	var d_p10: float = ds[int(ds.size() * 0.1)] if not ds.is_empty() else 0.0
+	var fuera := visibles.count(false)
+	print("FLUIDEZ %s: %d cuadros, aceleración media %.1f m/s², pico (p99) %.1f m/s², giro máx %.0f°/s, distancia mín %.2f m (p10 %.2f m), paloma fuera de imagen %d cuadros" %
+		[nombre, posiciones.size(), media, p99, giro_max, d_min, d_p10, fuera])
 	return [media, p99, giro_max]

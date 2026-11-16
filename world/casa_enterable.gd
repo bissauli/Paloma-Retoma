@@ -37,6 +37,7 @@ const V_AFUERA := 15.0        ## m/s afuera
 const V_ADENTRO := 11.5       ## m/s esquivando por adentro
 const V_VENTANA := 7.5        ## m/s justo al pasar una ventana
 const V_LENTA := 3.0          ## m/s en la cámara lenta del esquive destacado
+const DIST_MIN := 1.6         ## De frente, la cámara de cine nunca se acerca más que esto a la paloma
 
 var ancho := 12.0             ## Ancho de la casa (eje X local)
 var fondo := 8.0              ## Profundidad (eje Z local)
@@ -98,6 +99,8 @@ var _cam_vel := Vector3.ZERO      ## Velocidad del resorte de la posición de la
 var _cam_mira := Vector3.ZERO
 var _mira_vel := Vector3.ZERO     ## Velocidad del resorte del punto al que mira
 var _ocl := 1.0                   ## 0..1: cuánto se acerca la cámara si un mueble tapa a la paloma
+var _subir := 0.0                 ## Metros que sube la cámara de frente para ver por encima de un mueble
+var _da_orbita := INF             ## De frente: el giro de la órbita del cuadro anterior (para no saltar de lado)
 var _cam_fov := 70.0
 var _lado_orbita := 1.0
 
@@ -378,6 +381,8 @@ func _empezar(desde_frente: bool) -> void:
 	_cam_vel = j.velocity   # La cámara arranca con el envión que traía, sin frenar de golpe
 	_mira_vel = j.velocity
 	_ocl = 1.0
+	_subir = 0.0
+	_da_orbita = INF
 	_cabeceo = 0.0
 	_barras.mostrar()
 	if nombre != "":
@@ -463,9 +468,9 @@ func _process(delta: float) -> void:
 	# golpe: la mezcla entre las dos se arma en 0,8 s al entrar y se desarma al salir (o, de frente,
 	# antes de llegar a la pared), así la cámara viaja sin pasar a través de la paloma
 	var hacia_estilo := adentro and estilo != Estilo.PERSECUCION
-	if estilo == Estilo.DE_FRENTE and _largo - _s < 5.0:
-		hacia_estilo = false   # Al final de la ruta ya no queda "adelante": vuelve a perseguirla
-	_mezcla = move_toward(_mezcla, 1.0 if hacia_estilo else 0.0, delta / 1.1)
+	if estilo == Estilo.DE_FRENTE and _s > _s_sale:
+		hacia_estilo = true   # De frente termina afuera, en la ventana de salida, mirándola salir
+	_mezcla = move_toward(_mezcla, 1.0 if hacia_estilo else 0.0, delta / 1.5)
 	var w := smoothstep(0.0, 1.0, _mezcla)
 	var plan := _plano(p, k, Estilo.PERSECUCION)
 	if w > 0.0:
@@ -479,8 +484,14 @@ func _process(delta: float) -> void:
 	var tiempo: float = plan[2]
 	if adentro:
 		var lo := to_local(objetivo)
+		# De frente la cámara sale por la ventana antes que la paloma: no se la traba contra la pared
+		# del fondo (si no, la paloma se le viene encima y queda pegada a la lente)
+		var por_ventana := estilo == Estilo.DE_FRENTE \
+			and absf(lo.x - _x_ventana_salida()) < VENTANA_ANCHO / 2.0 + 1.6 \
+			and signf(lo.z) == (-1.0 if _desde_frente else 1.0)
 		lo.x = clampf(lo.x, -ancho / 2.0 + ESPESOR + 0.35, ancho / 2.0 - ESPESOR - 0.35)
-		lo.z = clampf(lo.z, -fondo / 2.0 + ESPESOR + 0.35, fondo / 2.0 - ESPESOR - 0.35)
+		if not por_ventana:
+			lo.z = clampf(lo.z, -fondo / 2.0 + ESPESOR + 0.35, fondo / 2.0 - ESPESOR - 0.35)
 		lo.y = clampf(lo.y, 0.5, 5.5)
 		objetivo = to_global(lo)
 	# Si un mueble se mete entre la paloma y la cámara, la cámara se acerca (rápido al taparse, despacio
@@ -488,32 +499,83 @@ func _process(delta: float) -> void:
 	var ocl_obj := 1.0
 	var q := PhysicsRayQueryParameters3D.create(p, objetivo, 1, [_jugador.get_rid()])
 	var choque := get_world_3d().direct_space_state.intersect_ray(q)
+	# De frente, si un mueble alto (archivero, planta) tapa, la cámara sube por encima en vez de
+	# acercarse: la paloma se sigue viendo entera. La altura extra también va con resorte
+	var subir_obj := 0.0
+	if estilo == Estilo.DE_FRENTE and adentro and not choque.is_empty():
+		for extra: float in [0.5, 1.0, 1.5]:
+			var alto := objetivo + Vector3.UP * extra
+			if to_local(alto).y > 5.4:
+				break
+			q = PhysicsRayQueryParameters3D.create(p, alto, 1, [_jugador.get_rid()])
+			if get_world_3d().direct_space_state.intersect_ray(q).is_empty():
+				subir_obj = extra
+				choque = {}
+				break
+	_subir = lerpf(_subir, subir_obj, 1.0 - exp(-(6.0 if subir_obj > _subir else 1.5) * delta))
+	objetivo += Vector3.UP * _subir
 	if not choque.is_empty():
 		var largo := p.distance_to(objetivo)
-		# Nunca a menos de 1 m de la paloma: más cerca, cualquier movimiento suyo sería un giro brusco
-		ocl_obj = clampf((p.distance_to(choque["position"] as Vector3) - 0.3) / maxf(largo, 0.01), minf(1.0 / maxf(largo, 0.01), 1.0), 1.0)
-	_ocl = lerpf(_ocl, ocl_obj, 1.0 - exp(-(25.0 if ocl_obj < _ocl else 3.0) * delta))
+		# Nunca a menos de 1 m de la paloma: más cerca, cualquier movimiento suyo sería un giro brusco.
+		# De frente, 2,4 m: ahí un mueble que la tapa un instante es parte del plano, y pegarse a ella no
+		var minimo := 2.4 if estilo == Estilo.DE_FRENTE else 1.0
+		ocl_obj = clampf((p.distance_to(choque["position"] as Vector3) - 0.3) / maxf(largo, 0.01), minf(minimo / maxf(largo, 0.01), 1.0), 1.0)
+	# (De frente se acerca más despacio: la tapa un mueble que pasa, no hace falta saltar hacia ella)
+	var de_frente := estilo == Estilo.DE_FRENTE
+	_ocl = lerpf(_ocl, ocl_obj, 1.0 - exp(-((5.0 if de_frente else 25.0) if ocl_obj < _ocl else (2.5 if de_frente else 3.0)) * delta))
 	objetivo = p + (objetivo - p) * _ocl
 	# Plano final: ya afuera, la cámara se queda (frenando suave) y la ve alejarse
-	if _s > _s_sale + 1.2:
+	# (De frente ya tiene su lugar fijo afuera, al costado de la ventana de salida)
+	if _s > _s_sale + 1.2 and estilo != Estilo.DE_FRENTE:
 		if _quieta == Vector3.INF:
 			_quieta = _cam_pos + _cam_vel * 0.3
 		objetivo = _quieta
 		mira_obj = p
 		tiempo = 0.35
+	# Un resorte que persigue algo que se mueve siempre queda atrás (velocidad × tiempo: a 11 m/s,
+	# más de 3 m). Detrás de la paloma no importa, pero de frente ese atraso hacía que la paloma
+	# alcanzara a la cámara y quedara pegada a la lente. Por eso de frente el resorte trabaja "viajando
+	# con la paloma": sólo suaviza dónde está la cámara alrededor de ella, sin quedar atrás. Cuando
+	# la cámara se va a su lugar fijo de afuera, vuelve de a poco al resorte común
+	var v_ref := Vector3.ZERO
+	if estilo == Estilo.DE_FRENTE:
+		v_ref = _dir_suave * _velocidad(_s) * w * (1.0 - _saliendo())
 	# Resortes con amortiguación crítica: la cámara acelera y frena suave, nunca de golpe. La
 	# posición, un poco más blanda (como una cámara en mano con estabilizador)
-	var r := _resorte(_cam_pos, objetivo, _cam_vel, tiempo * 1.4, delta)
-	_cam_pos = r[0]
-	_cam_vel = r[1]
+	var r := _resorte(_cam_pos, objetivo, _cam_vel - v_ref, tiempo * 1.4, delta)
+	_cam_pos = (r[0] as Vector3) + v_ref * delta
+	_cam_vel = (r[1] as Vector3) + v_ref
+	if estilo == Estilo.DE_FRENTE:
+		_mantener_distancia(p)
 	var cerca := clampf(inverse_lerp(1.6, 0.7, _cam_pos.distance_to(p)), 0.0, 1.0)
 	var m := _resorte(_cam_mira, mira_obj, _mira_vel, lerpf(0.1, 0.22, cerca), delta)
 	_cam_mira = m[0]
 	_mira_vel = m[1]
 	var rapidez := clampf(inverse_lerp(V_LENTA, V_AFUERA, _velocidad(_s)), 0.0, 1.0)
 	_cam_fov = lerpf(_cam_fov, lerpf(64.0, 88.0, rapidez), 1.0 - exp(-2.5 * delta))
-	_girar_vista(_cam_mira - _cam_pos, deg_to_rad(150.0), delta)
+	# De frente la cámara da vueltas alrededor de la paloma y al final la ve pasar al costado: ahí la
+	# mirada gira más rápido para no perderla de cuadro
+	var giro_max := lerpf(210.0, 260.0, _saliendo()) if estilo == Estilo.DE_FRENTE else 150.0
+	_girar_vista(_cam_mira - _cam_pos, deg_to_rad(giro_max), delta)
 	_camara.corte(_cam_pos, _cam_pos + _vista * 4.0, _cam_fov)
+
+
+## De frente la cámara nunca se pega a la paloma: si el resorte la trae a menos de DIST_MIN (al dar
+## la vuelta alrededor de ella, o cuando un mueble la tapa), se la corre hacia afuera. Así la órbita
+## es un arco y no una cuerda que pasa rozándola.
+func _mantener_distancia(p: Vector3) -> void:
+	var rel := _cam_pos - p
+	var dist := rel.length()
+	if dist >= DIST_MIN:
+		return
+	var afuera := rel / dist if dist > 0.01 else -_dir_suave
+	_cam_pos = p + afuera * DIST_MIN
+	# Se le saca la velocidad que la acercaba a la paloma (relativa a la paloma, que también se
+	# mueve): así se desliza alrededor de ella en vez de chocar y rebotar contra el límite
+	var v_paloma := _dir * _velocidad(_s)
+	var hacia := (_cam_vel - v_paloma).dot(-afuera)
+	if hacia > 0.0:
+		_cam_vel += afuera * hacia
 
 
 ## La mirada de la cámara gira con inercia, como la de un camarógrafo: acelera y frena suave y no
@@ -562,24 +624,42 @@ func _plano(p: Vector3, k: float, cual: Estilo, w := 1.0) -> Array:
 			_esquina = mejor
 			return [to_global(_esquina), p + d * 0.4, 0.42]
 		Estilo.DE_FRENTE:
-			# Adelante, mirándola venir: la cámara va 2,6 m más adelante SOBRE LA RUTA (que siempre está
-			# adentro del cuarto, y al final sale por la ventana antes que ella). Para pasar de atrás a
-			# adelante da la vuelta en órbita alrededor de la paloma: nunca la atraviesa
-			var adelante := to_global(_curva.sample_baked(minf(_s + 2.6, _largo), true))
-			var paso := 2.6
-			while adelante.distance_to(p) < 2.2 and paso < 6.0 and _s + paso < _largo:   # En las vueltas cerradas, más adelante
-				paso += 0.4
-				adelante = to_global(_curva.sample_baked(minf(_s + paso, _largo), true))
+			# Adelante, mirándola venir: la cámara va ~4 m más adelante SOBRE LA RUTA (que siempre está
+			# adentro del cuarto, y al final sale por la ventana antes que ella), 1,5 m más alta: la ve
+			# entera, un poco desde arriba, y la vista pasa por encima de los muebles que esquiva.
+			# Se promedian varios puntos de la ruta: así no copia cada vuelta del zigzag.
+			# Para pasar de atrás a adelante da la vuelta en órbita alrededor de la paloma: nunca la atraviesa
+			var adelante := Vector3.ZERO
+			for paso in [3.4, 4.0, 4.6]:
+				adelante += to_global(_curva.sample_baked(minf(_s + paso, _largo), true)) / 3.0
 			var v0 := -d * 2.4
 			var v1 := adelante - p
 			var a0 := atan2(v0.x, v0.z)
 			var da := wrapf(atan2(v1.x, v1.z) - a0, -PI, PI)
-			if absf(da) > PI * 0.92:
-				da = PI * 0.92 * _lado_orbita   # Justo opuestos: elige un costado para dar la vuelta
+			# Cuánto hay que girar alrededor de ella, sin saltos: entre ir por un lado o por el otro se
+			# queda con el más parecido al del cuadro anterior (si no, cuando adelante y atrás quedan
+			# justo opuestos la vuelta cambia de lado de golpe)
+			var otro_lado := da - TAU * signf(da)
+			if is_inf(_da_orbita):
+				# La primera vez: si hay que dar media vuelta, por el lado con más lugar en el cuarto
+				var medio := a0 + da / 2.0
+				var medio_otro := a0 + otro_lado / 2.0
+				if absf(da) > PI * 0.5 and _lugar(p + Vector3(sin(medio_otro), 0, cos(medio_otro)) * 3.0) \
+						> _lugar(p + Vector3(sin(medio), 0, cos(medio)) * 3.0):
+					da = otro_lado
+			elif absf(otro_lado - _da_orbita) < absf(da - _da_orbita):
+				da = otro_lado
+			_da_orbita = da
 			var ang := a0 + da * w
-			var largo := lerpf(Vector2(v0.x, v0.z).length(), maxf(Vector2(v1.x, v1.z).length(), 1.2), w)
-			var pos := p + Vector3(sin(ang) * largo, lerpf(0.6, v1.y + 0.25, w), cos(ang) * largo)
-			return [pos, p + d * lerpf(1.6, 0.0, w) + Vector3.UP * 0.05, 0.16]
+			# A mitad de la vuelta la órbita se abre un metro más: así la rodea con aire, sin rozarla
+			var largo := lerpf(Vector2(v0.x, v0.z).length(), maxf(Vector2(v1.x, v1.z).length(), 3.2), w) + sin(PI * w) * 1.2
+			var pos := p + Vector3(sin(ang) * largo, lerpf(0.6, v1.y + 1.5, w), cos(ang) * largo)
+			# Llegando a la ventana de salida la cámara se va a su lugar de afuera, y desde ahí la ve
+			# salir y alejarse
+			var salir := _saliendo() * w
+			pos = pos.lerp(_punto_salida(), salir)
+			# Mientras da la vuelta mira a la paloma (no adelante de ella: de costado la dejaría afuera)
+			return [pos, p + d * lerpf(1.6, 0.0, sqrt(w)) + Vector3.UP * 0.05, lerpf(0.22, 0.32, salir)]
 		Estilo.CENITAL:
 			# Desde arriba, un poco atrás, sin pasarse del techo
 			var alto := clampf(5.4 - p.y, 1.4, 3.0)
@@ -587,6 +667,26 @@ func _plano(p: Vector3, k: float, cual: Estilo, w := 1.0) -> Array:
 	# PERSECUCION: detrás; en el destacado la rodea de costado y se acerca (bullet time)
 	var atras := (-d * lerpf(2.4, 1.6, k)).rotated(Vector3.UP, 1.75 * k * _lado_orbita)
 	return [p + atras + Vector3.UP * lerpf(0.65, 0.3, k), p + d * lerpf(1.8, 0.2, k), 0.14]
+
+
+## 0..1: de frente, cuánto se fue ya la cámara a su lugar de afuera de la ventana de salida.
+func _saliendo() -> float:
+	return smoothstep(_s_sale - 7.0, _s_sale - 1.5, _s)
+
+
+## Centro (X local) de la ventana por la que sale la paloma en esta pasada.
+func _x_ventana_salida() -> float:
+	return x_fondo if _desde_frente else x_frente
+
+
+## Dónde espera la cámara de frente (global) a que la paloma salga: afuera de la ventana de salida,
+## a un costado. La ve salir y alejarse, y queda detrás de ella para devolverle el mando a la cámara
+## del juego sin dar vueltas. Al callejón, contra el fondo y del lado contrario al que dobla; a la
+## plaza, a un costado de la ventana.
+func _punto_salida() -> Vector3:
+	if _desde_frente:
+		return to_global(Vector3(x_fondo - lado_callejon * 2.3, Y_PASO + 1.2, -fondo / 2.0 - CALLEJON + 0.5))
+	return to_global(Vector3(x_frente + 2.1 * _lado_orbita, Y_PASO + 0.6, fondo / 2.0 + 3.2))
 
 
 ## Cuánto lugar hay en un punto (global) dentro del cuarto: distancia a la pared más cercana.
