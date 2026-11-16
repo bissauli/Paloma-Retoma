@@ -106,6 +106,8 @@ func _micro(main: Node, b: Bandada) -> void:
 	for m in main.find_children("*", "AnimationMixer", true, false):
 		mixers.append(m as AnimationMixer)
 	var humanos := get_tree().get_nodes_in_group("humanos")
+	var chicos := get_tree().get_nodes_in_group("chicos")
+	var animales := get_tree().get_nodes_in_group("animales")
 	var comidas := get_tree().get_nodes_in_group("comida")
 	var transito := main.get_node_or_null("Plaza/Transito")
 	var casos := {
@@ -118,6 +120,12 @@ func _micro(main: Node, b: Bandada) -> void:
 		"humanos (%d)" % humanos.size(): func() -> void:
 			for h in humanos:
 				if is_instance_valid(h): h._physics_process(DT),
+		"chicos (%d)" % chicos.size(): func() -> void:
+			for c in chicos:
+				if is_instance_valid(c): c._process(DT),
+		"perros y gatos (%d)" % animales.size(): func() -> void:
+			for a in animales:
+				if is_instance_valid(a): a._process(DT),
 		"comida (%d)" % comidas.size(): func() -> void:
 			for c in comidas:
 				if is_instance_valid(c): c._process(DT),

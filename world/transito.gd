@@ -7,7 +7,8 @@ extends Node3D
 ## Mano derecha. Las dos rutas no se cruzan nunca, así cada auto sólo mira al de adelante de su ruta.
 ## En la avenida hay dos cruces peatonales con semáforos que los hacen frenar.
 ## Los autos frenan ante el auto de adelante, el semáforo, las esquinas y la gente que cruza. A las
-## palomas no las esperan: les tocan bocina, las sueltas se espantan y si te pisan salís volando.
+## palomas no las esperan: les tocan bocina, las sueltas se espantan y si te pisan quedás chata en el piso
+## como en los dibujitos (ver PalomaJugador.aplastar).
 
 const Z_CARRIL := {1: 32.0, -1: 28.0}    ## Carriles de la avenida
 const CRUCES := [-40.5, 4.5]          ## X de cada senda peatonal (sin pisar las líneas del medio)
@@ -290,11 +291,11 @@ func _revisar_jugador(a: Auto, j: Node3D, _delta: float) -> void:
 			AudioManager.reproducir_en("bocina", a.global_position, -4.0)
 		return
 	if absf(a_lo_largo) <= a.largo / 2.0 + 0.3 and a.velocidad > 1.5:
-		if GameState.invulnerable > 0.0 or GameState.partida_terminada or not j.has_method("empujar"):
+		if GameState.invulnerable > 0.0 or GameState.partida_terminada or not j.has_method("aplastar"):
 			return
-		GameState.invulnerable = 1.2
-		var costado := signf(lateral) if absf(lateral) > 0.05 else 1.0
-		j.empujar(fw * 0.8 + lado * costado, 6.5)
+		# La deja chata en el piso (el auto le pasa por encima) y después se infla de nuevo
+		GameState.invulnerable = PalomaJugador.DURACION_APLASTADA + 1.0
+		j.aplastar()
 		AudioManager.reproducir_en("bocina", a.global_position, 0.0)
 
 

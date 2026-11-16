@@ -3,14 +3,14 @@ extends Node
 ## Si existe res://audio/<nombre>.wav (o .ogg) se usa ese archivo.
 ## Si no, el sonido se sintetiza por código al arrancar (placeholder).
 ## Nombres previstos: arrullo, aleteo, picoteo, grito_nene, silbato,
-## chillido_halcon, ambiente, recoger, victoria, bocina.
+## chillido_halcon, ambiente, recoger, victoria, bocina, aplastar, boing, ladrido.
 ## Cada sonido sale por un bus (ver default_bus_layout.tres): las voces (arrullo, grito, chillido)
 ## por "Voces", el ambiente y la música por "Musica" y el resto por "Efectos".
 ## Si existe res://audio/musica.ogg (o .wav) suena en bucle por el bus "Musica".
 
 const MEZCLA := 22050
 const NOMBRES := ["arrullo", "aleteo", "picoteo", "grito_nene", "silbato",
-	"chillido_halcon", "ambiente", "recoger", "victoria", "bocina"]
+	"chillido_halcon", "ambiente", "recoger", "victoria", "bocina", "aplastar", "boing", "ladrido"]
 const CANALES := 10
 const BUS_VOCES := ["arrullo", "grito_nene", "chillido_halcon"]
 
@@ -131,6 +131,9 @@ func _cargar_o_generar(nombre: String) -> AudioStream:
 		"recoger": return _gen_recoger()
 		"victoria": return _gen_victoria()
 		"bocina": return _gen_bocina()
+		"aplastar": return _gen_aplastar()
+		"boing": return _gen_boing()
+		"ladrido": return _gen_ladrido()
 	return _a_wav(PackedFloat32Array([0.0]))
 
 
@@ -248,6 +251,53 @@ func _gen_bocina() -> AudioStreamWAV:
 			v += clampf(x * 3.0, -1.0, 1.0)
 		var env := minf(minf(t / 0.015, 1.0), clampf((dur - t) / 0.08, 0.0, 1.0))
 		m[i] = v * 0.16 * env
+	return _a_wav(m)
+
+
+func _gen_aplastar() -> AudioStreamWAV:
+	# "¡Plaf!" de dibujito: un golpe grave que cae de tono y un chasquido de ruido encima.
+	var dur := 0.32
+	var m := _muestras(dur)
+	var fase := 0.0
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		fase += lerpf(170.0, 55.0, minf(t / 0.12, 1.0)) / MEZCLA
+		var golpe := sin(TAU * fase) * exp(-t * 14.0)
+		var chasquido := _rng.randf_range(-1.0, 1.0) * exp(-t * 55.0)
+		m[i] = (golpe * 0.75 + chasquido * 0.45) * minf(t / 0.003, 1.0)
+	return _a_wav(m)
+
+
+func _gen_boing() -> AudioStreamWAV:
+	# "¡Boing!": un resorte que sube de tono y vibra mientras se apaga.
+	var dur := 0.55
+	var m := _muestras(dur)
+	var fase := 0.0
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		var f := lerpf(140.0, 420.0, minf(t / 0.09, 1.0)) * (1.0 + 0.09 * sin(TAU * 17.0 * t) * exp(-t * 3.0))
+		fase += f / MEZCLA
+		var s := sin(TAU * fase) + 0.3 * sin(TAU * fase * 2.0)
+		m[i] = s * 0.33 * minf(t / 0.01, 1.0) * exp(-t * 5.5)
+	return _a_wav(m)
+
+
+func _gen_ladrido() -> AudioStreamWAV:
+	# "¡Guau, guau!": dos golpes de voz que bajan de tono, con algo de ruido (ronquera).
+	var dur := 0.62
+	var m := _muestras(dur)
+	var fase := 0.0
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		var v := 0.0
+		for c: float in [0.0, 0.3]:
+			var u := t - c
+			if u >= 0.0 and u < 0.2:
+				var f := lerpf(520.0, 290.0, u / 0.2)
+				fase += f / MEZCLA
+				var onda := sin(TAU * fase) + 0.5 * sin(TAU * fase * 2.0) + 0.25 * sin(TAU * fase * 3.0)
+				v += (onda * 0.8 + _rng.randf_range(-0.35, 0.35)) * minf(u / 0.012, 1.0) * exp(-u * 13.0)
+		m[i] = v * 0.32
 	return _a_wav(m)
 
 

@@ -106,6 +106,8 @@ var _mat_vereda: Material
 var _mat_peatonal: Material
 var _locales: Array = []
 var _oficinas: Array = []
+var autos_estacionados := 0         ## Cuántos autos y motos estacionados hay (lo miran las pruebas)
+var lotes := 0                      ## Cuántos lotes hay en los corazones de manzana
 
 
 func _ready() -> void:
@@ -117,11 +119,13 @@ func _ready() -> void:
 	_mat_peatonal = Construir.material_lajas("lajas_peatonal", 4.0)
 	_locales = LOCALES.duplicate()
 	_oficinas = OFICINAS.duplicate()
-	# Cada etapa anota cuánto tardó (se ve con --verbose)
+	# Cada etapa anota cuánto tardó (se ve con --verbose) y tiene su propia semilla: si una zona cambia
+	# (más o menos piezas al azar), las demás quedan igual
 	var etapas: Array[String] = []
 	for etapa: Callable in [_suelos, _manzanas, _parque, _barrio, _peatonal, _pasaje, _props_veredas, _estacionamientos,
 			_obras, _fondo, _puntos_de_juego]:
 		var t := Time.get_ticks_usec()
+		_rng.seed = 20261115 + hash(etapa.get_method())
 		etapa.call()
 		etapas.append("%s %d" % [etapa.get_method(), (Time.get_ticks_usec() - t) / 1000])
 	# Los cuerpos entran al árbol recién ahora, con todas sus formas (así cada uno se arma una sola vez)
@@ -136,6 +140,12 @@ func _ready() -> void:
 	Construir.fusionar_estaticas(self, 64.0)
 	etapas.append("fusión de %d piezas %d" % [piezas, (Time.get_ticks_usec() - t1) / 1000])
 	print_verbose("Ciudad armada en %d ms (%s)" % [Time.get_ticks_msec() - t0, ", ".join(etapas)])
+
+
+## Al desarmar la ciudad (volver al menú) se sueltan las zonas de navegación: la próxima se arman de nuevo
+## con las colisiones nuevas.
+func _exit_tree() -> void:
+	Navegacion.limpiar()
 
 
 ## Cuerpo estático de la zona de "pos" (celdas de 48 m): miles de formas repartidas en varios
@@ -401,34 +411,261 @@ func _manzana(r: Rect2, lados: String, pool: Array, esquinas: Array, patio := tr
 		var a := z0 + (FONDO if no else 0.0)
 		_fila(Vector3(x0, 0, a), Vector3.BACK, z1 - (FONDO if so else 0.0) - a, -PI / 2.0, pool, true, true, false, fijos.get("O", []))
 	if patio:
-		_jardin(r.grow(-FONDO))
+		_corazon_de_manzana(r.grow(-FONDO))
 
 
-## Pulmón de manzana: losetas de pasto con árboles grandes, flores, arbustos y algún tendedero.
-func _jardin(r: Rect2) -> void:
+# ---------------------------------------------------------------- Corazón de manzana
+
+const ALTO_MEDIANERA := 2.4      ## Paredes bajas entre lote y lote del corazón de manzana
+const COLORES_CASA := ["fachada_crema", "fachada_rosa", "fachada_celeste", "fachada_verde", "fachada_amarilla",
+	"fachada_lila", "fachada_beige", "fachada_menta", "fachada_salmon", "fachada_gris", "ladrillo", "fachada_ocre"]
+const COLORES_PRETIL := ["blanco", "remate_crema", "remate_marron", "remate_verde", "remate_azul", "piedra"]
+const PISOS_AZOTEA := ["azotea", "azotea", "techo", "piedra_osc"]
+const PISOS_PATIO := ["azotea", "piedra_osc", "lajas", "vereda", "tejas"]
+const ARBOLES_PATIO := ["arbol_grande_A", "arbol_grande_B", "jacaranda_grande"]
+
+var _colores_kit := {}
+
+
+## Color de la paleta del kit por nombre (las cajas sueltas usan los mismos colores que las piezas).
+func _c(nombre: String) -> Color:
+	if _colores_kit.is_empty():
+		for p: Array in KitDatos.PALETA:
+			_colores_kit[p[0]] = Color(p[1] as String)
+	return _colores_kit.get(nombre, Color.MAGENTA)
+
+
+func _al_azar(lista: Array) -> Variant:
+	return lista[_rng.randi() % lista.size()]
+
+
+## Caja de color con su colisión en el cuerpo de la celda (Construir.caja con colisión crea un cuerpo
+## por cada caja).
+func _bloque(c: Vector3, tam: Vector3, color: Color, col := true) -> void:
+	Construir.caja(self, c, tam, color, false)
+	if col:
+		var forma := BoxShape3D.new()
+		forma.size = tam
+		Kit._forma(_cuerpo_en(c), forma, Transform3D(Basis.IDENTITY, c))
+
+
+## Corazón de manzana (mapa V3.1; antes era un pulmón de pasto que parecía una plaza metida en un
+## callejón): lotes como los del fondo de una manzana porteña. Cada lote está pegado al fondo de un
+## edificio y tiene una casa baja o un PH de una o dos plantas (con azotea, pretil de color y tanque),
+## un galpón de chapa, un patio de baldosas o un jardincito; entre lote y lote, medianeras bajas. Todo
+## tiene colisión: las palomas se pueden posar en techos y paredes.
+func _corazon_de_manzana(r: Rect2) -> void:
 	if r.size.x < 6.0 or r.size.y < 6.0:
 		return
-	var nx := int(r.size.x / 6.0)
-	var nz := int(r.size.y / 6.0)
-	var x0 := r.get_center().x - nx * 3.0
-	var z0 := r.get_center().y - nz * 3.0
-	for i in nx:
-		for j in nz:
-			var c := Vector3(x0 + 3.0 + 6.0 * i, 0.0, z0 + 3.0 + 6.0 * j)
-			Kit.colocar(self, "pasto", c)
-			var dado := _rng.randf()
-			if dado < 0.3:
-				_poner(ARBOLES[_rng.randi() % ARBOLES.size()], c + Vector3(_rng.randf_range(-1.2, 1.2), T_PARQUE,
-					_rng.randf_range(-1.2, 1.2)), _rng.randf() * TAU, Vector3.ONE * _rng.randf_range(0.75, 0.95))
-			elif dado < 0.42:
-				_poner("tendedero", c + Vector3(_rng.randf_range(-1, 1), T_PARQUE, _rng.randf_range(-1, 1)),
-					_rng.randf() * TAU, Vector3.ONE, false)
-			_flores_en(c, 2.4, 1 if Ajustes.movil else 2)
-	# Colisión del jardín (a la altura de las losetas)
-	var forma := BoxShape3D.new()
-	forma.size = Vector3(nx * 6.0, 0.2, nz * 6.0)
-	Kit._forma(_cuerpo_en(Vector3(r.get_center().x, 0, r.get_center().y)), forma,
-		Transform3D(Basis.IDENTITY, Vector3(r.get_center().x, 0.1, r.get_center().y)))
+	var lista: Array[Rect2] = []
+	_partir_lotes(r, lista)
+	lotes += lista.size()
+	for l in lista:
+		_lote(l, r)
+	# Medianeras: en el borde este y en el sur de cada lote, salvo en el borde del corazón (ahí está el
+	# fondo de los edificios). Así cada pared se pone una sola vez.
+	var y := Y_VEREDA + ALTO_MEDIANERA / 2.0
+	var color := _c("medianera")
+	for l in lista:
+		if l.end.x < r.end.x - 0.01:
+			_bloque(Vector3(l.end.x, y, l.get_center().y), Vector3(0.2, ALTO_MEDIANERA, l.size.y), color)
+		if l.end.y < r.end.y - 0.01:
+			_bloque(Vector3(l.get_center().x, y, l.end.y), Vector3(l.size.x, ALTO_MEDIANERA, 0.2), color)
+
+
+## Parte el corazón en lotes de 6 a 14 m de ancho y hasta 16 m de fondo (cortes al azar, a metro).
+func _partir_lotes(r: Rect2, out: Array[Rect2]) -> void:
+	var lx := r.size.x
+	var lz := r.size.y
+	var cortar_x := lx > 14.0 or (lx >= 12.0 and _rng.randf() < 0.4)
+	var cortar_z := lz > 16.0 or (lz >= 13.0 and _rng.randf() < 0.3)
+	if cortar_x and (not cortar_z or lx / 14.0 >= lz / 16.0):
+		var c := float(_rng.randi_range(6, int(lx) - 6))
+		_partir_lotes(Rect2(r.position, Vector2(c, lz)), out)
+		_partir_lotes(Rect2(r.position + Vector2(c, 0), Vector2(lx - c, lz)), out)
+	elif cortar_z:
+		var c := clampf(roundf(lz / 2.0 + _rng.randf_range(-3.0, 3.0)), 6.0, lz - 6.0)
+		_partir_lotes(Rect2(r.position, Vector2(lx, c)), out)
+		_partir_lotes(Rect2(r.position + Vector2(0, c), Vector2(lx, lz - c)), out)
+	else:
+		out.append(r)
+
+
+## Lado del lote pegado al fondo de un edificio ("N", "S", "E" u "O"); si no toca ninguno, uno al azar.
+func _lado_lote(l: Rect2, r: Rect2) -> String:
+	var lados: Array[String] = []
+	if absf(l.position.y - r.position.y) < 0.01:
+		lados.append("N")
+	if absf(l.end.y - r.end.y) < 0.01:
+		lados.append("S")
+	if lados.is_empty():
+		if absf(l.position.x - r.position.x) < 0.01:
+			lados.append("O")
+		if absf(l.end.x - r.end.x) < 0.01:
+			lados.append("E")
+	if lados.is_empty():
+		lados.assign(["N", "S", "E", "O"])
+	return lados[_rng.randi() % lados.size()]
+
+
+## Punto del lote en coordenadas locales: "u" a lo largo del lado pegado al edificio (0 en el medio) y
+## "v" hacia adentro desde ese lado; "y" es la altura.
+func _pl(l: Rect2, lado: String, u: float, v: float, y: float) -> Vector3:
+	match lado:
+		"N": return Vector3(l.get_center().x + u, y, l.position.y + v)
+		"S": return Vector3(l.get_center().x - u, y, l.end.y - v)
+		"O": return Vector3(l.position.x + v, y, l.get_center().y - u)
+	return Vector3(l.end.x - v, y, l.get_center().y + u)
+
+
+## Tamaño en ejes del mundo de una caja de "ancho" a lo largo del lado, "alto" y "prof" hacia adentro.
+func _tl(lado: String, ancho: float, alto: float, prof: float) -> Vector3:
+	return Vector3(ancho, alto, prof) if lado == "N" or lado == "S" else Vector3(prof, alto, ancho)
+
+
+## Giro en Y de una pieza del kit (que mira a +Z) para que mire hacia adentro del lote.
+func _rl(lado: String) -> float:
+	match lado:
+		"S": return PI
+		"O": return PI / 2.0
+		"E": return -PI / 2.0
+	return 0.0
+
+
+func _lote(l: Rect2, r: Rect2) -> void:
+	var lado := _lado_lote(l, r)
+	var a := l.size.x if lado == "N" or lado == "S" else l.size.y      # ancho a lo largo del lado
+	var d := l.size.y if lado == "N" or lado == "S" else l.size.x      # fondo hacia adentro
+	var dado := _rng.randf()
+	if dado < 0.52:
+		# Casa baja o PH, pegada al fondo del edificio, y su patio del lado de adentro
+		var pisos := 1 if _rng.randf() < 0.62 else 2
+		var prof := d if d < 8.0 else roundf(d * _rng.randf_range(0.5, 0.75))
+		_casa(l, lado, a, prof, pisos)
+		if d - prof > 1.5:
+			_patio(l, lado, a, prof, d)
+	elif dado < 0.64:
+		var prof := d if d < 9.0 else roundf(d * _rng.randf_range(0.6, 0.85))
+		_galpon(l, lado, a, prof)
+		if d - prof > 1.5:
+			_patio(l, lado, a, prof, d)
+	elif dado < 0.84:
+		_patio(l, lado, a, 0.0, d)
+	else:
+		_jardincito(l, lado, a, d)
+
+
+## Casa baja o PH de "pisos" plantas, de "prof" metros desde el fondo del edificio: paredes de color,
+## puerta y ventanas hacia el patio y azotea con pretil de color, tanque y alguna cosa más.
+func _casa(l: Rect2, lado: String, ancho: float, prof: float, pisos: int) -> void:
+	var y0 := Y_VEREDA
+	var h := 3.0 * pisos + 0.2
+	var a := ancho - 0.24     # deja lugar para la medianera entre lotes
+	var p := prof - 0.12
+	var vm := 0.12 + p / 2.0
+	_bloque(_pl(l, lado, 0, vm, y0 + h / 2.0), _tl(lado, a, h, p), _c(_al_azar(COLORES_CASA)))
+	# Azotea: piso, pretil de color alrededor y lo que haya arriba
+	_bloque(_pl(l, lado, 0, vm, y0 + h + 0.02), _tl(lado, a - 0.36, 0.04, p - 0.36), _c(_al_azar(PISOS_AZOTEA)), false)
+	const PR := 0.55
+	var cp := _c(_al_azar(COLORES_PRETIL))
+	for s: float in [-1.0, 1.0]:
+		_bloque(_pl(l, lado, s * (a / 2.0 - 0.09), vm, y0 + h + PR / 2.0), _tl(lado, 0.18, PR, p), cp)
+	for v: float in [0.21, 0.03 + p]:
+		_bloque(_pl(l, lado, 0, v, y0 + h + PR / 2.0), _tl(lado, a - 0.36, PR, 0.18), cp)
+	var arriba := y0 + h + 0.04
+	var rot := _rl(lado)
+	if _rng.randf() < 0.75 and a > 3.0 and p > 3.0:
+		_poner("tanque", _pl(l, lado, _rng.randf_range(-0.5, 0.5) * (a - 2.4), 0.12 + p - 1.3, arriba), rot)
+	var extra := _rng.randf()
+	if extra < 0.35 and a > 4.5 and p > 3.5:
+		_poner("tendedero", _pl(l, lado, 0, 0.12 + p * 0.4, arriba), rot, Vector3.ONE, false)
+	elif extra < 0.6 and not Ajustes.movil:
+		for k in _rng.randi_range(1, 3):
+			if k * 1.3 + 0.4 < a:
+				_poner(_al_azar(["maceton", "maceton_flores"]), _pl(l, lado, k * 1.3 - a / 2.0, 0.9, arriba), _rng.randf() * TAU)
+	# Puerta y ventanas hacia el patio (si la casa es angosta y profunda, el frente da a la medianera)
+	var vf := 0.12 + p + 0.02
+	if prof >= _d_lote(l, lado) - 0.01 and a < 5.0:
+		return
+	_bloque(_pl(l, lado, -a * 0.25, vf, y0 + 1.05), _tl(lado, 0.9, 2.1, 0.04), _c("madera"), false)
+	for k in pisos:
+		for u: float in ([a * 0.2] if k == 0 else [-a * 0.25, a * 0.2]):
+			if absf(u) + 0.6 < a / 2.0:
+				_bloque(_pl(l, lado, u, vf, y0 + 1.6 + 3.0 * k), _tl(lado, 1.1, 1.1, 0.04), _c("vidrio_osc"), false)
+
+
+## Fondo del lote hacia adentro (la medida perpendicular al lado pegado al edificio).
+func _d_lote(l: Rect2, lado: String) -> float:
+	return l.size.y if lado == "N" or lado == "S" else l.size.x
+
+
+## Galpón o taller del fondo: paredes de ladrillo o revoque, techo de chapa con nervaduras y un portón.
+func _galpon(l: Rect2, lado: String, ancho: float, prof: float) -> void:
+	var y0 := Y_VEREDA
+	var h := _rng.randf_range(3.4, 4.2)
+	var a := ancho - 0.24
+	var p := prof - 0.12
+	var vm := 0.12 + p / 2.0
+	_bloque(_pl(l, lado, 0, vm, y0 + h / 2.0), _tl(lado, a, h, p), _c(_al_azar(["ladrillo", "medianera", "fachada_gris"])))
+	var chapa := _c("chapa")
+	var sale := 0.3 if prof < _d_lote(l, lado) - 0.5 else 0.0      # el alero sólo si hay patio adelante
+	_bloque(_pl(l, lado, 0, vm + sale / 2.0, y0 + h + 0.04), _tl(lado, a + 0.1, 0.08, p + sale), chapa)
+	var n := maxi(int(a / 1.2), 1)
+	for k in n:
+		_bloque(_pl(l, lado, -a / 2.0 + (k + 0.5) * a / n, vm + sale / 2.0, y0 + h + 0.1), _tl(lado, 0.07, 0.05, p + sale),
+			chapa.darkened(0.12), false)
+	if sale > 0.0:
+		_bloque(_pl(l, lado, 0, 0.12 + p + 0.02, y0 + 1.4), _tl(lado, minf(3.0, a - 1.0), 2.8, 0.05), chapa.darkened(0.25), false)
+
+
+## Patio de baldosas de "v0" a "v1" metros desde el fondo del edificio, con alguna de estas cosas: un
+## tendedero, una mesa con sombrilla, una parrilla de ladrillos, un arbolito, macetas o una bici.
+func _patio(l: Rect2, lado: String, ancho: float, v0: float, v1: float) -> void:
+	var y0 := Y_VEREDA
+	var d := v1 - v0
+	var a := ancho - 0.2
+	_bloque(_pl(l, lado, 0, v0 + d / 2.0, y0 + 0.01), _tl(lado, a, 0.02, d - 0.1), _c(_al_azar(PISOS_PATIO)), false)
+	var piso := y0 + 0.02
+	var rot := _rl(lado)
+	if d >= 2.5 and a >= 4.0 and _rng.randf() < 0.55:
+		_poner("tendedero", _pl(l, lado, 0, v0 + d * 0.5, piso), rot, Vector3.ONE, false)
+	elif d >= 4.0 and a >= 5.0 and _rng.randf() < 0.5:
+		_poner(_al_azar(["mesa_cafe_roja", "mesa_cafe_verde"]), _pl(l, lado, 0, v0 + d * 0.5, piso), rot)
+	if _rng.randf() < 0.3 and a >= 4.0 and d >= 2.5:
+		# Parrilla de ladrillos contra la medianera, con su chimenea
+		var s := 1.0 if _rng.randf() < 0.5 else -1.0
+		var u := s * (a / 2.0 - 0.55)
+		_bloque(_pl(l, lado, u, v1 - 0.9, piso + 0.5), _tl(lado, 0.9, 1.0, 1.3), _c("ladrillo"))
+		_bloque(_pl(l, lado, u, v1 - 1.1, piso + 1.6), _tl(lado, 0.45, 1.2, 0.45), _c("ladrillo").darkened(0.1))
+		_bloque(_pl(l, lado, u, v1 - 1.1, piso + 2.25), _tl(lado, 0.6, 0.1, 0.6), _c("hierro"), false)
+	elif _rng.randf() < 0.35 and d >= 4.0:
+		_poner(_al_azar(ARBOLES_PATIO), _pl(l, lado, _rng.randf_range(-0.3, 0.3) * a, v1 - 1.6, piso),
+			_rng.randf() * TAU, Vector3.ONE * _rng.randf_range(0.5, 0.65))
+	if not Ajustes.movil:
+		if _rng.randf() < 0.6:
+			var s := 1.0 if _rng.randf() < 0.5 else -1.0
+			_poner(_al_azar(["maceton", "maceton_flores"]), _pl(l, lado, s * (a / 2.0 - 0.7), v1 - 0.7, piso), _rng.randf() * TAU)
+		if _rng.randf() < 0.15 and d >= 2.0:
+			_poner(_al_azar(["bici_azul", "bici_roja", "bici_verde"]), _pl(l, lado, 0.0, v0 + 0.5, piso), rot + PI / 2.0,
+				Vector3.ONE, false)
+
+
+## Jardincito del fondo: pasto, un árbol, flores y, a veces, una pelopincho.
+func _jardincito(l: Rect2, lado: String, ancho: float, d: float) -> void:
+	var y0 := Y_VEREDA
+	var a := ancho - 0.2
+	_bloque(_pl(l, lado, 0, d / 2.0, y0 + 0.02), _tl(lado, a, 0.04, d - 0.1), _c("pasto"), false)
+	var piso := y0 + 0.04
+	_poner(_al_azar(ARBOLES_PATIO), _pl(l, lado, _rng.randf_range(-0.25, 0.25) * a, d * _rng.randf_range(0.3, 0.7), piso),
+		_rng.randf() * TAU, Vector3.ONE * _rng.randf_range(0.6, 0.8))
+	if _rng.randf() < 0.35 and a >= 5.0 and d >= 6.0:
+		# Pelopincho: borde de lona azul y el agua
+		var c := _pl(l, lado, a * 0.22, d - 2.0, piso)
+		_bloque(c + Vector3(0, 0.17, 0), _tl(lado, 2.6, 0.34, 1.9), _c("plastico_azul"))
+		Construir.caja(self, c + Vector3(0, 0.33, 0), _tl(lado, 2.36, 0.03, 1.66), _c("agua"), false)
+	for k in (2 if Ajustes.movil else 4):
+		var q := _pl(l, lado, _rng_flores.randf_range(-0.4, 0.4) * a, _rng_flores.randf_range(0.6, d - 0.6), piso)
+		_poner(_al_azar(FLORES + ARBUSTOS), q, _rng_flores.randf() * TAU, Vector3.ONE, false)
 
 
 ## Matas de flores, arbustos y pasto alto al azar alrededor de "c" (sobre el pasto del parque).
@@ -616,17 +853,43 @@ func _juegos() -> void:
 	var c := Vector3(-101, 0, -91)
 	var y := T_PARQUE + 0.065
 	_poner("piso_juegos", c)
-	# Calesita (la parte de arriba gira)
-	_poner("calesita_base", c + Vector3(7, y, -4))
-	_animado("calesita_giro", c + Vector3(7, y, -4), 0.0, "girar", 0.45)
-	# Hamacas de madera: el marco fijo y cada asiento se hamaca sobre el eje de arriba
+	# Los juegos que se mueven sólo se mueven con chicos arriba (world/animado.gd, enemies/chico.gd).
+	# Cada uno sabe dónde va sentado cada chico (mirando a -Z en el espacio de la pieza) y dónde se para
+	# para subirse.
+	# Calesita (la parte de arriba gira): tres lugares sobre la plataforma, mirando hacia donde gira
+	var cc := c + Vector3(7, y, -4)
+	_poner("calesita_base", cc)
+	var cal := _animado("calesita_giro", cc, 0.0, "girar", 0.45)
+	for k in 3:
+		var a := TAU * k / 3.0
+		var d := Vector3(cos(a), 0, sin(a))
+		cal.asientos.append([Transform3D(Basis(Vector3.UP, -a), d * 2.6 + Vector3(0, 0.45, 0)),
+			cc + Vector3(d.x, 0, d.z) * 4.7])
+	# Hamacas de madera: el marco fijo y cada asiento se hamaca sobre el eje de arriba; el chico mira
+	# hacia la plaza (al sur)
 	_poner("hamaca_madera", c + Vector3(-6, y, -6.5))
 	for x: float in [-0.65, 0.65]:
-		_animado("hamaca_asiento", c + Vector3(-6 + x, y + 2.5, -6.5), 0.0, "hamacar", 1.6 + x, 0.55)
+		var h := _animado("hamaca_asiento", c + Vector3(-6 + x, y + 2.5, -6.5), 0.0, "hamacar", 2.1 + x * 0.1, 0.6)
+		h.asientos.append([Transform3D(Basis(Vector3.UP, PI), Vector3(0, -1.95, 0)), c + Vector3(-6 + x, y, -5.7)])
 	_poner("tobogan_torre", c + Vector3(-9, y, 4), deg_to_rad(20))
 	_poner("subibaja_base", c + Vector3(9, y, 6))
-	_animado("subibaja_tabla", c + Vector3(9, y + 0.5, 6), 0.0, "subibaja", 1.2, 0.25)
+	var sb := _animado("subibaja_tabla", c + Vector3(9, y + 0.5, 6), 0.0, "subibaja", 1.4, 0.25)
+	for s: float in [1.0, -1.0]:
+		sb.asientos.append([Transform3D(Basis(Vector3.UP, s * PI / 2.0), Vector3(s * 1.45, 0.13, 0)),
+			c + Vector3(9 + s * 1.5, y, 6.8)])
+	for j: Animado in [cal, sb]:
+		j.add_to_group("juegos_plaza")
+	for h in get_children():
+		if h is Animado and (h as Animado).tipo == "hamacar":
+			h.add_to_group("juegos_plaza")
 	_poner("arenero", c + Vector3(0.5, y, 1.5))
+	var m := Marker3D.new()
+	m.add_to_group("zona_chicos")
+	m.set_meta("tam", Vector2(26, 18))
+	m.set_meta("cantidad", 3 if Ajustes.movil else 5)
+	m.set_meta("arenero", c + Vector3(0.5, y + 0.1, 1.5))
+	add_child(m)
+	m.position = c + Vector3(0, y, 1)
 	# Caballitos de resorte
 	_poner("resorte_dino", c + Vector3(3.5, y, 7.5), 0.4)
 	_poner("resorte_elefante", c + Vector3(-2.0, y, 8.0), -0.3)
@@ -673,23 +936,60 @@ func _parque_perros() -> void:
 	_cerco("reja", Vector3(x1, y, z0), Vector3(x1, y, z1), [2, 3])     # portón donde llega el camino
 	_cerco("reja", Vector3(x1, y, z1), Vector3(x0, y, z1), [])
 	_cerco("reja", Vector3(x0, y, z1), Vector3(x0, y, z0), [])
-	_poner("agility_salto", Vector3(-176, y, -31), 0.0)
-	_poner("agility_salto", Vector3(-168, y, -25), 0.6)
-	_poner("agility_tunel", Vector3(-160, y, -34), 0.2)
-	_poner("agility_rampa", Vector3(-183, y, -24), PI / 2.0)
+	# Mitad oeste: circuito de agility. Una pista de tierra en rectángulo y los obstáculos en fila sobre
+	# cada recta, cruzados al paso: vallas al norte y al este, la rampa al oeste y el túnel al sur. Un
+	# perro lo recorre cada tanto (ver PISTA_AGILITY y world/animal.gd).
+	var p := PISTA_AGILITY
+	_pista_tierra(p, 1.6, y)
+	for x: float in [-182.0, -177.5, -173.0]:
+		_poner("agility_salto", Vector3(x, y, p.position.y), PI / 2.0)
+	for z: float in [-32.0, -27.5]:
+		_poner("agility_salto", Vector3(p.end.x, y, z), 0.0)
+	_poner("agility_rampa", Vector3(p.position.x, y, p.get_center().y), 0.0)
+	_poner("agility_tunel", Vector3(p.get_center().x, y, p.end.y), 0.0)
+	_poner("arbol_E", Vector3(-189.4, y, -21.2), 2.0)
+	# Mitad este: lugar libre para correr, con los bancos de los dueños a la sombra contra la reja sur, el
+	# bebedero y el tacho al lado del portón
 	_poner("bebedero", Vector3(-149.5, y, -22.5))
+	_poner("tacho", Vector3(-147.4, y, -36.0), PI / 2.0)
 	_poner("cartel_madera", Vector3(-143.6, y, -36.5), PI / 2.0, Vector3.ONE, true, {"madera": "Parque de perros"})
-	_poner("arbol_A", Vector3(-158, y, -24), 0.7)
-	_poner("arbol_E", Vector3(-187, y, -37), 2.0)
-	_poner("banco", Vector3(-151, y, -38.3), 0.0)
-	_poner("perro_negro", Vector3(-152, y, -35.5), -2.6)
-	_poner("perro_echado", Vector3(-185, y, -36), 0.8)
-	var zona := Rect2(x0 + 2.0, z0 + 2.0, x1 - x0 - 4.0, z1 - z0 - 4.0)
-	for nombre: String in ["perro_marron", "perro_blanco", "perro_marron"]:
-		var p := Vector3(_rng.randf_range(zona.position.x, zona.end.x), y, _rng.randf_range(zona.position.y, zona.end.y))
-		var a := _animado(nombre, p, _rng.randf() * TAU, "pasear", 1.6)
-		a.zona = zona
-	_paseo(Vector3(-168, y, -29), Vector2(30, 12), 2, "turista", "")
+	_poner("arbol_A", Vector3(-158, y, -21.5), 0.7)
+	_poner("arbol_E", Vector3(-153.5, y, -39.0), 1.1)
+	for x: float in [-157.0, -150.0]:
+		_poner("banco", Vector3(x, y, -38.3), PI)     # de espaldas a la reja, mirando a los perros
+	_senora(Vector3(-150.0, y, -38.3), 0.0, "")
+	# Los perros (world/animal.gd): el negro sentado al lado de su dueña, uno echado a la sombra, dos que
+	# pasean por la mitad libre y el blanco, que cada tanto hace el circuito
+	_animal("perro_negro", Vector3(-151.2, y, -36.4), PI, "sentado")
+	_animal("perro_marron", Vector3(-156.0, y, -21.6), 2.4, "echado", 1.1)
+	var zona := Rect2(-165.0, z0 + 2.5, x1 - 2.5 + 165.0, z1 - z0 - 5.0)
+	for k in 2:
+		var q := Vector3(_rng.randf_range(zona.position.x, zona.end.x), y, _rng.randf_range(zona.position.y, zona.end.y))
+		_animal(["perro_marron", "perro_negro"][k], q, _rng.randf() * TAU, "pasear", [1.0, 0.92][k]).zona = zona
+	var ag := _animal("perro_blanco", Vector3(-160.0, y, -30.0), -PI / 2.0, "agility", 0.85)
+	ag.zona = Rect2(x0 + 1.5, z0 + 1.5, x1 - x0 - 3.0, z1 - z0 - 3.0)
+	ag.pista = PackedVector3Array([Vector3(p.end.x, y, p.position.y), Vector3(p.position.x, y, p.position.y),
+		Vector3(p.position.x, y, p.end.y), Vector3(p.end.x, y, p.end.y)])
+	ag.obstaculos = [["valla", Vector3(-173.0, y, p.position.y)], ["valla", Vector3(-177.5, y, p.position.y)],
+		["valla", Vector3(-182.0, y, p.position.y)], ["rampa", Vector3(p.position.x, y, p.get_center().y)],
+		["tunel", Vector3(p.get_center().x, y, p.end.y)], ["valla", Vector3(p.end.x, y, -32.0)],
+		["valla", Vector3(p.end.x, y, -27.5)]]
+	# Los dueños esperan del lado del portón, lejos de la pista
+	_paseo(Vector3(-155, y, -29), Vector2(12, 12), 2, "turista", "")
+
+
+## Pista del circuito de agility del parque de perros (rectángulo por el medio de la pista).
+const PISTA_AGILITY := Rect2(-187.5, -36.5, 20.0, 13.0)
+
+
+## Pista de tierra de "ancho" metros alrededor del rectángulo "r" (las rectas norte y sur cubren las
+## esquinas, así no hay dos tiras encimadas).
+func _pista_tierra(r: Rect2, ancho: float, y: float) -> void:
+	var c := C_TIERRA.lightened(0.18)
+	for z: float in [r.position.y, r.end.y]:
+		Construir.caja(self, Vector3(r.get_center().x, y + 0.002, z), Vector3(r.size.x + ancho, 0.03, ancho), c, false)
+	for x: float in [r.position.x, r.end.x]:
+		Construir.caja(self, Vector3(x, y + 0.002, r.get_center().y), Vector3(ancho, 0.03, r.size.y - ancho), c, false)
 
 
 ## Cancha de básquet en el sureste del parque, con sus aros, una pelota, bancos y un par de árboles.
@@ -713,7 +1013,7 @@ func _cancha() -> void:
 func _bolt() -> void:
 	var y := T_PARQUE
 	_poner("cucha", Vector3(-191.5, y, -61), PI / 2.0, Vector3.ONE, true, {"cucha": "BOLT"})
-	_poner("perro_bolt", Vector3(-189.6, y, -61.2), PI / 2.0)
+	_animal("perro_bolt", Vector3(-189.6, y, -61.2), PI / 2.0, "dormilon")
 	_poner("plato_hueso", Vector3(-189.9, y, -59.2), 0.4)
 	for p: Vector3 in [Vector3(-188.0, y, -64.2), Vector3(-187.4, y, -57.8), Vector3(-186.3, y, -61.5), Vector3(-190.5, y, -64.8),
 			Vector3(-190.2, y, -56.9)]:
@@ -800,11 +1100,13 @@ func _barrio() -> void:
 			continue
 		var d: Dictionary = KitDatos.PIEZAS[n]
 		var local := Vector3(-float(d["ancho"]) / 2.0 + 1.5, float(d["alto"]) + 0.06, -3.0)
-		_animado(gatos[k % 3], casa.position + casa.basis * local, _rng.randf() * TAU, "respirar", 1.0)
+		_animal(gatos[k % 3], casa.position + casa.basis * local, _rng.randf() * TAU, "gato", 0.55)
 		k += 1
-	for p: Vector3 in [Vector3(120, Y_VEREDA + 0.02, 81), Vector3(153, Y_VEREDA + 0.02, 56), Vector3(108, Y_VEREDA, 33)]:
-		_animado(gatos[_rng.randi() % 3], p, _rng.randf() * TAU, "respirar", 1.0)
-	_animado("gato_negro", Vector3(105.2, Y_VEREDA + 1.81, 29.95), 1.0, "respirar", 1.0)
+	for p: Vector3 in [Vector3(153, Y_VEREDA + 0.02, 56), Vector3(108, Y_VEREDA, 33)]:
+		_animal(gatos[_rng.randi() % 3], p, _rng.randf() * TAU, "gato", 0.55)
+	_animal("gato_negro", Vector3(105.2, Y_VEREDA + 1.81, 29.95), 1.0, "gato", 0.6)
+	# Uno que da vueltas por el potrero
+	_animal("gato_naranja", Vector3(120, Y_VEREDA + 0.02, 81), 0.0, "gato_paseo", 0.55).zona = Rect2(114, 76, 12, 10)
 
 
 # ---------------------------------------------------------------- Peatonal y pasaje
@@ -979,6 +1281,7 @@ func _props_veredas() -> void:
 
 ## Auto del kit estacionado (con colisión) y sus cuatro ruedas. Los modelos miran a +X.
 func _auto_estacionado(nombre: String, pos: Vector3, rot: float) -> void:
+	autos_estacionados += 1
 	_poner(nombre, pos, rot)
 	var d: Dictionary = KitDatos.PIEZAS[nombre]
 	var rueda := "rueda_colectivo" if float(d["radio_rueda"]) > 0.4 else "rueda_auto"
@@ -987,45 +1290,38 @@ func _auto_estacionado(nombre: String, pos: Vector3, rot: float) -> void:
 		Kit.colocar(self, rueda, t * Vector3(p[0], p[1], p[2]), rot)
 
 
-## Lugares de estacionamiento a lo largo de un cordón: marcas blancas en L cada 5,5 m y autos en la
-## mayoría. "a" y "b" son los extremos sobre el cordón y "afuera" apunta hacia el medio de la calle;
-## los autos miran hacia "sentido" (la mano de ese lado de la calle).
-func _estacionar(a: Vector3, b: Vector3, afuera: Vector3, sentido: Vector3, ocupado := 0.7, modelos: Array = AUTOS) -> void:
+## Autos estacionados a lo largo de un cordón, de a grupitos de 1 a 3 con varios lugares libres entre
+## grupo y grupo (más o menos 1 de cada 5 lugares de 5,5 m), sin marcas en la calle. "a" y "b" son los
+## extremos sobre el cordón y "afuera" apunta hacia el medio de la calle; los autos miran hacia
+## "sentido" (la mano de ese lado de la calle).
+func _estacionar(a: Vector3, b: Vector3, afuera: Vector3, sentido: Vector3, modelos: Array = AUTOS) -> void:
 	const LUGAR := 5.5
 	var largo := a.distance_to(b)
 	var dir := (b - a) / largo
 	var n := int(largo / LUGAR)
 	var inicio := (largo - n * LUGAR) / 2.0
 	var rot := atan2(-sentido.z, sentido.x)
-	for k in n + 1:
-		var p := a + dir * (inicio + k * LUGAR)
-		# Marca en L: la raya perpendicular al cordón y una pata corta a lo largo
-		_raya(p + afuera * 1.1, Vector2(0.14, 2.2) if absf(afuera.x) < 0.5 else Vector2(2.2, 0.14))
-		var pata := p + afuera * 2.15 + dir * 0.3
-		_raya(pata, Vector2(0.6, 0.14) if absf(afuera.x) < 0.5 else Vector2(0.14, 0.6))
-		if k < n and _rng.randf() < ocupado:
-			var c := a + dir * (inicio + (k + 0.5) * LUGAR) + afuera * 1.25 + Vector3(0, Y_CALZADA, 0)
-			if _rng.randf() < 0.06:
+	var k := _rng.randi_range(1, 5)
+	while k < n:
+		var grupo := mini(_rng.randi_range(1, 3), n - k)
+		for g in grupo:
+			var c := a + dir * (inicio + (k + g + 0.5) * LUGAR) + afuera * 1.25 + Vector3(0, Y_CALZADA, 0)
+			if _rng.randf() < 0.1:
+				autos_estacionados += 1
 				_poner(["moto_roja", "moto_celeste"][_rng.randi() % 2], c, rot + _rng.randf_range(-0.2, 0.2))
 			else:
 				_auto_estacionado(modelos[_rng.randi() % modelos.size()], c, rot)
-
-
-func _raya(c: Vector3, tam: Vector2) -> void:
-	Construir.caja(self, Vector3(c.x, 0.016, c.z), Vector3(tam.x, 0.01, tam.y), C_LINEA, false)
+		k += grupo + _rng.randi_range(6, 11)
 
 
 func _estacionamientos() -> void:
-	# Sólo en las calles sin tránsito (Rivadavia, la Av. de Mayo y Reconquista): los autos que andan
-	# van por Bolívar, la avenida y Paseo Colón (ver world/transito.gd)
-	_estacionar(Vector3(-57, 0, -53), Vector3(57, 0, -53), Vector3.BACK, Vector3.LEFT)
-	_estacionar(Vector3(-57, 0, -43), Vector3(57, 0, -43), Vector3.FORWARD, Vector3.RIGHT)
-	_estacionar(Vector3(-196, 0, -7), Vector3(-82, 0, -7), Vector3.BACK, Vector3.LEFT)
-	_estacionar(Vector3(-196, 0, 3), Vector3(-82, 0, 3), Vector3.FORWARD, Vector3.RIGHT)
-	# Reconquista: del lado de la comisaría estacionan también los patrulleros
-	_estacionar(Vector3(82, 0, -11), Vector3(196, 0, -11), Vector3.BACK, Vector3.LEFT, 0.65,
+	# Sólo en las calles sin tránsito (Rivadavia, la Av. de Mayo y Reconquista) y de un solo lado: los
+	# autos que andan van por Bolívar, la avenida y Paseo Colón (ver world/transito.gd)
+	_estacionar(Vector3(-57, 0, -53), Vector3(57, 0, -53), Vector3.BACK, Vector3.LEFT)       # Rivadavia, lado norte
+	_estacionar(Vector3(-196, 0, 3), Vector3(-82, 0, 3), Vector3.FORWARD, Vector3.RIGHT)     # Av. de Mayo, lado de los locales
+	# Reconquista, del lado de la comisaría: ahí estacionan también los patrulleros
+	_estacionar(Vector3(82, 0, -11), Vector3(196, 0, -11), Vector3.BACK, Vector3.LEFT,
 		AUTOS + ["patrullero", "patrullero", "patrullero"])
-	_estacionar(Vector3(82, 0, -1), Vector3(196, 0, -1), Vector3.FORWARD, Vector3.RIGHT, 0.75)
 
 
 ## Obras en la vereda: un pozo con un caño, vallas de rayas y conos.
@@ -1138,7 +1434,20 @@ func _puntos_de_juego() -> void:
 	_migas("MigasPeatonal", Vector3(-120, Y_VEREDA + 0.02, 58), 6.0, 5, 5.0)
 
 
-## Pieza que se mueve (no se fusiona): la calesita, las hamacas, el subibaja, los perros y los gatos.
+## Perro o gato con esqueleto y animaciones (world/animal.gd). "escala": el tamaño (los gatos son
+## perros de 0,55).
+func _animal(variante: String, pos: Vector3, rot: float, conducta: String, escala := 1.0) -> Animal:
+	var a := Animal.new()
+	a.variante = variante
+	a.conducta = conducta
+	a.position = pos
+	a.rotation.y = rot
+	a.scale = Vector3.ONE * escala
+	add_child(a)
+	return a
+
+
+## Pieza que se mueve (no se fusiona): la calesita, las hamacas y el subibaja.
 func _animado(nombre: String, pos: Vector3, rot: float, tipo: String, velocidad: float, amplitud := 0.5) -> Animado:
 	var a := Animado.new()
 	a.tipo = tipo

@@ -1,6 +1,7 @@
 extends Node
 ## Capturas de la ciudad desde varios puntos de vista (NO headless). Sin el HUD ni los menús.
-## godot --path . res://tests/captura_ciudad.tscn -- <carpeta_salida> [vista1,vista2...]
+## godot --path . res://tests/captura_ciudad.tscn -- <carpeta_salida> [vista1,vista2...] [segundos de espera]
+## (la espera deja que la gente, los chicos y los animales se pongan en movimiento antes de las fotos)
 
 const VISTAS := {
 	"aerea": [Vector3(0, 150, 215), Vector3(0, 0, -15)],
@@ -32,6 +33,15 @@ const VISTAS := {
 	"iso_rivadavia": [Vector3(22, 26, -24), Vector3(-2, 2, -50)],
 	"iso_juegos": [Vector3(-82, 26, -70), Vector3(-101, 0, -91)],
 	"iso_reconquista": [Vector3(66, 30, 8), Vector3(120, 2, -8)],
+	# Corazones de manzana, fondos de los edificios y balcones
+	"manzana_norte": [Vector3(-38, 34, -66), Vector3(0, 0, -86)],
+	"manzana_este": [Vector3(100, 38, -30), Vector3(140, 0, -66)],
+	"manzana_comercial": [Vector3(-90, 30, 30), Vector3(-140, 0, 30)],
+	"balcones": [Vector3(-20, 14, -38), Vector3(-20, 12, -60)],
+	"perros_cerca": [Vector3(-160, 4, -18), Vector3(-170, 0, -30)],
+	"juegos_cerca": [Vector3(-102, 4.5, -82), Vector3(-104, 1.2, -95)],
+	"dueños": [Vector3(-147, 2.2, -30), Vector3(-154, 0.5, -36)],
+	"gatos": [Vector3(116, 9, 20), Vector3(124, 4, 30)],
 }
 
 var salida := "user://"
@@ -41,13 +51,18 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	if args.size() > 0:
 		salida = args[0]
-	var solo: PackedStringArray = args[1].split(",") if args.size() > 1 else PackedStringArray()
+	var solo: PackedStringArray = args[1].split(",") if args.size() > 1 and args[1] != "" else PackedStringArray()
+	var espera := float(args[2]) if args.size() > 2 else 0.0
 	var main: Node = load("res://main.tscn").instantiate()
 	add_child(main)
 	var cam := Camera3D.new()
 	cam.far = 600.0
 	add_child(cam)
 	await _frames(30)
+	if espera > 0.0:
+		Engine.time_scale = 4.0
+		await get_tree().create_timer(espera).timeout
+		Engine.time_scale = 1.0
 	cam.current = true
 	_esconder_interfaz(get_tree().root)
 	for nombre: String in VISTAS:

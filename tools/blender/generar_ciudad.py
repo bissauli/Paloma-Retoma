@@ -445,16 +445,16 @@ def ventana(F, u, z, w, h, rng, persiana=0.75, marco="marco", alfeizar=True):
 
 
 def baranda(F, u, z, w, off, alto=0.95, sep=0.22, color="hierro", lados=0.0):
-    """Baranda de hierro de ancho w a 'off' metros de la pared. lados>0: también los costados."""
-    bms = [F.caja(u, z + alto - 0.05, w, 0.05, 0.05, off - 0.025), F.caja(u, z + 0.1, w, 0.04, 0.04, off - 0.02)]
-    n = max(2, int(round(w / sep)))
+    """Baranda simple de hierro de ancho w a 'off' metros de la pared: pasamanos, travesaño de abajo y
+    pocos barrotes gruesos (uno cada medio metro como mucho, así se lee de lejos y suma pocas caras).
+    lados>0: también los costados (sólo el pasamanos; el barrote de la punta ya está)."""
+    bms = [F.caja(u, z + alto - 0.06, w + 0.04, 0.06, 0.06, off - 0.03), F.caja(u, z + 0.1, w, 0.05, 0.05, off - 0.025)]
+    n = max(2, int(round(w / max(sep, 0.5))))
     for i in range(n + 1):
-        bms.append(F.caja(u - w / 2 + i * w / n, z, 0.03, alto, 0.03, off - 0.015))
+        bms.append(F.caja(u - w / 2 + i * w / n, z, 0.05, alto - 0.03, 0.05, off - 0.025))
     if lados > 0:
         for s in (-1, 1):
-            bms.append(F.caja(u + s * w / 2, z + alto - 0.05, 0.05, 0.05, lados, 0))
-            for k in range(1, 3):
-                bms.append(F.caja(u + s * w / 2, z, 0.03, alto, 0.03, lados * k / 3 - 0.015))
+            bms.append(F.caja(u + s * w / 2, z + alto - 0.06, 0.06, 0.06, lados, 0))
     return [P(b, color) for b in bms]
 
 
@@ -776,6 +776,9 @@ def pisos_fachada(F, pisos, estilo, fachada, rng, z_base=PB, opciones=None):
         return est, det
     corrido = estilo == "departamentos"
     baranda_maciza = op.get("maciza", rng.random() < 0.5)
+    # Balcones de los clásicos (mapa V3.1: menos y más simples): no todos los edificios tienen, y los que
+    # tienen los llevan en el primer piso y alguno suelto en el paño del medio
+    con_balcones = op.get("balcones", rng.random() < 0.6)
     for f in range(pisos):
         z0 = z_base + f * PISO
         if corrido:
@@ -787,7 +790,9 @@ def pisos_fachada(F, pisos, estilo, fachada, rng, z_base=PB, opciones=None):
             if baranda_maciza:
                 est.append(P(F.caja(0, z0 + 0.14, W - 0.65, 0.9, 0.1, prof - 0.1), op.get("pared_balcon", fachada), z_base, H))
             else:
-                det += baranda(F, 0, z0 + 0.14, W - 0.65, prof - 0.05, alto=0.95, sep=0.3)
+                # Baranda de vidrio: un paño y el pasamanos (en vez de decenas de barrotes)
+                det.append(P(F.caja(0, z0 + 0.14, W - 0.65, 0.82, 0.05, prof - 0.08), "vidrio"))
+                det.append(P(F.caja(0, z0 + 0.96, W - 0.6, 0.07, 0.09, prof - 0.1), "hierro"))
             for u in us:
                 det += ventana(F, u, z0 + 0.2, bw - 0.85, 2.35, rng, 0.85, alfeizar=False)
             if rng.random() < 0.45:
@@ -803,7 +808,8 @@ def pisos_fachada(F, pisos, estilo, fachada, rng, z_base=PB, opciones=None):
                 det += ventana(F, u, zv, w, alto_v, rng, 0.7)
                 if estilo == "clasico":
                     det.append(P(F.caja(u, zv + alto_v + 0.12, w + 0.5, 0.18, 0.14), "piedra"))
-                    if op.get("balcones", True) and (f == 0 or rng.random() < 0.65):
+                    del_medio = abs(u) < bw * 0.6
+                    if con_balcones and (f == 0 or (del_medio and f < pisos - 1 and rng.random() < 0.3)):
                         est.append(P(F.caja(u, z0 + 0.2, w + 0.7, 0.14, 0.6), "piedra"))
                         F.col(u, z0 + 0.2, w + 0.7, 0.14, 0.6)
                         det += baranda(F, u, z0 + 0.34, w + 0.6, 0.55, alto=0.9, sep=0.26, lados=0.55)
@@ -814,6 +820,35 @@ def pisos_fachada(F, pisos, estilo, fachada, rng, z_base=PB, opciones=None):
             if estilo == "clasico" and f < pisos - 1:
                 det.append(P(F.caja(0, z0 + PISO - 0.08, W, 0.12, 0.08), "piedra"))
     return est, det
+
+
+def contrafrente(W, D, pisos, fachada, rng):
+    """Fondo del edificio, que da al corazón de manzana (mapa V3.1; antes era la pared lisa de la
+    medianera): revoque del color de la fachada, una ventana por paño en cada piso (más chicas que las
+    del frente, alguna puerta-ventana), algún aire acondicionado y el caño de desagüe. Va del primer piso
+    para arriba: la planta baja la tapan las casas bajas del corazón de manzana (ver world/ciudad.gd)."""
+    Fb = Frente((0, D), (0, 1), W)
+    H = PB + pisos * PISO
+    est = [P(Fb.caja(0, PB - 0.6, W - 0.1, H - PB + 0.6, 0.03), fachada, 0, H)]
+    det = []
+    bays = max(1, int(round(W / 3.0)))
+    bw = W / bays
+    for f in range(pisos):
+        z0 = PB + f * PISO
+        for i in range(bays):
+            u = -W / 2 + bw * (i + 0.5)
+            w = min(1.1, bw - 1.1)
+            puerta = rng.random() < 0.25
+            alto = 2.15 if puerta else 1.35
+            det += ventana(Fb, u, z0 + (0.2 if puerta else 0.85), w, alto, rng, 0.6, alfeizar=not puerta)
+            if rng.random() < 0.2:
+                ua = u + w / 2 + 0.6
+                if abs(ua) + 0.45 > W / 2:
+                    ua = u - w / 2 - 0.6
+                if abs(ua) + 0.45 <= W / 2:
+                    det += aire(Fb, ua, z0 + (1.3 if puerta else 0.25), 0.03)
+    det += cano_desague(Fb, W / 2 - 0.3, H)
+    return est, det, Fb
 
 
 def remate_frente(F, H, estilo, fachada, rng, balaustrada=False):
@@ -842,12 +877,21 @@ def remate_frente(F, H, estilo, fachada, rng, balaustrada=False):
 # ---------------------------------------------------------------- edificios
 
 
-def lejos(nombre, frentes, base, H, pisos, estilo, toldo_col=None):
+def lejos(nombre, frentes, base, H, pisos, estilo, toldo_col=None, fondo=None):
     """Versión simple de un edificio para verlo de lejos (Godot la cambia por la detallada a más de
     ~120 m, y el horizonte usa sólo esta): el mismo volumen, una caja por ventana, la planta baja, el
-    toldo, la cornisa y lo de la azotea que pase en "base". Sin biseles: unas 10 veces menos caras."""
+    toldo, la cornisa y lo de la azotea que pase en "base". Sin biseles: unas 10 veces menos caras.
+    fondo: (Frente del contrafrente, color) para ponerle también su revoque y sus ventanas."""
     empezar()
     bms = list(base)
+    if fondo:
+        Fb, color = fondo
+        bms.append(P(Fb.caja(0, PB - 0.6, Fb.w - 0.1, H - PB + 0.6, 0.03), color, 0, H))
+        bays = max(1, int(round(Fb.w / 3.0)))
+        for f in range(pisos):
+            for i in range(bays):
+                bms.append(P(Fb.caja(-Fb.w / 2 + Fb.w / bays * (i + 0.5), PB + f * PISO + 0.85, min(1.1, Fb.w / bays - 1.1),
+                                     1.35, 0.06), "vidrio"))
     for F in frentes:
         W = F.w
         if estilo == "barrio":
@@ -961,6 +1005,10 @@ def edificio(nombre, W, D, pisos, estilo, fachada, seed, pb="local", toldo_col=N
     est += tapas_pretil(lados, H)
     if cano and estilo != "moderno":
         det += cano_desague(F, W / 2 - 0.3, H)
+    # El fondo (con su propio azar, así el frente y la azotea no cambian)
+    e, d, Fb = contrafrente(W, D, pisos, fachada, random.Random(seed * 13 + 5))
+    est += e
+    det += d
     if extra:
         e, d = extra(F, H, rng)
         est += e
@@ -991,7 +1039,7 @@ def edificio(nombre, W, D, pisos, estilo, fachada, seed, pb="local", toldo_col=N
         base.append(P(bm_perfil_x([(y0, H), (y1, H), (y1 - entra, H + alto), (y0 + entra, H + alto)], -W / 2 + 0.3, W / 2 - 0.3), "pizarra"))
     else:
         base += _techo_lejos(0, D - 2.2, H, pisos)
-    lejos(nombre, [F], base, H, pisos, estilo, toldo_col)
+    lejos(nombre, [F], base, H, pisos, estilo, toldo_col, fondo=(Fb, fachada))
 
 
 def mansarda(W, D, H, rng):
