@@ -148,43 +148,66 @@ static func piramide(padre: Node3D) -> void:
 		valla(padre, d * 5.2 + t * 5.2, d * 5.2 - t * 5.2)
 
 
-## Oeste: el Cabildo, blanco con galería de arcos, torre y techo de tejas.
+## Oeste: el Cabildo, blanco con galería de arcos, torre con reloj y techo de tejas.
+## Mapa V4.5: lo que se ve es el modelo de Blender (modelos/cabildo/cabildo.res, sacado de
+## Escenario_Cabildo.glb con tools/extraer_cabildo.gd; lo genera tools/blender/generar_escenario_cabildo.py):
+## ventanas con persianas en los costados y el fondo, ménsulas en los arcos, dentículos en la cornisa,
+## techo a cuatro aguas con hastiales y la torre con campanario, reloj y linterna. Antes el fondo era
+## una caja blanca lisa de 9 x 9 x 30 m. Acá se arma sólo la colisión, con las mismas formas de siempre:
+## donde la paloma camina o se posa, el modelo tiene la misma superficie.
+const CABILDO_MALLA := "res://modelos/cabildo/cabildo.res"
+
+
 static func cabildo(padre: Node3D) -> void:
-	var x_fondo := -57.0
 	var x_frente := -45.0
-	# Cuerpo trasero
-	Construir.caja(padre, Vector3(-52.5, 4.5, 0), Vector3(9, 9, 30), C_BLANCO)
-	# Piso superior sobre la galería
-	Construir.caja(padre, Vector3(-46.5, 6.9, 0), Vector3(3, 4.2, 30), C_BLANCO)
+	var modelo := MeshInstance3D.new()
+	modelo.name = "CabildoModelo"
+	modelo.mesh = load(CABILDO_MALLA) as Mesh
+	modelo.set_meta(&"no_fusionar", true)
+	padre.add_child(modelo)
+	# Cuerpo trasero y piso superior sobre la galería
+	_col_caja(padre, Vector3(-52.5, 4.5, 0), Vector3(9, 9, 30))
+	_col_caja(padre, Vector3(-46.5, 6.9, 0), Vector3(3, 4.2, 30))
 	# Columnas de la galería (planta baja)
 	for i in 11:
-		var z := -15.0 + i * 3.0
-		Construir.caja(padre, Vector3(x_frente - 0.4, 2.4, z), Vector3(0.8, 4.8, 0.8), C_BLANCO)
-	# Arcos (sombra oscura dentro de la galería)
-	Construir.caja(padre, Vector3(-47.9, 2.4, 0), Vector3(0.2, 4.6, 29.6), Color("cfc8b8"), false)
-	# Ventanas y balconcitos del piso alto
+		_col_caja(padre, Vector3(x_frente - 0.4, 2.4, -15.0 + i * 3.0), Vector3(0.8, 4.8, 0.8))
+	# Balconcitos del piso alto (para posarse)
 	for i in 10:
-		var z := -13.5 + i * 3.0
-		Construir.caja(padre, Vector3(x_frente - 0.02, 6.6, z), Vector3(0.1, 2.0, 1.1), C_VENTANA, false)
-		Construir.caja(padre, Vector3(x_frente + 0.35, 5.5, z), Vector3(0.7, 0.15, 1.5), C_MADERA)
+		_col_caja(padre, Vector3(x_frente + 0.35, 5.5, -13.5 + i * 3.0), Vector3(0.7, 0.15, 1.5))
 	# Cornisa (lugar ideal para posarse)
-	Construir.caja(padre, Vector3(-51.0, 9.15, 0), Vector3(13.2, 0.3, 31.0), C_BLANCO)
+	_col_caja(padre, Vector3(-51.0, 9.15, 0), Vector3(13.2, 0.3, 31.0))
 	# Techo de tejas (prisma con la cumbrera a lo largo de Z)
-	Construir.prisma(padre, Vector3(-51.0, 10.6, 0), Vector3(12.5, 2.6, 30.0), C_TEJAS, Vector3.ZERO, true)
-	# Torre central con cúpula y reloj
-	Construir.caja(padre, Vector3(-46.5, 13.0, 0), Vector3(4, 7.6, 4), C_BLANCO)
-	Construir.caja(padre, Vector3(-46.5, 16.95, 0), Vector3(4.6, 0.3, 4.6), C_BLANCO)
-	_rot(Construir.cilindro(padre, Vector3(-44.47, 13.9, 0), 1.0, 0.1, Color("fdfbf0"), false, 16), "z", PI / 2.0)
-	Construir.caja(padre, Vector3(-44.39, 14.15, 0), Vector3(0.06, 0.6, 0.08), Color("2a2a2a"), false)
-	var cupula := Construir.esfera(padre, Vector3(-46.5, 17.1, 0), 1.6, C_TEJAS.lightened(0.15), Vector3(1, 0.9, 1), 10)
-	cupula.scale = Vector3(1, 0.9, 1)
+	var prisma := PrismMesh.new()
+	prisma.size = Vector3(12.5, 2.6, 30.0)
+	var forma_techo := ConvexPolygonShape3D.new()
+	forma_techo.points = prisma.get_faces()
+	Construir.colision(padre, Vector3(-51.0, 10.6, 0), forma_techo)
+	# Torre central, su cornisa y la cúpula
+	_col_caja(padre, Vector3(-46.5, 13.0, 0), Vector3(4, 7.6, 4))
+	_col_caja(padre, Vector3(-46.5, 16.95, 0), Vector3(4.6, 0.3, 4.6))
 	var forma := SphereShape3D.new()
 	forma.radius = 1.5
 	Construir.colision(padre, Vector3(-46.5, 17.0, 0), forma)
-	# El nombre va pintado en el frente de la torre, debajo del reloj
+	# Lo que el modelo agrega sobre la cornisa de la torre también es sólido: los 4 pináculos de las
+	# esquinas y la linterna con la aguja
+	for x in [-48.55, -44.45]:
+		for z in [-2.05, 2.05]:
+			_col_caja(padre, Vector3(x, 17.5, z), Vector3(0.28, 0.8, 0.28))
+	var linterna := CylinderShape3D.new()
+	linterna.radius = 0.25
+	linterna.height = 1.0
+	Construir.colision(padre, Vector3(-46.5, 19.0, 0), linterna)
+	# El nombre va pintado en el frente de la torre, debajo del reloj (sobre una tablita del modelo)
 	_rot(Construir.cartel(padre, Vector3(-44.44, 11.2, 0), "CABILDO", Color("6b5a40"), 56), "y", PI / 2.0)
-	# Fondo cerrado para que no se vea el vacío
-	Construir.caja(padre, Vector3(x_fondo - 1.0, 5, 0), Vector3(2, 10, 30), C_CREMA)
+	# Fondo cerrado (en el modelo, con sus ventanas)
+	_col_caja(padre, Vector3(-58.0, 5, 0), Vector3(2, 10, 30))
+
+
+## Sólo colisión (caja), sin malla: la parte visual la pone un modelo de Blender.
+static func _col_caja(padre: Node3D, pos: Vector3, tam: Vector3) -> void:
+	var forma := BoxShape3D.new()
+	forma.size = tam
+	Construir.colision(padre, pos, forma)
 
 
 ## Norte: la Catedral, con columnas, frontón y escalinata.

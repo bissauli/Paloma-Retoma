@@ -43,6 +43,7 @@ const ALTO_POSTE := 8.8
 const Y_CRUCETA := 8.2
 const GROSOR_CABLE := 0.045
 const GROSOR_COLISION := 0.12
+const Y_AGARRE := 7.35       ## Altura del soporte en la pared: entre el dintel del primer piso y el alféizar del segundo
 
 ## Terrazas altas para mirar la ciudad (las llena _torre): [centro, tamaño en X/Z] del piso, en el mundo.
 static var miradores: Array = []
@@ -58,6 +59,7 @@ static func reiniciar() -> void:
 	muestras.clear()
 	NivelMedio.cuenta.clear()
 	NivelMedio.muestras.clear()
+	NivelMedio.salientes.clear()
 
 
 static func c(nombre: String) -> Color:
@@ -439,34 +441,148 @@ static func ciudad(ci: Ciudad) -> void:
 
 # ---------------------------------------------------------------- Postes y cables
 
-## Tramos de fachada en el mundo (edificios del kit y torres): [a, b, alto].
+## Tramos de fachada en el mundo (edificios del kit y torres): [a, b, alto, transformación, datos].
 static func _fachadas(ci: Ciudad) -> Array:
 	var out := []
 	for e: Array in NivelMedio.edificios_kit(ci):
 		var t: Transform3D = (e[0] as MeshInstance3D).transform
 		for tr: Array in NivelMedio._tramos_fachada(e[2]):
-			out.append([t * (tr[0] as Vector3), t * (tr[1] as Vector3), float((e[2] as Dictionary)["alto"])])
+			out.append([t * (tr[0] as Vector3), t * (tr[1] as Vector3), float((e[2] as Dictionary)["alto"]), t, e[2]])
 	for to: Dictionary in TORRES:
 		var t := Transform3D(Basis.from_euler(Vector3(0, float(to["rot"]), 0)), to["esquina"])
-		out.append([t * Vector3(0, 0, -LADO), t * Vector3.ZERO, float(to["alto"])])
-		out.append([t * Vector3.ZERO, t * Vector3(LADO, 0, 0), float(to["alto"])])
+		out.append([t * Vector3(0, 0, -LADO), t * Vector3.ZERO, float(to["alto"]), t, {}])
+		out.append([t * Vector3.ZERO, t * Vector3(LADO, 0, 0), float(to["alto"]), t, {}])
 	return out
 
 
-## Alto de la fachada que pasa a menos de 40 cm de "p" (en X/Z), o 0.
-static func _fachada_en(fachadas: Array, p: Vector3) -> float:
+## La fachada que pasa a menos de 40 cm de "p" (en X/Z), o [] si no hay.
+static func _fachada_en(fachadas: Array, p: Vector3) -> Array:
 	var q := Vector2(p.x, p.z)
 	for f: Array in fachadas:
 		var a := Vector2((f[0] as Vector3).x, (f[0] as Vector3).z)
 		var b := Vector2((f[1] as Vector3).x, (f[1] as Vector3).z)
 		if Geometry2D.get_closest_point_to_segment(q, a, b).distance_to(q) < 0.4:
-			return f[2]
-	return 0.0
+			return f
+	return []
+
+
+## Mapa V4.5: dónde se agarra a la fachada "f" un cable que viene desde "desde": sobre la pared, entre
+## dos columnas de ventanas (no en una ventana, un balcón o un toldo) y en la franja lisa entre el
+## dintel del primer piso y el alféizar del segundo. Devuelve [punto, normal hacia afuera], o [] si ahí
+## hay un balcón.
+static func _agarre(f: Array, desde: Vector3) -> Array:
+	var a: Vector3 = f[0]
+	var b: Vector3 = f[1]
+	var largo := a.distance_to(b)
+	var dir := (b - a) / largo
+	var normal := Vector3(-dir.z, 0, dir.x)
+	if normal.dot(desde - a) < 0.0:
+		normal = -normal
+	var u := clampf((desde - a).dot(dir), 1.0, largo - 1.0)
+	var d: Dictionary = f[4]
+	if d.get("tipo", "") == "medio":
+		# Entre columnas de ventanas (las X son del marco de la pieza, que va de -ancho/2 a ancho/2)
+		var xs := NivelMedio._ventanas_kit(d, float(d["ancho"]))
+		var huecos: Array[float] = []
+		for i in xs.size() - 1:
+			huecos.append((xs[i] + xs[i + 1]) / 2.0)
+		if not huecos.is_empty():
+			var t: Transform3D = f[3]
+			var x_local := (t.affine_inverse() * (a + dir * u)).x
+			var mejor := huecos[0]
+			for h in huecos:
+				if absf(h - x_local) < absf(mejor - x_local):
+					mejor = h
+			u = clampf(u + (mejor - x_local) * signf((t.basis * Vector3.RIGHT).dot(dir)), 0.6, largo - 0.6)
+	var y := minf(Y_AGARRE, float(f[2]) - 1.5)
+	var punto := a + dir * u + normal * 0.12 + Vector3(0, y, 0)
+	# Donde la fachada tiene balcones propios (los corridos de los departamentos) el cable terminaría
+	# adentro de un balcón: ahí no va
+	if not d.is_empty():
+		var x_local := ((f[3] as Transform3D).affine_inverse() * punto).x
+		for l: Array in NivelMedio._losas_kit(d):
+			if x_local > float(l[0]) - 0.4 and x_local < float(l[1]) + 0.4 and y > float(l[2]) - 0.4 and y < float(l[2]) + 1.4:
+				return []
+	return [punto, normal]
+
+
+## Soporte del cable en la pared: una planchuela con el aislador blanco (sólo para ver).
+static func _soporte(ci: Ciudad, p: Vector3, normal: Vector3) -> void:
+	var n := NivelMedio.marco(ci, Transform3D(Basis.from_euler(Vector3(0, atan2(normal.x, normal.z), 0)), p))
+	caja(n, Vector3(0, 0, -0.06), Vector3(0.06, 0.06, 0.16), c("metal"))
+	caja(n, Vector3(0, -0.1, -0.11), Vector3(0.14, 0.26, 0.03), c("metal"))
+	Construir.cilindro(n, Vector3(0, 0.05, 0.0), 0.045, 0.1, c("blanco"), false, 6)
+
+
+## Edificios del kit y torres con sus formas de colisión, para ver si un cable se mete adentro:
+## [centro aproximado, radio, transformación inversa, formas de ColisionAuto].
+static func _volumenes(ci: Ciudad) -> Array:
+	var out := []
+	var formas := {}
+	for e: Array in NivelMedio.edificios_kit(ci):
+		var mi: MeshInstance3D = e[0]
+		var nombre: String = e[1]
+		if not formas.has(nombre):
+			formas[nombre] = ColisionAuto.formas(nombre)
+		var aabb := mi.mesh.get_aabb()
+		out.append([mi.transform * aabb.get_center(), aabb.size.length() / 2.0, mi.transform.affine_inverse(), formas[nombre]])
+	for to: Dictionary in TORRES:
+		var t := Transform3D(Basis.from_euler(Vector3(0, float(to["rot"]), 0)), to["esquina"])
+		var caja_t := [Transform3D(Basis.IDENTITY, Vector3(LADO / 2.0, float(to["alto"]) / 2.0, -LADO / 2.0)).affine_inverse(),
+			Vector3(LADO, float(to["alto"]), LADO) / 2.0]
+		out.append([t * Vector3(LADO / 2.0, 0, -LADO / 2.0), LADO + float(to["alto"]), t.affine_inverse(), [caja_t]])
+	return out
+
+
+## Troncos de los árboles de la ciudad (en X/Z): las copas van de 2,5 a 9 m.
+static func _arboles(ci: Ciudad) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for h in ci.get_children():
+		if h is MeshInstance3D and h.has_meta(&"pieza"):
+			var nombre := String(h.get_meta(&"pieza"))
+			if nombre.contains("arbol") or nombre.contains("jacaranda") or nombre.contains("pino"):
+				out.append(Vector2((h as Node3D).position.x, (h as Node3D).position.z))
+	for p: Vector3 in NivelMedio.ARBOLES_ALTOS:
+		out.append(Vector2(p.x, p.z))
+	return out
+
+
+## Si el cable de "a" a "b" (con su comba) pasa por adentro de un edificio o de la copa de un árbol.
+## Los últimos 40 cm (donde se agarra a la pared) no cuentan.
+static func _cable_choca(a: Vector3, b: Vector3, comba: float, volumenes: Array, arboles: PackedVector2Array) -> bool:
+	var largo := a.distance_to(b)
+	var medio := (a + b) / 2.0
+	var cerca := []
+	for v: Array in volumenes:
+		if (v[0] as Vector3).distance_to(medio) < float(v[1]) + largo / 2.0 + 1.0:
+			cerca.append(v)
+	for s: AABB in NivelMedio.salientes:
+		if s.grow(0.3).has_point(b):
+			return true
+	var pasos := ceili(largo / 0.4)
+	for i in range(1, pasos):
+		var t := float(i) / pasos
+		if (1.0 - t) * largo < 0.4:
+			break
+		var q := a.lerp(b, t) - Vector3(0, 4.0 * comba * t * (1.0 - t), 0)
+		for v: Array in cerca:
+			if ColisionAuto._salida((v[2] as Transform3D) * q, v[3]) <= 0.1:
+				return true
+		for s: AABB in NivelMedio.salientes:
+			if s.grow(0.15).has_point(q):
+				return true
+		if q.y > 2.5 and q.y < 9.0:
+			for arbol in arboles:
+				if arbol.distance_to(Vector2(q.x, q.z)) < 1.9:
+					return true
+	return false
 
 
 static func _tendidos(ci: Ciudad) -> void:
 	ci._mapear_ocupado()
 	var fachadas := _fachadas(ci)
+	var volumenes := _volumenes(ci)
+	var arboles := _arboles(ci)
 	for td: Array in TENDIDOS:
 		var a: Vector3 = td[0]
 		var b: Vector3 = td[1]
@@ -492,19 +608,27 @@ static func _tendidos(ci: Ciudad) -> void:
 				if anterior != Vector3.INF and anterior.distance_to(p) < PASO_POSTES + 8.0:
 					for lado in [-0.6, 0.6]:
 						cable(ci, anterior + Vector3(0, Y_CRUCETA + 0.1, 0) + adentro * lado, arriba + adentro * lado, 0.5)
-				# Cruzando la calle hasta la fachada de enfrente (uno sí y uno no) y, en los otros, a la de atrás
-				var enfrente := p - adentro * 13.0
-				for _paso in 12:
-					if _fachada_en(fachadas, enfrente) > 0.0:
-						break
-					enfrente -= adentro * 0.5
-				var atras := p + adentro * (Ciudad.VEREDA - 0.45)
-				var h_enf := _fachada_en(fachadas, enfrente)
-				var h_atr := _fachada_en(fachadas, atras)
-				if k % 2 == 0 and h_enf >= 9.0:
-					cable(ci, arriba - adentro * 0.6, enfrente + Vector3(0, minf(7.6, h_enf - 1.5), 0) + adentro * 0.05, 0.35)
-				elif k % 2 == 1 and h_atr >= 9.0:
-					cable(ci, arriba + adentro * 0.6, atras + Vector3(0, 7.0, 0) - adentro * 0.05, 0.15)
+				# La bajada a una casa: cruzando la calle hasta la fachada de enfrente (uno sí y uno no) y,
+				# en los otros, a la de atrás. Termina en un soporte en la pared; si en el camino se mete en
+				# un edificio o en un árbol, no va.
+				var f: Array = []
+				if k % 2 == 0:
+					var enfrente := p - adentro * 13.0
+					for _paso in 12:
+						f = _fachada_en(fachadas, enfrente)
+						if not f.is_empty():
+							break
+						enfrente -= adentro * 0.5
+				else:
+					f = _fachada_en(fachadas, p + adentro * (Ciudad.VEREDA - 0.45))
+				if not f.is_empty() and float(f[2]) >= 9.0:
+					var desde := arriba + adentro * (-0.6 if k % 2 == 0 else 0.6)
+					var agarre := _agarre(f, desde)
+					var comba := 0.35 if k % 2 == 0 else 0.15
+					if not agarre.is_empty() and not _cable_choca(desde, agarre[0], comba, volumenes, arboles):
+						cable(ci, desde, agarre[0], comba)
+						_soporte(ci, agarre[0], agarre[1])
+						contar("bajada")
 				anterior = p
 				k += 1
 			else:

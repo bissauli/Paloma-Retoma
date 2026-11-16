@@ -45,6 +45,9 @@ const ESCALA_ARBOL := 1.65   ## Edificios.jacaranda: tronco de 5,3 m y la copa d
 static var cuenta := {}
 ## Balcones, toldos y cornisas de la ciudad con colisión: [tipo, punto de arriba en el mundo] (pruebas).
 static var muestras: Array = []
+## Lo que salen de las fachadas los balcones y toldos de la ciudad (cajas en el mundo): los cables de
+## NivelAlto no pasan por ahí.
+static var salientes: Array[AABB] = []
 
 
 # ---------------------------------------------------------------- Ayudas para armar
@@ -93,6 +96,13 @@ static func caja(n: Node3D, centro: Vector3, tam: Vector3, color: Color, col := 
 	return mi
 
 
+## Anota la caja "local" (en el marco "n") en salientes, si "n" es de la ciudad.
+static func _saliente(n: Node3D, local: AABB) -> void:
+	if not n.get_parent() is Ciudad:
+		return
+	salientes.append(n.transform * local)
+
+
 static func _detalle(mi: GeometryInstance3D) -> void:
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.set_meta(&"rango", RANGO_DETALLE * (0.7 if Ajustes.movil else 1.0))
@@ -118,6 +128,7 @@ static func tramo(n: Node3D, a: Vector3, b: Vector3, y: float, alto: float, sali
 static func balcon(n: Node3D, x: float, y: float, rng: RandomNumberGenerator, ancho := BALCON.x,
 		salida := BALCON.z) -> void:
 	var hierro := c("hierro")
+	_saliente(n, AABB(Vector3(x - ancho / 2.0, y - 0.3, 0.0), Vector3(ancho, BARANDA + 0.4, salida)))
 	caja(n, Vector3(x, y, salida / 2.0), Vector3(ancho, BALCON.y, salida), c("piedra"), true)
 	# Ménsulas debajo de la losa
 	for lado in [-1.0, 1.0]:
@@ -172,6 +183,7 @@ static func maceta(n: Node3D, pos: Vector3, rng: RandomNumberGenerator) -> void:
 ## Toldo a rayas sobre una ventana: arranca contra la pared (z = 0 del marco) a la altura "y" y baja
 ## hacia afuera. La lona tiene colisión (se posa encima); el faldón y los brazos no.
 static func toldo(n: Node3D, x: float, y: float, ancho: float, salida: float, color: Color) -> void:
+	_saliente(n, AABB(Vector3(x - ancho / 2.0, y - salida * tan(TOLDO_INCLINACION) - 0.3, 0.0), Vector3(ancho, salida * tan(TOLDO_INCLINACION) + 0.4, salida)))
 	var ang := TOLDO_INCLINACION
 	var largo := salida / cos(ang)
 	var centro := Vector3(x, y - sin(ang) * largo / 2.0, salida / 2.0)
@@ -343,6 +355,7 @@ static func ciudad(ci: Ciudad) -> void:
 				c(COLORES_CARTEL[rng.randi() % COLORES_CARTEL.size()]))
 		k_cartel += 1
 		var algo := false
+		var losas := _losas_kit(d)
 		var pisos := 0
 		while PISO_0 + ALTO_PISO * (pisos + 1) <= alto + 0.1:
 			pisos += 1
@@ -355,6 +368,12 @@ static func ciudad(ci: Ciudad) -> void:
 			var y := PISO_0 + ALTO_PISO * k
 			for x: float in xs:
 				if rng.randf() > 0.85 or absf(x - x_cartel) < 1.45:
+					continue
+				# Mapa V4.5: donde el edificio ya trae su balcón (o el balcón corrido de los departamentos)
+				# no va otro encima, ni un toldo metido debajo de la losa del piso de arriba
+				if r < 0.45 and _hay_losa(losas, x, y + BALCON.y / 2.0, 0.6):
+					continue
+				if r >= 0.45 and r < 0.7 and _hay_losa(losas, x, y + ALTO_PISO, 0.6):
 					continue
 				if r < 0.45:
 					balcon(n, x, y, rng)
@@ -371,6 +390,33 @@ static func ciudad(ci: Ciudad) -> void:
 		if not Ciudad.PLAZA.has_point(Vector2(p.x, p.z)):
 			Edificios.jacaranda(ci, p, ESCALA_ARBOL)
 			contar("arbol_alto")
+
+
+## Losas que ya salen de la fachada de una pieza del kit (balcones propios y balcones corridos):
+## [x desde, x hasta, altura de arriba], en el marco de la pieza.
+static func _losas_kit(d: Dictionary) -> Array:
+	var out := []
+	for cj: Array in d.get("cajas", []):
+		var b := Basis.IDENTITY
+		if cj.size() >= 15:
+			b = Basis(Vector3(cj[6], cj[7], cj[8]), Vector3(cj[9], cj[10], cj[11]), Vector3(cj[12], cj[13], cj[14]))
+		var t := Vector3(cj[3], cj[4], cj[5])
+		var tam := Vector3.ZERO   # Tamaño en los ejes de la pieza
+		for k in 3:
+			tam += Vector3(absf(b[k].x), absf(b[k].y), absf(b[k].z)) * t[k]
+		var c := Vector3(cj[0], cj[1], cj[2])
+		if tam.y <= 0.25 and tam.z >= 0.45 and c.z > 0.1 and tam.x < 20.0:
+			out.append([c.x - tam.x / 2.0, c.x + tam.x / 2.0, c.y + tam.y / 2.0])
+	return out
+
+
+## Si hay una losa del kit cerca de "x" (a menos de un balcón) con la parte de arriba a menos de
+## "tolerancia" de "y".
+static func _hay_losa(losas: Array, x: float, y: float, tolerancia: float) -> bool:
+	for l: Array in losas:
+		if x + BALCON.x / 2.0 > float(l[0]) and x - BALCON.x / 2.0 < float(l[1]) and absf(float(l[2]) - y) < tolerancia:
+			return true
+	return false
 
 
 ## Posiciones en X de las ventanas de una pieza del kit: de los alféizares del primer piso (las cajas de
