@@ -36,6 +36,9 @@ func _physics_process(delta: float) -> void:
 		_iniciado = true
 		zona_centro = global_position
 		_destino = global_position
+		# Corre por un cuadrado más grande que su zona de paseo (cuando persigue se aleja un poco)
+		nav_zona = Navegacion.zona(get_world_3d(), Vector3(zona_centro.x, 0.0, zona_centro.z),
+			Vector2.ONE * (zona_radio * 2.0 + radio_vision * 2.0))
 	var j := GameState.jugador
 	_t -= delta
 	_timer_grito -= delta
@@ -53,7 +56,7 @@ func _physics_process(delta: float) -> void:
 				_t = descanso
 			else:
 				var hacia := plano(j.global_position - global_position)
-				_ir_hacia(j.global_position, velocidad_carrera, 5.0, delta)
+				_ir_hacia(_proximo_punto(j.global_position, delta, 0.4), velocidad_carrera, 5.0, delta)
 				if _timer_grito <= 0.0:
 					_gritar()
 				# ¿La alcanzó?
@@ -82,8 +85,8 @@ func _pasear(delta: float) -> void:
 	if _t <= 0.0:
 		_t = randf_range(2.0, 5.0)
 		var a := randf() * TAU
-		_destino = zona_centro + Vector3(cos(a), 0, sin(a)) * sqrt(randf()) * zona_radio
-	var hacia := plano(_destino - global_position)
+		_destino = Navegacion.mas_cercano(nav_zona, zona_centro + Vector3(cos(a), 0, sin(a)) * sqrt(randf()) * zona_radio)
+	var hacia := plano(_proximo_punto(_destino, delta) - global_position)
 	_acelerar(Vector3.ZERO if hacia.length() < 0.4 else hacia.normalized() * velocidad_paseo, 3.0, delta)
 
 

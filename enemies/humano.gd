@@ -117,6 +117,10 @@ func _pasear(delta: float) -> void:
 	if _miedo > 0.0:
 		_miedo -= delta
 		return  # Mientras huye mantiene la velocidad
+	if nav_zona.is_empty():
+		# Su zona de navegación: el rectángulo (o el cuadrado del círculo) por donde pasea, con un margen
+		var tam := zona_tam if zona_tam != Vector2.ZERO else Vector2.ONE * zona_radio * 2.0
+		nav_zona = Navegacion.zona(get_world_3d(), Vector3(zona_centro.x, _altura, zona_centro.z), tam + Vector2(2, 2))
 	_timer_paseo -= delta
 	if _timer_paseo <= 0.0:
 		_timer_paseo = randf_range(2.5, 7.0)
@@ -124,9 +128,10 @@ func _pasear(delta: float) -> void:
 		_destino = zona_centro + Vector3(cos(a), 0, sin(a)) * sqrt(randf()) * zona_radio
 		if zona_tam != Vector2.ZERO:
 			_destino = zona_centro + Vector3(randf_range(-0.5, 0.5) * zona_tam.x, 0, randf_range(-0.5, 0.5) * zona_tam.y)
+		_destino = Navegacion.mas_cercano(nav_zona, _destino)   # nunca adentro de la fuente o de un banco
 		if randf() < 0.4:
 			_destino = global_position
-	var hacia := plano(_destino - global_position)
+	var hacia := plano(_proximo_punto(_destino, delta) - global_position)
 	_acelerar(Vector3.ZERO if hacia.length() < 0.3 else hacia.normalized() * velocidad, 3.0, delta)
 
 

@@ -83,7 +83,8 @@ func _poblar() -> void:
 		var s := ESC_HUMANO.instantiate() as Humano
 		s.tipo = "senora"
 		s.preparar_aspecto()
-		s.generador = _generador(String(p.get_meta("migas", "")))
+		var migas := String(p.get_meta("migas", ""))
+		s.generador = _generador(migas) if migas != "" else null   # una señora sin migas: la dueña de un perro
 		s.intervalo_migas = randf_range(2.5, 4.0)
 		s.rotation.y = float(p.get_meta("rumbo", 0.0))
 		s.position = p.global_position   # antes de add_child: en _ready toma su altura
@@ -110,6 +111,17 @@ func _poblar() -> void:
 			h.intervalo_migas = randf_range(8.0, 14.0)
 			h.position = p.global_position + Vector3(randf_range(-0.5, 0.5) * tam.x, 0, randf_range(-0.5, 0.5) * tam.y)
 			add_child(h)
+	# Chicos en la plaza de juegos del parque: se suben a las hamacas, al subibaja y a la calesita
+	for m in get_tree().get_nodes_in_group("zona_chicos"):
+		var p := m as Node3D
+		var tam: Vector2 = p.get_meta("tam", Vector2(20, 12))
+		for i in int(p.get_meta("cantidad", 4)):
+			var ch := Chico.crear()
+			ch.zona_centro = p.global_position
+			ch.zona_tam = tam
+			ch.arenero = p.get_meta("arenero", Vector3.INF)
+			ch.position = p.global_position + Vector3(randf_range(-0.4, 0.4) * tam.x, 0, randf_range(0.1, 0.45) * tam.y)
+			add_child(ch)
 	# El nene corretea por el centro de la plaza
 	var nene := ESC_NENE.instantiate() as Nene
 	add_child(nene)
