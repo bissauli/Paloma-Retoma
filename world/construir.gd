@@ -6,7 +6,7 @@ extends RefCounted
 const CAPA_MUNDO := 1
 
 static var _materiales := {}
-static var _texturas := {}
+	static var _texturas := {}
 
 
 ## Material plano (cacheado por color).

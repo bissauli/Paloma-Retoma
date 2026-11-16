@@ -20,8 +20,13 @@ func _ready() -> void:
 	_check("hay un casillero por cada baile de los créditos", Emotes._bailes.size() == Coreografia.ORDEN.size() + 1)
 	_check("todos los bailes tienen nombre traducible", Emotes._bailes.all(func(b: StringName) -> bool:
 		return Coreografia.NOMBRES.has(b)))
+	# Los casilleros se reparten en círculo desde arriba, hacia la derecha: la cuenta depende de cuántos bailes hay
+	var n := float(Emotes._bailes.size())
+	var a_la_derecha := int((90.0 + 180.0 / n) / (360.0 / n))
+	var abajo := int((180.0 + 180.0 / n) / (360.0 / n))
 	_check("el casillero 0 está arriba y el de la derecha le sigue", Emotes._casillero(Vector2(0, -200)) == 0
-		and Emotes._casillero(Vector2(200, 0)) == 3 and Emotes._casillero(Vector2(0, 200)) == 5 and Emotes._casillero(Vector2(5, 5)) == -1)
+		and Emotes._casillero(Vector2(200, 0)) == a_la_derecha and Emotes._casillero(Vector2(0, 200)) == abajo
+		and Emotes._casillero(Vector2(5, 5)) == -1)
 
 	_tecla("emotes", true)
 	await _frames(3)

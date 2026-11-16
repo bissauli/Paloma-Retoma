@@ -69,4 +69,5 @@ func _physics_process(_delta: float) -> void:
 		var valor: int = Comida.VALORES.get(tipo, 2)
 		GameState.set_carga("")
 		GameState.sumar_comida(valor)
-		AudioManager.reproducir("victoria", -8.0)
+		Logros.sumar("entregas")
+		AudioManager.ui("currency", -4.0)

@@ -42,6 +42,9 @@ static var _mallas := {}
 const FORMAS_MIGA := 6
 
 var activa := true
+var _volando := false          ## La despidió un aletazo y todavía está en el aire
+var _origen_guardado := false  ## Dónde estaba antes del primer aletazo (para volver ahí al reaparecer)
+var _origen := Vector3.ZERO
 var _visual: Node3D
 var _destello: Label3D
 var _destello_alfa := 0.0
@@ -86,15 +89,52 @@ func picoteada(_jugador: Node3D) -> void:
 		"choripan":
 			if GameState.bandada >= Config.UMBRAL_CHORIPAN:
 				GameState.sumar_comida(VALORES["choripan"])
-				AudioManager.reproducir("victoria", -6.0)
+				Logros.sumar("choripanes")
+				AudioManager.ui("currency", -4.0)
 				AudioManager.reproducir("arrullo")
 				_consumir()
+			else:
+				AudioManager.ui("lock", -6.0)   # Todavía no alcanza la bandada
 		_:
 			if GameState.carga != "":
 				return
 			GameState.set_carga(tipo)
 			AudioManager.reproducir("recoger")
 			_consumir()
+
+
+## Un aletazo de la paloma: sale despedida en la dirección "dir" (en un arco) y cae unos metros más
+## allá, en el piso o donde haya algo firme (una mesa de al lado, la vereda). Las migas apenas se
+## corren. El choripán no se mueve (está en el carrito). Si es de las que reaparecen, cuando se la
+## coma vuelve a su lugar de origen. Devuelve false si no se pudo golpear.
+func golpear(dir: Vector3) -> bool:
+	if not activa or _volando or tipo == "choripan":
+		return false
+	if reaparece and not _origen_guardado:
+		_origen_guardado = true
+		_origen = position
+	_volando = true
+	var d := dir.rotated(Vector3.UP, randf_range(-0.35, 0.35))
+	var dist := randf_range(0.4, 0.8) if tipo == "miga" else randf_range(1.5, 2.2)
+	var inicio := global_position
+	var destino := inicio + d * dist
+	destino.y = _altura_del_suelo(destino, inicio.y)
+	var salto := 0.12 if tipo == "miga" else 0.75
+	var tw := create_tween()
+	tw.tween_method(func(u: float) -> void:
+		var p := inicio.lerp(destino, u)
+		p.y = lerpf(inicio.y, destino.y, u) + salto * 4.0 * u * (1.0 - u)
+		global_position = p, 0.0, 1.0, 0.42 if tipo != "miga" else 0.25)
+	tw.parallel().tween_property(_visual, "rotation:y", _visual.rotation.y + TAU * 1.5, 0.42)
+	tw.tween_callback(func() -> void: _volando = false)
+	return true
+
+
+## Altura del suelo (lo más alto que haya, pero por debajo de "desde_y" + 0.7) en un punto.
+func _altura_del_suelo(p: Vector3, desde_y: float) -> float:
+	var q := PhysicsRayQueryParameters3D.create(Vector3(p.x, desde_y + 0.7, p.z), Vector3(p.x, desde_y - 5.0, p.z), 1)
+	var r := get_world_3d().direct_space_state.intersect_ray(q)
+	return float((r["position"] as Vector3).y) + 0.01 if not r.is_empty() else 0.02
 
 
 func _consumir() -> void:
@@ -109,6 +149,8 @@ func _consumir() -> void:
 
 
 func _reaparecer() -> void:
+	if _origen_guardado:
+		position = _origen   # Si la habían tirado de la mesa, vuelve a la mesa
 	activa = true
 	visible = true
 	add_to_group("comida")

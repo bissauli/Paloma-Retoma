@@ -19,6 +19,7 @@ signal destinos_cambio(destinos: Array)       ## A dónde apunta la brújula (ve
 
 # --- Señales de eventos del mundo ---
 signal arrullo(posicion: Vector3, radio: float)        ## El jugador arrulló
+signal cortejo(posicion: Vector3, radio: float)        ## El gran final del baile de cortejo (enamora palomas sueltas)
 signal perder_palomas(cantidad: int, desde: Vector3)   ## Pedido a la bandada de soltar palomas
 signal jugador_atrapado(motivo: String)                ## Hay que volver al nido
 signal jugador_volvio_al_nido
@@ -38,6 +39,7 @@ var partida_terminada := false
 var halcon_activo := false
 var tutorial_hecho := false
 var migas_comidas := 0
+var capturas := 0               ## Veces que te atraparon en esta partida (para el trofeo Intocable)
 var posicion_nido := Vector3(0, 0.5, 0)
 ## La paloma de la jugadora (la registra ella misma al entrar al árbol). Evita buscarla por
 ## grupo en cada cuadro desde enemigos, comida, tránsito, etc.
@@ -90,6 +92,7 @@ func reiniciar(datos: Dictionary = {}) -> void:
 	halcon_activo = false
 	tutorial_hecho = bool(datos.get("tutorial_hecho", false))
 	migas_comidas = int(datos.get("migas_comidas", 0))
+	capturas = int(datos.get("capturas", 0))
 	Misiones.desde_dict(datos.get("misiones", {}))   # {} = partida nueva: sin misiones
 	_umbrales.clear()
 	for u in datos.get("umbrales", []):
@@ -139,6 +142,7 @@ func guardar_partida() -> void:
 	cfg.set_value("partida", "progreso_dia", progreso_dia)
 	cfg.set_value("partida", "tutorial_hecho", tutorial_hecho)
 	cfg.set_value("partida", "migas_comidas", migas_comidas)
+	cfg.set_value("partida", "capturas", capturas)
 	cfg.set_value("partida", "umbrales", _umbrales.keys())
 	cfg.set_value("partida", "misiones", Misiones.a_dict())
 	cfg.save(archivo_partida)
@@ -221,6 +225,7 @@ func set_stamina(v: float) -> void:
 
 func comio_miga() -> void:
 	migas_comidas += 1
+	Logros.sumar("migas")
 	Misiones.notificar("miga")
 	if migas_comidas >= 3 and not tutorial_hecho:
 		tutorial_hecho = true
@@ -302,6 +307,8 @@ func atrapar(motivo: String, perdidas: int, desde: Vector3, volver := true) -> b
 	if invulnerable > 0.0 or partida_terminada:
 		return false
 	invulnerable = 3.0
+	capturas += 1
+	Logros.sumar("atrapadas")
 	pedir_perdida(perdidas, desde)
 	if volver:
 		jugador_atrapado.emit(motivo)

@@ -47,6 +47,7 @@ func _ready() -> void:
 			_palomas.erase(n as PalomaNPC)
 			seguidoras.erase(n as PalomaNPC))
 	GameState.arrullo.connect(_al_arrullar)
+	GameState.cortejo.connect(_al_cortejar)
 	GameState.perder_palomas.connect(_al_perder)
 	GameState.victoria.connect(_al_ganar)
 	_poblar.call_deferred()
@@ -112,6 +113,32 @@ func _al_arrullar(pos: Vector3, radio: float) -> void:
 		reclutadas += 1
 	if reclutadas > 0:
 		AudioManager.reproducir("arrullo", -4.0)
+		AudioManager.ui("purchase", -10.0)   # Gastó comida
+
+
+## El baile de cortejo de la jugadora enamora a las palomas sueltas de alrededor: se suman a la
+## bandada GRATIS (sin gastar comida), hasta CORTEJO_MAX por vez y las más cercanas primero.
+## Cada una muestra su corazón (PalomaNPC.reclutar). Devuelve cuántas se sumaron.
+func _al_cortejar(pos: Vector3, radio: float) -> int:
+	var candidatas: Array[PalomaNPC] = []
+	for n in get_children():
+		var p := n as PalomaNPC
+		if p and p.modo == PalomaNPC.Modo.SUELTA and p.global_position.distance_to(pos) <= radio:
+			candidatas.append(p)
+	candidatas.sort_custom(func(a: PalomaNPC, b: PalomaNPC) -> bool:
+		return a.global_position.distance_squared_to(pos) < b.global_position.distance_squared_to(pos))
+	var enamoradas := 0
+	for p in candidatas:
+		if enamoradas >= Config.CORTEJO_MAX or not GameState.hay_lugar_en_bandada():
+			break
+		p.reclutar()
+		seguidoras.append(p)
+		enamoradas += 1
+	if enamoradas > 0:
+		AudioManager.reproducir("arrullo", -4.0)
+		Logros.sumar("cortejos")
+		Logros.sumar("cortejadas", enamoradas)
+	return enamoradas
 
 
 ## Al continuar una partida guardada: suma "cantidad" palomas a la bandada sin gastar comida.

@@ -121,6 +121,13 @@ func _en_la_plaza() -> void:
 	await _frames(3)
 	_check("E inicia la conversación y la paloma queda sin control", Dialogos.activo and not j.controlable)
 	_check("la caja de diálogo se ve", Dialogos._ui._caja.visible and Dialogos._ui._nombre.text == "DOÑA ROSA")
+	_check("Doña Rosa atiende a la paloma", rosa._atendiendo == j)
+	for i in 90:   # Un segundo y medio de física (los cuadros sin ventana van más rápido que la física)
+		await get_tree().physics_frame
+	var hacia: Vector3 = (j.global_position - rosa.global_position) * Vector3(1, 0, 1)
+	var rumbo_ideal := atan2(-hacia.x, -hacia.z)
+	_check("Doña Rosa se da vuelta y mira a la paloma (rumbo %.2f, ideal %.2f, modelo %.2f)" % [rosa._rumbo, rumbo_ideal, rosa.modelo.rotation.y],
+		absf(angle_difference(rosa._rumbo, rumbo_ideal)) < 0.2)
 	# El saludo tiene dos opciones (la de la misión sí aparece porque el tutorial está hecho)
 	_check("el saludo ofrece la misión", Dialogos._ui._opciones.get_child_count() == 2)
 	Dialogos.elegir(0)
@@ -128,6 +135,7 @@ func _en_la_plaza() -> void:
 	_check("aceptar la misión la activa", Misiones.estado("migas_rosa") == "activa")
 	Dialogos.avanzar()
 	_check("al terminar vuelve el control", not Dialogos.activo and j.controlable)
+	_check("al terminar Doña Rosa deja de atenderla", rosa._atendiendo == null)
 	_check("el marcador de Rosa pasó a '...'", Misiones.marcador("dona_rosa") == "...")
 	await _frames(40)
 	_check("hablar de nuevo muestra el recordatorio", CatalogoDialogos.elegir("dona_rosa") == "rosa_recordatorio")

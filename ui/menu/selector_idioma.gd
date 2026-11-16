@@ -41,7 +41,7 @@ func set_activo(si: bool) -> void:
 func _elegir(codigo: String) -> void:
 	if codigo == Ajustes.idioma:
 		return
-	AudioManager.reproducir("picoteo", -12.0)
+	AudioManager.ui("button", -8.0)
 	Ajustes.set_idioma(codigo)
 
 

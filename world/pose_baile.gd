@@ -20,6 +20,10 @@ var ala_izq := Basis.IDENTITY
 var ala_der := Basis.IDENTITY
 var pata_izq := Basis.IDENTITY
 var pata_der := Basis.IDENTITY
+## Escala de la cabeza (el cuello inflado del cortejo) y de la cola (el abanico): en el espacio del hueso.
+## Son huesos sin hijos, así que la escala no arrastra a nadie.
+var escala_cabeza := Vector3.ONE
+var escala_cola := Vector3.ONE
 
 
 ## Mezcla esta pose con otra: w = 0 es esta y w = 1 es la otra (para pasar de un tramo del baile a otro).
@@ -34,6 +38,8 @@ func mezclar(otra: PoseBaile, w: float) -> PoseBaile:
 	p.ala_der = _mezclar_giro(ala_der, otra.ala_der, w)
 	p.pata_izq = _mezclar_giro(pata_izq, otra.pata_izq, w)
 	p.pata_der = _mezclar_giro(pata_der, otra.pata_der, w)
+	p.escala_cabeza = escala_cabeza.lerp(otra.escala_cabeza, w)
+	p.escala_cola = escala_cola.lerp(otra.escala_cola, w)
 	return p
 
 
@@ -67,3 +73,8 @@ func aplicar_a(esqueleto: Skeleton3D, reposo: Array[Basis]) -> void:
 		# Giro en el espacio del modelo -> giro local del hueso (los padres tienen índice menor)
 		var local := global_padre.inverse() * delta * reposo[i]
 		esqueleto.set_bone_pose_rotation(i, local.get_rotation_quaternion())
+		var nombre := esqueleto.get_bone_name(i)
+		if nombre == &"head":
+			esqueleto.set_bone_pose_scale(i, escala_cabeza)
+		elif nombre == &"tail":
+			esqueleto.set_bone_pose_scale(i, escala_cola)

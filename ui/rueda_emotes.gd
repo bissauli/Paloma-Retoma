@@ -89,7 +89,7 @@ func abrir() -> void:
 	_tween = create_tween().set_parallel().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(_raiz, "modulate:a", 1.0, 0.15)
 	_tween.tween_property(_raiz, "scale", Vector2.ONE, 0.22)
-	AudioManager.reproducir("picoteo", -16.0)
+	AudioManager.ui("menu_open", -8.0)
 	_dibujo.queue_redraw()
 	if _miniaturas.is_empty() and not _generando:
 		_generar_miniaturas()
@@ -105,12 +105,13 @@ func cerrar(elegido := -1) -> void:
 		GameState.jugador.controlable = true
 	Ajustes.capturar_mouse(true)
 	if elegido >= 0 and elegido < _bailes.size() and GameState.jugador != null:
-		AudioManager.reproducir("picoteo", -12.0)
+		AudioManager.ui("confirm", -8.0)
 		# El click que eligió no debe contar como picotazo (que corta el baile)
 		await get_tree().physics_frame
 		await get_tree().physics_frame
 		if GameState.jugador != null and not abierta:
 			GameState.jugador.bailar(_bailes[elegido])
+			Logros.registrar_baile(_bailes[elegido])
 
 
 func _process(delta: float) -> void:
@@ -134,7 +135,7 @@ func _process(delta: float) -> void:
 		_actualizar_textos()
 		_dibujo.queue_redraw()
 		if nuevo >= 0:
-			AudioManager.reproducir("picoteo", -24.0)
+			AudioManager.ui("highlight", -12.0)
 
 
 func _input(event: InputEvent) -> void:

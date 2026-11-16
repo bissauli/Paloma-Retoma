@@ -6,7 +6,7 @@ extends Node
 ## Se guarda con la partida (GameState.guardar_partida) y la brújula marca a dónde ir.
 
 signal mision_cambio(id: String, estado: String)
-signal progreso_cambio(id: String)
+signal progreso_cambio(id: String, indice: int)   ## indice: el objetivo que avanzó
 
 const NUEVA := "nueva"
 const ACTIVA := "activa"
@@ -15,10 +15,16 @@ const COMPLETADA := "completada"
 
 var _misiones := {}      ## id -> {estado: String, progreso: Array[int]}   (sólo las que ya se aceptaron)
 var _banderas := {}      ## nombre -> true
+var _aviso: AvisoMision
+var _aceptada_ms := {}   ## id -> cuándo se aceptó (el primer "avance" de una bandada ya cumplida no avisa)
 
 
 func _ready() -> void:
 	GameState.bandada_cambio.connect(func(_n: int) -> void: _revisar_estado_bandada())
+	_aviso = AvisoMision.new()
+	add_child(_aviso)
+	mision_cambio.connect(_avisar_estado)
+	progreso_cambio.connect(_avisar_progreso)
 
 
 # ---------------------------------------------------------------- Consultas
@@ -52,6 +58,15 @@ func en_curso() -> Array:
 	var ids: Array = []
 	for id: String in _misiones:
 		if estado(id) == ACTIVA or estado(id) == LISTA:
+			ids.append(id)
+	return ids
+
+
+## Ids de las misiones ya completadas.
+func completadas() -> Array:
+	var ids: Array = []
+	for id: String in _misiones:
+		if estado(id) == COMPLETADA:
 			ids.append(id)
 	return ids
 
@@ -106,6 +121,7 @@ func aceptar(id: String) -> bool:
 	ceros.resize(cantidad)
 	ceros.fill(0)
 	_misiones[id] = {"estado": ACTIVA, "progreso": ceros}
+	_aceptada_ms[id] = Time.get_ticks_msec()
 	mision_cambio.emit(id, ACTIVA)
 	_revisar_estado_bandada()
 	_revisar(id)
@@ -126,8 +142,8 @@ func notificar(clave: String, cantidad := 1) -> void:
 			if datos[i].get("tipo", "") == "evento" and datos[i].get("clave", "") == clave:
 				progreso[i] = int(progreso[i]) + cantidad
 				cambio = true
+				progreso_cambio.emit(id, i)
 		if cambio:
-			progreso_cambio.emit(id)
 			_revisar(id)
 
 
@@ -150,8 +166,8 @@ func _revisar_estado_bandada() -> void:
 			if datos[i].get("tipo", "") == "bandada" and int(progreso[i]) != GameState.bandada:
 				progreso[i] = GameState.bandada
 				cambio = true
+				progreso_cambio.emit(id, i)
 		if cambio:
-			progreso_cambio.emit(id)
 			_revisar(id)
 
 
@@ -177,6 +193,37 @@ func _completar(id: String) -> void:
 		GameState.sumar_comida(int(premio["comida"]))
 	mision_cambio.emit(id, COMPLETADA)
 	GameState.actualizar_objetivo()
+
+
+# ---------------------------------------------------------------- Avisos en pantalla
+
+func _avisar_estado(id: String, nuevo: String) -> void:
+	var m := CatalogoMisiones.mision(id)
+	var titulo := tr(String(m.get("titulo", id)))
+	match nuevo:
+		ACTIVA:
+			_aviso.mostrar(tr("MISIÓN ACEPTADA"), titulo, id)
+			AudioManager.ui("confirm", -8.0)
+		LISTA:
+			var a_quien := tr(CatalogoDialogos.nombre(String(m.get("entrega", m.get("dador", "")))))
+			_aviso.mostrar(tr("MISIÓN LISTA"), tr("Volvé con %s") % a_quien, id, AvisoMision.ORO, 4.0)
+			AudioManager.ui("unlock", -6.0)
+		COMPLETADA:
+			var premio: Dictionary = m.get("recompensa", {})
+			var detalle := titulo
+			if premio.has("comida"):
+				detalle += "  ·  " + tr("+%d de comida") % int(premio["comida"])
+			_aviso.mostrar(tr("MISIÓN COMPLETADA"), detalle, id, AvisoMision.ORO, 4.0)
+			AudioManager.ui("success", -6.0)
+
+
+func _avisar_progreso(id: String, indice: int) -> void:
+	if Time.get_ticks_msec() - int(_aceptada_ms.get(id, -10000)) < 400:
+		return      # Recién aceptada: ya avisó "MISIÓN ACEPTADA"
+	var o: Dictionary = objetivos(id)[indice]
+	_aviso.mostrar(tr(String(CatalogoMisiones.mision(id).get("titulo", id))).to_upper(),
+		"%s   %d / %d" % [tr(String(o["texto"])), o["actual"], o["meta"]], id, AvisoMision.CIAN, 2.4)
+	AudioManager.ui("highlight", -14.0)
 
 
 # ---------------------------------------------------------------- Guardado

@@ -43,6 +43,7 @@ func activar() -> void:
 	_angulo = randf() * TAU
 	global_position = Vector3(cos(_angulo) * radio_vuelta, altura_vuelo + 10.0, sin(_angulo) * radio_vuelta)
 	AudioManager.reproducir("chillido_halcon", -2.0)
+	AudioManager.ui("warning", -6.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -59,6 +60,7 @@ func _physics_process(delta: float) -> void:
 				estado = Estado.ALERTA
 				_t = tiempo_alerta
 				AudioManager.reproducir("chillido_halcon", 2.0)
+				AudioManager.ui("warning", -4.0)
 		Estado.ALERTA:
 			_circular(delta)
 			_t -= delta

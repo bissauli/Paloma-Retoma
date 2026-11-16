@@ -58,6 +58,14 @@ func generar() -> void:
 					chico = false
 			if chico:
 				zona = 5
+			# Los ojos (cajitas a los costados de la cabeza) quedan sin zona: conservan su color original
+			var ojo := true
+			for k in 3:
+				var p := pos[idx[t + k]]
+				if absf(p.x) < 0.0999 or p.z < 0.074 or p.z > 0.151 or p.y < 0.374 or p.y > 0.451:
+					ojo = false
+			if ojo:
+				zona = 0
 		_rasterizar(mapa, cubierto, textura, uv[idx[t]] * TAM, uv[idx[t + 1]] * TAM, uv[idx[t + 2]] * TAM, zona)
 
 	# Píxeles de textura con color que ningún triángulo tocó (bordes): toman la zona del vecino

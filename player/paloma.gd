@@ -49,6 +49,8 @@ var _coyote := 0.0
 var _timer_aleteo_sfx := 0.0
 var _enfriamiento_arrullo := 0.0
 var _enfriamiento_picoteo := 0.0
+var _enfriamiento_aletazo := 0.0
+var _ala_izquierda := false      ## Con qué ala va el próximo aletazo (van alternando)
 var _rumbo := 0.0           ## Hacia dónde mira la paloma (yaw)
 var _alabeo := 0.0
 var _velocidad_previa := Vector3.ZERO
@@ -76,6 +78,7 @@ func _ready() -> void:
 	floor_max_angle = deg_to_rad(50.0)
 	GameState.carga_cambio.connect(modelo.mostrar_carga)
 	GameState.jugador_atrapado.connect(_al_ser_atrapada)
+	modelo.cortejo_logrado.connect(_al_cortejar)
 	# Líneas de viento al volar rápido (van pegadas a la cámara)
 	var viento := VientoVuelo.new()
 	viento.name = "Viento"
@@ -121,12 +124,43 @@ func bailar(baile: StringName) -> void:
 	modelo.bailar(baile)
 
 
+## Se mete a bañarse (lo llama una fuente o un charco): hace el baño en el lugar, sin darse vuelta
+## hacia la cámara, hasta que se mueva, vuele, picotee o arrulle (igual que cualquier baile).
+func banarse() -> void:
+	if estado != Estado.SUELO:
+		return
+	velocity.x = 0.0
+	velocity.z = 0.0
+	modelo.bailar(Coreografia.BANO)
+
+
+## El gran final del cortejo: lo ven las palomas sueltas de alrededor (las enamora la Bandada) y
+## unos corazones suben de la jugadora.
+func _al_cortejar() -> void:
+	GameState.cortejo.emit(global_position, Config.RADIO_CORTEJO)
+	for i in 3:
+		var l := Label3D.new()
+		l.text = "♥"
+		l.font_size = 96
+		l.modulate = Color(1, 0.4, 0.55)
+		l.outline_size = 12
+		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		l.pixel_size = 0.0028
+		l.top_level = true
+		add_child(l)
+		l.global_position = global_position + Vector3((i - 1) * 0.35, 0.7, 0.0)
+		var tw := l.create_tween().set_parallel(true)
+		tw.tween_property(l, "global_position:y", global_position.y + 2.0 + i * 0.25, 1.2).set_delay(i * 0.12)
+		tw.tween_property(l, "modulate:a", 0.0, 0.9).set_delay(0.4 + i * 0.12)
+		tw.chain().tween_callback(l.queue_free)
+
+
 func _revisar_baile() -> void:
 	if not modelo.bailando():
 		return
 	var corta := estado == Estado.AIRE or not GameState.en_partida
 	if controlable and not corta:
-		corta = Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras").length() > 0.1 			or Input.is_action_just_pressed("volar") or Input.is_action_just_pressed("picotear") 			or Input.is_action_just_pressed("arrullar")
+		corta = Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras").length() > 0.1 			or Input.is_action_just_pressed("volar") or Input.is_action_just_pressed("picotear") 			or Input.is_action_just_pressed("arrullar") or Input.is_action_just_pressed("aletazo")
 	if corta:
 		modelo.dejar_de_bailar()
 
@@ -300,6 +334,7 @@ func _animar(delta: float) -> void:
 func _acciones(delta: float) -> void:
 	_enfriamiento_arrullo = maxf(_enfriamiento_arrullo - delta, 0.0)
 	_enfriamiento_picoteo = maxf(_enfriamiento_picoteo - delta, 0.0)
+	_enfriamiento_aletazo = maxf(_enfriamiento_aletazo - delta, 0.0)
 	if not controlable or (not Ajustes.movil and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED):
 		return
 	if Input.is_action_just_pressed("picotear") and _enfriamiento_picoteo <= 0.0:
@@ -310,6 +345,71 @@ func _acciones(delta: float) -> void:
 	if Input.is_action_just_pressed("arrullar") and _enfriamiento_arrullo <= 0.0:
 		_enfriamiento_arrullo = enfriamiento_arrullo
 		arrullar()
+	if Input.is_action_just_pressed("aletazo") and _enfriamiento_aletazo <= 0.0 and estado == Estado.SUELO:
+		_enfriamiento_aletazo = 0.5
+		aletazo()
+
+
+# ---------------------------------------------------------------- Aletazo
+
+## Alcance del aletazo: metros hacia adelante desde el pico, y qué tan de costado puede estar algo
+## para que lo alcance el ala (se mide como cuánto se parece su dirección a la que mira la paloma).
+const ALCANCE_ALETAZO := 1.5
+const ANGULO_ALETAZO := 0.2
+
+## Un golpe con el ala (como el zarpazo del gato de Little Kitty, Big City): un ala se arma, barre al
+## frente y tira lo que encuentra: la comida (sale despedida de las mesas), tazas y vasos de los cafés
+## (con física), los sombreros de la gente (que se queda sorprendida) y asusta a las palomas sueltas.
+func aletazo() -> void:
+	_ala_izquierda = not _ala_izquierda
+	modelo.aletazo(_ala_izquierda)
+	AudioManager.reproducir("aletazo", -3.0)
+	# El golpe llega cuando el ala ya pasó por delante del pico (un ratito después de arrancar)
+	await get_tree().create_timer(0.11).timeout
+	if is_inside_tree():
+		_golpear_adelante()
+
+
+## ¿Algo en "pos" queda al alcance del ala, adelante? ("dir" es hacia donde mira la paloma.)
+func _al_alcance(pos: Vector3, dir: Vector3, alcance := ALCANCE_ALETAZO) -> bool:
+	var d := pos - global_position
+	if absf(d.y) > 1.3:
+		return false
+	d.y = 0.0
+	var largo := d.length()
+	return largo < 0.45 or (largo <= alcance and d.normalized().dot(dir) > ANGULO_ALETAZO)
+
+
+## Golpea todo lo que haya al alcance. Devuelve cuántas cosas tiró.
+func _golpear_adelante() -> int:
+	var dir := Vector3(-sin(_rumbo), 0.0, -cos(_rumbo))
+	var tiradas := 0
+	for n in get_tree().get_nodes_in_group("comida"):
+		var c := n as Comida
+		if c and _al_alcance(c.global_position, dir) and c.golpear(dir):
+			tiradas += 1
+	for n in get_tree().get_nodes_in_group("golpeables"):
+		var g := n as Golpeable
+		if g and _al_alcance(g.global_position, dir) and g.golpear(dir):
+			tiradas += 1
+	var sombreros := 0
+	for n in get_tree().get_nodes_in_group("humanos"):
+		var h := n as Humano
+		if h and _al_alcance(h.global_position, dir, ALCANCE_ALETAZO + 0.2) and h.sombrerazo(dir):
+			tiradas += 1
+			sombreros += 1
+	for n in get_tree().get_nodes_in_group("palomas_npc"):
+		var p := n as PalomaNPC
+		if p and p.modo == PalomaNPC.Modo.SUELTA and _al_alcance(p.global_position, dir):
+			p.espantar(global_position)
+			tiradas += 1
+	if tiradas > 0:
+		camara.sacudir(0.15)
+		AudioManager.reproducir("picoteo", -1.0)
+		Logros.sumar("golpes", tiradas)
+	if sombreros > 0:
+		Logros.sumar("sombreros", sombreros)
+	return tiradas
 
 
 ## Busca comida (grupo "comida") delante del pico y le avisa que fue picoteada.
@@ -365,6 +465,7 @@ func _onda_arrullo() -> void:
 # ---------------------------------------------------------------- Penalizaciones
 
 func _al_ser_atrapada(_motivo: String) -> void:
+	AudioManager.ui("failure", -4.0)
 	volver_al_nido()
 
 

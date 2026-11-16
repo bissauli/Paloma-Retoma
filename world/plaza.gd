@@ -148,6 +148,7 @@ func _crear_zonas() -> void:
 	add_child(Transito.new())
 
 	_crear_jardines()
+	_crear_fuentes()
 	_crear_nido()
 	_crear_balcon_meta()
 	_crear_comida(mesas)
@@ -192,6 +193,19 @@ func _crear_jardines() -> void:
 		Edificios.farol(j, p)
 
 
+## Dos fuentes sobre el eje de la plaza (a cada lado de la Pirámide, entre los canteros) y charcos en
+## las baldosas: lugares donde la paloma se puede dar un baño de agua (ver Fuente).
+func _crear_fuentes() -> void:
+	var f := Node3D.new()
+	f.name = "Fuentes"
+	add_child(f)
+	Fuente.crear(f, Vector3(-19, 0, 0), 2.1, 0.3, true)
+	Fuente.crear(f, Vector3(19, 0, 0), 2.1, 0.3, true)
+	for c: Array in [[Vector3(11.5, 0, 19.5), 1.3], [Vector3(-10, 0, 19), 1.5],
+			[Vector3(27, 0, 2.5), 1.2], [Vector3(-27.5, 0, -2.0), 1.3]]:
+		Fuente.crear(f, c[0], c[1])
+
+
 func _crear_nido() -> void:
 	var nido := Node3D.new()
 	nido.name = "Nido"
@@ -228,6 +242,10 @@ func _crear_comida(mesas: Array[Vector3]) -> void:
 		com.tiempo_reaparicion = 40.0
 		c.add_child(com)
 		com.position = mesas[i] + Vector3(randf_range(-0.15, 0.15), 0, randf_range(-0.15, 0.15))
+		# ...y una tacita, un vaso, un florero o una azucarera, para tirar de un aletazo (ver Golpeable)
+		var objeto: String = ["taza", "vaso", "florero", "azucarera"][i % 4]
+		var lado := 1.0 if i % 2 == 0 else -1.0
+		Golpeable.crear(c, objeto, mesas[i] + Vector3(0.27 * lado, 0.0, 0.14 * lado), Color.WHITE, 1.5)
 	# El carrito de choripán sobre la avenida
 	_carrito_choripan(c, Vector3(23, 0.16, 35.2))
 	# Facturas cerca del subte (los oficinistas se las olvidan)

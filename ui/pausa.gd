@@ -6,6 +6,7 @@ const ESCENA_MENU := "res://main.tscn"
 const TEMA := preload("res://ui/tema/tema_paloma.tres")
 
 var _opciones: OpcionesMenu
+var _diario: DiarioMisiones
 var _hud: CanvasLayer             ## El HUD, escondido mientras están las Opciones (null = no se escondió)
 
 
@@ -20,7 +21,11 @@ func _ready() -> void:
 	%Opciones.pressed.connect(_abrir_opciones)
 	_opciones = OpcionesMenu.new()
 	add_child(_opciones)
-	_opciones.cerrada.connect(_al_cerrar_opciones)
+	_opciones.cerrada.connect(_al_cerrar_pantalla.bind(%Opciones))
+	_diario = DiarioMisiones.new()
+	add_child(_diario)
+	_diario.cerrada.connect(_al_cerrar_pantalla.bind(%Misiones))
+	%Misiones.pressed.connect(_abrir_diario)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -33,6 +38,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func pausar() -> void:
+	AudioManager.ui("pause", -4.0)
 	visible = true
 	($Centro as Control).visible = true
 	get_tree().paused = true
@@ -41,7 +47,9 @@ func pausar() -> void:
 
 
 func continuar() -> void:
+	AudioManager.ui("unpause", -4.0)
 	_opciones.cerrar()
+	_diario.cerrar()
 	visible = false
 	get_tree().paused = false
 	Ajustes.capturar_mouse(true)
@@ -60,21 +68,30 @@ func _salir() -> void:
 	get_tree().change_scene_to_file(ESCENA_MENU)
 
 
-## Con las Opciones abiertas se esconden el título y los botones de la pausa y también el HUD (la
-## misión y la brújula se leían encima de las opciones): queda sólo el fondo oscuro y las Opciones.
 func _abrir_opciones() -> void:
-	AudioManager.reproducir("picoteo")
+	_abrir_pantalla(_opciones)
+
+
+func _abrir_diario() -> void:
+	_diario.refrescar()
+	_abrir_pantalla(_diario)
+
+
+## Con una pantalla abierta (Opciones, Misiones) se esconden el título y los botones de la pausa y
+## también el HUD (la misión y la brújula se leían encima): queda sólo el fondo oscuro y la pantalla.
+func _abrir_pantalla(pantalla: PantallaMenu) -> void:
+	AudioManager.ui("menu_open", -6.0)
 	($Centro as Control).visible = false
 	var hud := get_parent().get_node_or_null("HUD") as CanvasLayer
 	if hud and hud.visible:
 		_hud = hud
 		hud.visible = false
-	_opciones.abrir()
+	pantalla.abrir()
 
 
-func _al_cerrar_opciones() -> void:
+func _al_cerrar_pantalla(boton: Button) -> void:
 	($Centro as Control).visible = true
 	if is_instance_valid(_hud):
 		_hud.visible = true     # Sólo si lo escondimos nosotros (en una cinemática ya estaba escondido)
 	_hud = null
-	%Opciones.grab_focus()
+	boton.grab_focus()

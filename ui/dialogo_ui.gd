@@ -99,15 +99,16 @@ func _mostrar_linea(quien: String, texto: String, opciones: Array) -> void:
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.custom_minimum_size = Vector2(0, 40)
 		b.mouse_entered.connect(b.grab_focus)
+		b.focus_entered.connect(func() -> void: AudioManager.ui("dialogue_blip", -6.0))
 		b.pressed.connect(_elegir.bind(i))
 		_opciones.add_child(b)
 	if _hay_opciones:
 		(_opciones.get_child(0) as Button).grab_focus.call_deferred()
-	AudioManager.reproducir("picoteo", -18.0)
+	AudioManager.ui("dialogue_expression", -10.0)
 
 
 func _elegir(i: int) -> void:
-	AudioManager.reproducir("picoteo", -14.0)
+	AudioManager.ui("button", -8.0)
 	Dialogos.elegir(i)
 
 

@@ -25,6 +25,8 @@ var _miedo := 0.0
 var _enfriamiento_susto := 0.0
 var _soltar_factura_en := -1.0
 var _altura := 0.0
+var _por_sorpresa := false          ## Un aletazo le tiró el sombrero: se frena un rato con los brazos arriba
+var _sorpresa := 0.0
 
 # Comensales
 var ruta: Array[Vector3] = []       ## Puntos por los que camina (el último es la silla o la salida)
@@ -87,6 +89,9 @@ func preparar_aspecto() -> void:
 
 func _physics_process(delta: float) -> void:
 	_enfriamiento_susto = maxf(_enfriamiento_susto - delta, 0.0)
+	if _atendiendo != null:
+		_paso_conversando(delta)
+		return
 	match tipo:
 		"senora":
 			_tirar_migas(delta)
@@ -110,6 +115,47 @@ func _physics_process(delta: float) -> void:
 	_girar_hacia_velocidad(delta, 6.0)
 	modelo.rotation.y = _rumbo
 	modelo.animar(delta, _vel.length(), _miedo > 0.0)
+
+
+## Hablando con la paloma (o sorprendido por un aletazo): se frena, la mira y deja de tirar migas
+## hasta que termine. Si es una sorpresa levanta los brazos un rato y después sigue con lo suyo.
+func _paso_conversando(delta: float) -> void:
+	_mirar_al_atendido(delta)
+	_miedo = 0.0
+	if _por_sorpresa:
+		_sorpresa -= delta
+		if _sorpresa <= 0.0:
+			_por_sorpresa = false
+			_atendiendo = null
+	if tipo != "senora" and not _comiendo:
+		_acelerar(Vector3.ZERO, 6.0, delta)
+		_avanzar(delta, _altura)
+	modelo.rotation.y = _rumbo
+	modelo.animar(delta, _vel.length(), _por_sorpresa)
+
+
+func atender(con_quien: Node3D) -> void:
+	_por_sorpresa = false
+	super(con_quien)
+
+
+## Un aletazo de la paloma le tira el sombrero o la gorra: sale volando (un objeto con física que
+## después se desvanece) y la persona se queda sorprendida con los brazos arriba un par de segundos.
+## Devuelve false si no llevaba nada en la cabeza.
+func sombrerazo(dir: Vector3) -> bool:
+	var color := modelo.color_accesorio
+	var k := modelo.alto / 1.75
+	var pos := modelo.global_position + Vector3(0, modelo.altura_sombrero(), 0)
+	var tenia := modelo.quitar_sombrero()
+	if tenia == "":
+		return false
+	var s := Golpeable.crear(get_parent(), tenia, pos, color, k, true)
+	s.golpear(dir, 1.6)
+	if _atendiendo == null and not Dialogos.activo:
+		_por_sorpresa = true
+		_sorpresa = 2.2
+		_atendiendo = GameState.jugador
+	return true
 
 
 func _pasear(delta: float) -> void:
