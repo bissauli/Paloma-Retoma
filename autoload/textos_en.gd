@@ -363,4 +363,13 @@ Talk to those with a ! above their head.",
 	"E · BAÑARSE": "E · BATHE",
 	"Artista": "Artist",
 	"Pintá tu paloma en el modo avanzado.": "Paint your pigeon in advanced mode.",
+	# Carteles de la ciudad (mapa V2). Los nombres de calles y negocios no se traducen.
+	"DIARIOS Y REVISTAS": "NEWSPAPERS",
+	"Plaza de juegos": "Playground",
+	"Parque de perros": "Dog park",
+	"PROHIBIDO\nPALOMAS": "NO\nPIGEONS",
+	"A LAS PALOMAS\nDE LA PLAZA": "TO THE PIGEONS\nOF THE SQUARE",
+	# Carteles del mapa V3 (los nombres de los locales no se traducen)
+	"GUARDIA": "EMERGENCY",
+	"POLICÍA": "POLICE",
 }

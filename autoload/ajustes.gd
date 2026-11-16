@@ -139,7 +139,10 @@ func set_brillo(b: float) -> void:
 func aplicar_brillo(env: Environment) -> void:
 	if env == null:
 		return
-	env.adjustment_enabled = not is_equal_approx(brillo, 1.0)
+	# Los ajustes se prenden si el brillo no es el normal o si el entorno pide saturación o contraste
+	# propios (el mapa V3 sube un poco la saturación, ver world/plaza.gd)
+	var propios := not is_equal_approx(env.adjustment_saturation, 1.0) or not is_equal_approx(env.adjustment_contrast, 1.0)
+	env.adjustment_enabled = propios or not is_equal_approx(brillo, 1.0)
 	env.adjustment_brightness = brillo
 
 

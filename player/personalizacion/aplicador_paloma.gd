@@ -24,7 +24,7 @@ static func aplicar(glb: Node3D, skel: Skeleton3D, perfil: PerfilPaloma) -> void
 
 ## Material liso para los párpados (GestosPaloma) con el color que tiene la cabeza en este material:
 ## el gris original de la cabeza (#bcbece) pasado por el mismo tinte que hace el shader.
-static func material_parpado(sm: ShaderMaterial) -> StandardMaterial3D:
+static func material_parpado(sm: ShaderMaterial) -> Material:
 	var color := Color("bcbece")
 	var activa: PackedFloat32Array = sm.get_shader_parameter("activa")
 	var paleta: PackedVector3Array = sm.get_shader_parameter("paleta")
@@ -33,9 +33,11 @@ static func material_parpado(sm: ShaderMaterial) -> StandardMaterial3D:
 		var l := lin.r * 0.2126 + lin.g * 0.7152 + lin.b * 0.0722
 		var t := (paleta[3] * (l / float(LUZ_BASE[3]))).clampf(0.0, 1.0)
 		color = Color(t.x, t.y, t.z).linear_to_srgb()
-	var m := StandardMaterial3D.new()
-	m.albedo_color = color
-	m.roughness = 1.0
+	# Misma luz cozy que el cuerpo (paloma_zonas), sin el degradado del mundo
+	var m := Construir.material_cozy(1.0)
+	m.set_shader_parameter("color_base", color)
+	m.set_shader_parameter("usar_degradado", false)
+	m.set_shader_parameter("rim_intensidad", 0.25)
 	return m
 
 

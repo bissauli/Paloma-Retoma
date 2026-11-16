@@ -6,66 +6,119 @@ extends RefCounted
 const CAPA_MUNDO := 1
 
 static var _materiales := {}
-	static var _texturas := {}
+static var _texturas := {}
 
 
-## Material plano (cacheado por color).
-static func material(color: Color, rugosidad := 0.9, sin_sombra := false) -> StandardMaterial3D:
+const SHADER_COZY := preload("res://shaders/estilo_cozy.gdshader")
+
+
+## Material plano (cacheado por color). Opaco y con sombra usa el shader del estilo cozy
+## (shaders/estilo_cozy.gdshader); transparente o sin sombra, un StandardMaterial3D.
+static func material(color: Color, rugosidad := 0.9, sin_sombra := false) -> Material:
 	var clave := "%s_%.2f_%s" % [color.to_html(), rugosidad, sin_sombra]
 	if _materiales.has(clave):
 		return _materiales[clave]
-	var m := StandardMaterial3D.new()
-	m.albedo_color = color
-	m.roughness = rugosidad
-	if sin_sombra:
-		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	if color.a < 1.0:
-		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	elif not sin_sombra:
+	var m: Material
+	if sin_sombra or color.a < 1.0:
+		var sm := StandardMaterial3D.new()
+		sm.albedo_color = color
+		sm.roughness = rugosidad
+		if sin_sombra:
+			sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		if color.a < 1.0:
+			sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m = sm
+	else:
+		m = material_cozy(rugosidad)
+		m.set_shader_parameter("color_base", color)
 		# Color liso y opaco: las piezas con este material se pueden fusionar (ver fusionar_estaticas)
 		m.set_meta(&"color_plano", color)
 	_materiales[clave] = m
 	return m
 
 
+## ShaderMaterial nuevo (sin cachear) con el estilo cozy y los ajustes del mundo.
+static func material_cozy(rugosidad := 0.9) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = SHADER_COZY
+	m.set_shader_parameter("roughness", rugosidad)
+	# Rim más suave que el default: en paredes grandes vistas de costado se notaba demasiado
+	m.set_shader_parameter("rim_intensidad", 0.15)
+	# Degradado leve por altura en el mundo: abajo un poco más frío, como en sombra de la calle
+	m.set_shader_parameter("usar_degradado", true)
+	m.set_shader_parameter("usar_altura_mundial", true)
+	m.set_shader_parameter("degradado_altura_min", 0.0)
+	m.set_shader_parameter("degradado_altura_max", 10.0)
+	m.set_shader_parameter("degradado_fuerza", 0.3)
+	m.set_meta(&"rugosidad", rugosidad)
+	return m
+
+
+## Rugosidad de un material del mundo (cozy o StandardMaterial3D).
+static func rugosidad_de(m: Material) -> float:
+	if m is BaseMaterial3D:
+		return (m as BaseMaterial3D).roughness
+	return float(m.get_meta(&"rugosidad", 0.9))
+
+
 ## Material que toma el color de los vértices: lo usan las mallas fusionadas, donde cada pieza
 ## guarda su color en sus vértices. Se ve igual que material(color, rugosidad).
-static func material_vertices(rugosidad := 0.9) -> StandardMaterial3D:
+static func material_vertices(rugosidad := 0.9) -> ShaderMaterial:
 	var clave := "vtx_%.2f" % rugosidad
 	if _materiales.has(clave):
 		return _materiales[clave]
-	var m := StandardMaterial3D.new()
-	m.vertex_color_use_as_albedo = true
-	m.vertex_color_is_srgb = true
-	m.roughness = rugosidad
+	var m := material_cozy(rugosidad)
+	m.set_shader_parameter("usar_color_vertices", true)
 	_materiales[clave] = m
 	return m
 
 
-## Material con textura de baldosas generada por código.
-static func material_baldosas(base: Color, junta: Color, escala_uv: Vector2, tam_px := 32) -> StandardMaterial3D:
+## Material con textura de baldosas generada por código, proyectada con la posición en el mundo.
+static func material_baldosas(base: Color, junta: Color, escala_uv: Vector2, tam_px := 128) -> ShaderMaterial:
 	var clave := "bald_%s_%s_%s" % [base.to_html(), junta.to_html(), escala_uv]
 	if _materiales.has(clave):
 		return _materiales[clave]
 	var img := Image.create(tam_px, tam_px, false, Image.FORMAT_RGB8)
 	var mitad: int = tam_px >> 1
+	# El shader filtra suave (no pixelado): con más resolución la junta queda nítida de cerca
+	var junta_px := maxi(tam_px >> 5, 1)
 	for y in tam_px:
 		for x in tam_px:
 			var c := base
 			# Leve variación por baldosa para que no quede tan plano
 			if ((x >= mitad) != (y >= mitad)):
 				c = base.darkened(0.06)
-			if x % mitad == 0 or y % mitad == 0:
+			if x % mitad < junta_px or y % mitad < junta_px:
 				c = junta
 			img.set_pixel(x, y, c)
+	img.generate_mipmaps()
 	var tex := ImageTexture.create_from_image(img)
-	var m := StandardMaterial3D.new()
-	m.albedo_texture = tex
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
-	m.uv1_scale = Vector3(escala_uv.x, escala_uv.y, 1.0)
-	m.uv1_triplanar = true
-	m.uv1_world_triplanar = true
-	m.roughness = 0.95
+	var m := material_cozy(0.95)
+	m.set_shader_parameter("textura_albedo", tex)
+	m.set_shader_parameter("usar_uv_mundo", true)
+	m.set_shader_parameter("escala_uv_mundo", escala_uv)
+	# El piso no lleva rim (de lejos lo aclaraba entero) ni degradado (está todo a la misma altura)
+	m.set_shader_parameter("rim_intensidad", 0.0)
+	m.set_shader_parameter("usar_degradado", false)
+	_materiales[clave] = m
+	return m
+
+
+## Material de lajas (mapa V3): una textura de modelos/ciudad/texturas/ (la genera
+## tools/generar_lajas.py) que cubre "metros" x "metros" y se aplica en coordenadas del mundo, así las
+## losas vecinas siguen el mismo dibujo sin uniones.
+static func material_lajas(nombre: String, metros := 4.0, tinte := Color.WHITE) -> ShaderMaterial:
+	var clave := "lajas_%s_%.2f_%s" % [nombre, metros, tinte.to_html()]
+	if _materiales.has(clave):
+		return _materiales[clave]
+	var m := material_cozy(0.95)
+	m.set_shader_parameter("textura_albedo", load("res://modelos/ciudad/texturas/%s.png" % nombre))
+	m.set_shader_parameter("color_base", tinte)
+	m.set_shader_parameter("usar_uv_mundo", true)
+	m.set_shader_parameter("escala_uv_mundo", Vector2.ONE / metros)
+	# El piso no lleva rim (de lejos lo aclaraba entero) ni degradado (está todo a la misma altura)
+	m.set_shader_parameter("rim_intensidad", 0.0)
+	m.set_shader_parameter("usar_degradado", false)
 	_materiales[clave] = m
 	return m
 
@@ -259,13 +312,23 @@ static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
 				var con_color := mat.has_meta(&"color_plano")
 				var t := inv * mi.global_transform
 				var centro := t * mi.mesh.get_aabb().get_center()
-				var clave_mat := ("v%.2f" % (mat as BaseMaterial3D).roughness) if con_color else ("m%d" % mat.get_instance_id())
-				var clave := "%d_%d_%s_%d" % [floori(centro.x / celda), floori(centro.z / celda), clave_mat, mi.cast_shadow]
+				var clave_mat := ("v%.2f" % rugosidad_de(mat)) if con_color else ("m%d" % mat.get_instance_id())
+				# Las piezas con la meta "rango" (árboles, props chicos) van aparte y se dejan de
+				# dibujar a esa distancia de la cámara
+				var rango := float(mi.get_meta(&"rango", 0.0))
+				var desde := float(mi.get_meta(&"rango_desde", 0.0))   # versiones "de lejos" (ver Kit)
+				var clave := "%d_%d_%s_%d_%d_%d" % [floori(centro.x / celda), floori(centro.z / celda), clave_mat,
+					mi.cast_shadow, roundi(rango), roundi(desde)]
 				if not grupos.has(clave):
-					grupos[clave] = {"mat": material_vertices((mat as BaseMaterial3D).roughness) if con_color else mat,
-						"color": con_color, "sombra": mi.cast_shadow, "piezas": []}
+					# La malla fusionada queda con su origen en el centro de la celda: así la distancia
+					# de dibujo (visibility_range) se mide desde ahí y no desde el origen del mundo
+					var origen := Vector3((floori(centro.x / celda) + 0.5) * celda, 0.0, (floori(centro.z / celda) + 0.5) * celda)
+					grupos[clave] = {"mat": material_vertices(rugosidad_de(mat)) if con_color else mat,
+						"color": con_color, "sombra": mi.cast_shadow, "rango": rango, "desde": desde, "origen": origen,
+						"piezas": []}
 				var color: Color = mat.get_meta(&"color_plano") if con_color else Color.WHITE
-				(grupos[clave]["piezas"] as Array).append([mi.mesh, t, color])
+				var o: Vector3 = grupos[clave]["origen"]
+				(grupos[clave]["piezas"] as Array).append([mi.mesh, t.translated(-o), color])
 				fusionadas.append(mi)
 				continue
 			pendientes.append(h)
@@ -277,7 +340,14 @@ static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
 		mi.mesh = combinar(g["piezas"], g["color"], not g["color"])
 		mi.material_override = g["mat"]
 		mi.cast_shadow = g["sombra"]
+		if float(g["rango"]) > 0.0:
+			mi.visibility_range_end = float(g["rango"])
+			mi.visibility_range_end_margin = 4.0
+		if float(g["desde"]) > 0.0:
+			mi.visibility_range_begin = float(g["desde"])
+			mi.visibility_range_begin_margin = 4.0
 		raiz.add_child(mi)
+		mi.position = g["origen"]
 		i += 1
 	for mi in fusionadas:
 		mi.get_parent().remove_child(mi)

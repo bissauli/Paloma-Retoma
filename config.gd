@@ -45,4 +45,9 @@ const PERDIDA_HALCON := 3          ## Palomas que perdés si te atrapa el halcó
 const PERDIDA_GRANADERO := 2       ## Palomas que perdés si te atrapa un granadero
 
 # --- Tiempo ---
-const DURACION_PARTIDA := 840.0    ## Segundos de "día" (14 minutos) para el ciclo de luz
+const DURACION_PARTIDA := 840.0    ## Segundos de "día" (14 minutos) para el avance del día (progreso)
+const DURACION_DIA := 1200.0       ## Segundos reales que dura un día entero de 24 h en el cielo
+const VELOCIDAD_NOCHE := 2.0       ## La noche (20:30 a 5:30) pasa más rápido
+const HORA_INICIO := 8.5           ## Hora a la que arranca una partida nueva (y la del menú)
+const CLIMA_MIN := 150.0           ## Segundos mínimos y máximos que dura un clima
+const CLIMA_MAX := 330.0
