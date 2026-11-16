@@ -42,6 +42,14 @@ size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 20
 text = "CONTINUAR"
 
+[node name="Misiones" type="Button" parent="Centro"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 56)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 20
+text = "MISIONES"
+
 [node name="Reiniciar" type="Button" parent="Centro"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(280, 56)

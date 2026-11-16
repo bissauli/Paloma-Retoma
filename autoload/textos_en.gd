@@ -24,6 +24,22 @@ const MAPA := {
 	"BORRAR": "DELETE",
 	# Conversaciones y misiones secundarias (dialogos/catalogo_dialogos.gd, misiones/catalogo_misiones.gd)
 	"HABLAR CON %s": "TALK TO %s",
+	# Avisos de misiones
+	"MISIÓN ACEPTADA": "QUEST ACCEPTED",
+	"MISIÓN LISTA": "QUEST READY",
+	"MISIÓN COMPLETADA": "QUEST COMPLETE",
+	"Volvé con %s": "Go back to %s",
+	"+%d de comida": "+%d food",
+	# Diario de misiones (pausa)
+	"MISIONES": "QUESTS",
+	"En curso": "In progress",
+	"Completadas": "Completed",
+	"No tenés misiones en curso.
+Hablá con quienes tienen un ! sobre la cabeza.":
+		"You have no quests in progress.
+Talk to those with a ! above their head.",
+	"Volvé con %s para cobrar la recompensa.": "Go back to %s to claim your reward.",
+	"Recompensa: %d de comida": "Reward: %d food",
 	# Rueda de bailes (V)
 	"BAILES": "DANCES",
 	"CLICK O ENTER PARA ELEGIR  ·  V PARA CERRAR": "CLICK OR ENTER TO PICK  ·  V TO CLOSE",
