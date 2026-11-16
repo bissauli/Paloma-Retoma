@@ -121,23 +121,23 @@ static func datos(nombre: String) -> Dictionary:
 	return PARQUE_COL.get(nombre, {})
 
 
-## Material compartido por las piezas de los dos kits.
-static func material() -> StandardMaterial3D:
+## Material compartido por las piezas de los dos kits, con la luz del estilo cozy
+## (shaders/estilo_cozy.gdshader).
+static func material() -> ShaderMaterial:
 	if _materiales.has("kit"):
 		return _materiales["kit"]
 	var paleta: Array = KitDatos.PALETA
-	var m := StandardMaterial3D.new()
-	m.albedo_texture = _paleta(paleta, [])
-	# Brillan sólo las lámparas, los faros y la luz verde de los semáforos (KitDatos.EMISION): con el
-	# operador "sumar", la emisión es color + textura (color negro)
-	m.emission_enabled = true
-	m.emission = Color.BLACK
-	m.emission_texture = _paleta(paleta, KitDatos.EMISION)
-	m.emission_energy_multiplier = 1.2
-	m.roughness = 0.85
-	m.metallic_specular = 0.25
+	var m := Construir.material_cozy(0.85)
 	# Sin mipmaps ni filtro raro: cada celda es un degradé liso, así de lejos no se mezclan colores
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+	# (textura_paleta tiene filtro lineal simple)
+	m.set_shader_parameter("usar_paleta", true)
+	m.set_shader_parameter("textura_paleta", _paleta(paleta, []))
+	# Brillan sólo las lámparas, los faros y la luz verde de los semáforos (KitDatos.EMISION)
+	m.set_shader_parameter("usar_textura_emision", true)
+	m.set_shader_parameter("textura_emision", _paleta(paleta, KitDatos.EMISION))
+	m.set_shader_parameter("emision_energia", 1.2)
+	# Las piezas ya traen su degradé en la paleta: sin el degradado por altura del mundo
+	m.set_shader_parameter("usar_degradado", false)
 	_materiales["kit"] = m
 	return m
 

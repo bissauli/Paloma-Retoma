@@ -15,14 +15,18 @@ uniform float activa[7];   // 1.0 = la zona usa su color; 0.0 = conserva el orig
 // Va encima del color de zona, texel por texel (filter_nearest: sigue siendo pixel-art).
 uniform sampler2D pintura : source_color, filter_nearest, repeat_disable;
 
+// Luz cozy (cel suave, sombra teñida y rim), la misma del resto del mundo.
+#include "res://shaders/estilo_cozy_luz.gdshaderinc"
+
 void fragment() {
 	vec3 base = texture(albedo_tex, UV).rgb;
 	int z = int(texture(zonas, UV).r * 255.0 + 0.5);
 	z = clamp(z, 0, 6);
 	float l = dot(base, vec3(0.2126, 0.7152, 0.0722));
-	vec3 tinte = clamp(paleta[z] * (l / max(luz_base[z], 0.001)), 0.0, 1.0);
+	vec3 tono = clamp(paleta[z] * (l / max(luz_base[z], 0.001)), 0.0, 1.0);
 	vec4 p = texture(pintura, UV);
-	ALBEDO = mix(mix(base, tinte, activa[z]), p.rgb, p.a);
+	ALBEDO = mix(mix(base, tono, activa[z]), p.rgb, p.a);
 	ROUGHNESS = 1.0;
-	SPECULAR = 0.5;
+	SPECULAR = 0.1;
+	COZY_FRAGMENT;
 }

@@ -11,6 +11,7 @@ const C_ASFALTO := Color("76787a")
 
 var sol: DirectionalLight3D
 var entorno: Environment
+var cielo: Cielo
 
 
 func _ready() -> void:
@@ -18,95 +19,19 @@ func _ready() -> void:
 	_crear_piso()
 	_crear_limites()
 	_crear_zonas()
-	GameState.fase_dia_cambio.connect(_al_cambiar_fase)
-	_al_cambiar_fase(0.0)
 	# Miles de piezas fijas (edificios, árboles, bancos...) pasan a ser unas pocas mallas grandes
 	Construir.fusionar_estaticas(self)
 
 
 # ---------------------------------------------------------------- Luz y cielo
 
-## Luz del mapa V3: colores saturados y nítidos como en las referencias. El tonemap lineal no lava los
-## colores (el Filmic los apagaba), el ambiente es claro (sombras suaves, nunca negras) y la niebla es
-## por distancia: la ciudad cercana se ve limpia y sólo el horizonte se pierde en la bruma.
-const CIELO_ARRIBA := Color("62aef0")
-const CIELO_HORIZONTE := Color("cfe8f7")
-const NIEBLA := Color("d6e9f5")
-const AMBIENTE := Color(0.72, 0.76, 0.84)
-const SOL_ENERGIA := 0.78
-
-
+## El cielo, el sol (y la luna), el día y la noche y el clima los arma world/cielo.gd.
 func _crear_ambiente() -> void:
-	var cielo_mat := ProceduralSkyMaterial.new()
-	cielo_mat.sky_top_color = CIELO_ARRIBA
-	cielo_mat.sky_horizon_color = CIELO_HORIZONTE
-	cielo_mat.ground_horizon_color = CIELO_HORIZONTE
-	cielo_mat.ground_bottom_color = Color("9aa3a8")
-	var cielo := Sky.new()
-	cielo.sky_material = cielo_mat
-
-	entorno = Environment.new()
-	entorno.background_mode = Environment.BG_SKY
-	entorno.sky = cielo
-	entorno.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	entorno.ambient_light_color = AMBIENTE
-	entorno.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
-	entorno.ambient_light_energy = 0.5
-	entorno.tonemap_mode = Environment.TONE_MAPPER_LINEAR
-	entorno.fog_enabled = true
-	entorno.fog_mode = Environment.FOG_MODE_DEPTH
-	entorno.fog_light_color = NIEBLA
-	entorno.fog_density = 0.75
-	entorno.fog_depth_begin = 110.0
-	entorno.fog_depth_end = 520.0
-	entorno.fog_depth_curve = 1.6
-	entorno.fog_sky_affect = 0.0
-	entorno.adjustment_saturation = 1.05
-	entorno.adjustment_contrast = 1.03
-
-	var we := WorldEnvironment.new()
-	we.name = "WorldEnvironment"
-	we.environment = entorno
-	we.add_to_group("entorno")
-	add_child(we)
-	Ajustes.aplicar_brillo(entorno)  # Opciones > Pantalla > Brillo
-
-	sol = DirectionalLight3D.new()
-	sol.name = "Sol"
-	sol.shadow_enabled = true
-	sol.light_energy = SOL_ENERGIA
-	sol.shadow_opacity = 0.8
-	sol.add_to_group("sol")
-	add_child(sol)
-	# Distancia y calidad de las sombras según el preset gráfico (Opciones > Gráficos)
-	Ajustes.aplicar_sombras(sol)
-
-
-## Ciclo de día: t = 0 mañana, t = 1 atardecer.
-func _al_cambiar_fase(t: float) -> void:
-	if sol == null:
-		return
-	# El sol sale por el este (sobre el Río de la Plata) y se pone por el oeste
-	var elevacion: float = lerpf(-35.0, -58.0, t * 2.0) if t < 0.5 else lerpf(-58.0, -14.0, (t - 0.5) * 2.0)
-	var azimut := lerpf(115.0, 245.0, t)
-	sol.rotation_degrees = Vector3(elevacion, azimut, 0.0)
-	var color_maniana := Color("fff0d8")
-	var color_mediodia := Color("fffaf0")
-	var color_atardecer := Color("ffb070")
-	var c: Color
-	if t < 0.5:
-		c = color_maniana.lerp(color_mediodia, t * 2.0)
-	else:
-		c = color_mediodia.lerp(color_atardecer, (t - 0.5) * 2.0)
-	sol.light_color = c
-	sol.light_energy = lerpf(SOL_ENERGIA, SOL_ENERGIA * 0.8, maxf(t - 0.5, 0.0) * 2.0)
-	var cielo_mat := entorno.sky.sky_material as ProceduralSkyMaterial
-	var k: float = clampf((t - 0.55) / 0.45, 0.0, 1.0)
-	cielo_mat.sky_top_color = CIELO_ARRIBA.lerp(Color("5a6fb8"), k)
-	cielo_mat.sky_horizon_color = CIELO_HORIZONTE.lerp(Color("f6b48a"), k)
-	cielo_mat.ground_horizon_color = cielo_mat.sky_horizon_color
-	entorno.fog_light_color = NIEBLA.lerp(Color("f2b892"), k)
-	entorno.ambient_light_color = AMBIENTE.lerp(Color(0.76, 0.62, 0.64), k)
+	cielo = Cielo.new()
+	cielo.name = "Cielo"
+	add_child(cielo)
+	sol = cielo.sol
+	entorno = cielo.entorno
 
 
 # ---------------------------------------------------------------- Piso y límites

@@ -140,7 +140,7 @@ func _semaforo(padre: Node3D, pos: Vector3, dir: int) -> void:
 	_lamparas.append(lamparas)
 
 
-func _material_luz(color: Color, prendida: bool) -> StandardMaterial3D:
+func _material_luz(color: Color, prendida: bool) -> Material:
 	if prendida:
 		return Construir.material(color, 0.9, true)
 	return Construir.material(color.darkened(0.75), 0.9)

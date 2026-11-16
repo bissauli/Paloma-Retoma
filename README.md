@@ -39,5 +39,10 @@ botones DESPEGAR/ALETEAR (mantener), PICADA (mantener), PICOTEAR y ARRULLAR · I
   El mapa de la ciudad lo arma `world/ciudad.gd`; las capturas de cada zona salen con
   `godot --path . res://tests/captura_ciudad.tscn -- <carpeta> [vistas] [segundos]` (las vistas `iso_*` son las altas,
   como las referencias; los segundos de espera dejan que la gente, los chicos y los animales se pongan en movimiento).
+- Cielo, día y noche y clima: `world/cielo.gd` (ver `DECISIONES.md`). En las versiones de prueba, **F6** cambia el
+  clima y **F7** adelanta 2 horas. Capturas de cada hora y clima: `godot --path . res://tests/captura_cielo.tscn -- <carpeta>`;
+  prueba headless: `test_cielo`. El estilo de los materiales está en `shaders/README_estilo_cozy.md`.
+- Las mallas de nubes y del rayo (`modelos/cielo/`) se extraen de un pack con
+  `godot --headless --path . -s res://tools/importar_cielo.gd -- <carpeta glb del pack>`.
 - Rendimiento: `godot --path . res://tests/bench_rendimiento.tscn --disable-vsync` (con `-- movil` emula
   la versión para teléfonos). Las decisiones de optimización están en `DECISIONES.md`.
