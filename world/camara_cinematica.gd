@@ -24,6 +24,12 @@ var _suave := true
 var _mira := Vector3.ZERO       ## A dónde mira ahora (se interpola, así nunca pierde el foco)
 var _juego: Camera3D
 
+## Si hay un nodo acá, mientras la cámara está quieta lo sigue con la mirada (más "seguir_offset").
+## Lo usan las cinemáticas de las casas: la cámara se queda en su lugar (o se mueve a mano con
+## colocar()) y gira para no perder a la paloma.
+var seguir: Node3D
+var seguir_offset := Vector3.ZERO
+
 
 func _ready() -> void:
 	near = 0.05
@@ -46,6 +52,7 @@ func empezar(camara_juego: Camera3D) -> void:
 func volar(pos: Vector3, mira: Vector3, fov_destino: float, duracion: float, arco := 0.0, suave := true) -> void:
 	if estado == Estado.VOLVIENDO or estado == Estado.TERMINADA:
 		return
+	seguir = null
 	_desde = global_transform
 	_desde_mira = _mira
 	_desde_fov = fov
@@ -57,6 +64,24 @@ func volar(pos: Vector3, mira: Vector3, fov_destino: float, duracion: float, arc
 	_suave = suave
 	_t = 0.0
 	estado = Estado.VOLANDO
+
+
+## Corte seco (como un cambio de plano de cine): la cámara aparece ya en "pos" mirando a "mira".
+## No emite "llego". No hace nada si ya está volviendo.
+func corte(pos: Vector3, mira: Vector3, fov_nuevo: float) -> void:
+	if estado == Estado.VOLVIENDO or estado == Estado.TERMINADA:
+		return
+	seguir = null
+	_mira = mira
+	global_transform = Transform3D(Basis.looking_at(mira - pos, Vector3.UP), pos)
+	fov = fov_nuevo
+	estado = Estado.QUIETA
+
+
+## Mueve la cámara a mano (un dolly lento sobre una toma). Sólo cuando está quieta.
+func colocar(pos: Vector3) -> void:
+	if estado == Estado.QUIETA:
+		global_position = pos
 
 
 ## Vuelve a la cámara del juego (que puede estar moviéndose) y le pasa el mando.
@@ -73,6 +98,13 @@ func volver(duracion: float, arco := 0.0) -> void:
 
 
 func _process(delta: float) -> void:
+	if estado == Estado.QUIETA and seguir != null:
+		if is_instance_valid(seguir):
+			var objetivo := seguir.get_global_transform_interpolated().origin + seguir_offset
+			_mira = objetivo
+			if objetivo.distance_to(global_position) > 0.05:
+				global_transform = Transform3D(Basis.looking_at(objetivo - global_position, Vector3.UP), global_position)
+		return
 	if estado != Estado.VOLANDO and estado != Estado.VOLVIENDO:
 		return
 	_t = minf(_t + delta / _dur, 1.0)

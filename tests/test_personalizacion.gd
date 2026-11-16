@@ -54,7 +54,7 @@ func _adjuntos(m: ModeloPaloma) -> Array[String]:
 func _perfil_completo() -> PerfilPaloma:
 	var p := PerfilPaloma.new()
 	p.colores = PackedInt32Array([4, 9, 6, 2, 5, 3])    # canela, azul, coral, grafito, amarillo, marrón
-	p.accesorios = PackedInt32Array([1, 2, 3, 1])       # gorra, capa, plumas, bigote
+	p.accesorios = PackedInt32Array([1, 2, 3, 1, 2, 1])  # gorra, capa, plumas, bigote, aviador, cadena
 	return p
 
 
@@ -179,7 +179,8 @@ func _pantalla() -> void:
 	menu.cerrada.connect(func() -> void: cerradas[0] += 1)
 	menu.abrir()
 	await get_tree().process_frame
-	_check("pantalla: 6 selectores de color y 4 de accesorio", menu._selectores_color.size() == 6 and menu._selectores_slot.size() == 4)
+	_check("pantalla: 6 selectores de color y uno por slot de accesorio (%d)" % CatalogoPaloma.SLOTS.size(),
+		menu._selectores_color.size() == 6 and menu._selectores_slot.size() == CatalogoPaloma.SLOTS.size())
 	_check("pantalla: arranca con todo en 'original' y 'ninguno'", menu._selectores_color[0].pos == 0 and menu._selectores_slot[0].pos == 0)
 
 	# Un cambio en el selector edita el perfil, se guarda y se ve en la paloma de la vista previa
@@ -435,11 +436,19 @@ func _guardar_y_cargar() -> void:
 func _cargar_datos_malos() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("paloma", "colores", [99, -5, "x", 3])
-	cfg.set_value("paloma", "accesorios", [9, 2, -1, 1, 7, 7])
+	cfg.set_value("paloma", "accesorios", [99, 2, -1, 1, 99, -3, 7])
 	cfg.save(ARCHIVO_TEST)
 	var p := PerfilPaloma.cargar(ARCHIVO_TEST)
 	_check("datos malos: colores fuera de rango se descartan", p.colores[0] == -1 and p.colores[1] == -1 and p.colores[2] == -1 and p.colores[3] == 3)
-	_check("datos malos: accesorios fuera de rango se descartan", p.accesorios[0] == 0 and p.accesorios[1] == 2 and p.accesorios[2] == 0 and p.accesorios[3] == 1)
+	_check("datos malos: accesorios fuera de rango se descartan", p.accesorios[0] == 0 and p.accesorios[1] == 2
+		and p.accesorios[2] == 0 and p.accesorios[3] == 1 and p.accesorios[4] == 0 and p.accesorios[5] == 0)
+	# Un perfil guardado antes de que existieran los slots de ojos y cuello sigue cargando
+	cfg.set_value("paloma", "accesorios", [3, 1, 0, 2])
+	cfg.save(ARCHIVO_TEST)
+	var viejo := PerfilPaloma.cargar(ARCHIVO_TEST)
+	_check("perfil viejo (4 slots): conserva lo que tenía y lo nuevo queda vacío",
+		viejo.accesorios[0] == 3 and viejo.accesorios[1] == 1 and viejo.accesorios[3] == 2 and viejo.accesorios[4] == 0
+		and viejo.accesorios[5] == 0)
 	_check("datos malos: el tamaño no cambia", p.colores.size() == CatalogoPaloma.ZONAS.size() and p.accesorios.size() == CatalogoPaloma.SLOTS.size())
 
 

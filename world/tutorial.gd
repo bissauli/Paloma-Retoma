@@ -55,6 +55,7 @@ var _hizo_picada := false
 var _barras: BarrasCinematica
 var _camara: CamaraCinematica
 var _en_cinematica := false
+var _cartel_pausado := false   ## Otra cinemática (la de una casa) está en pantalla: sin cartel
 var _saltear := false
 var _t_cine := 0.0
 
@@ -114,10 +115,20 @@ func _intro() -> void:
 	_mostrar(Paso.IR_A_LAS_MIGAS)
 
 
+## Esconde (o vuelve a mostrar) el cartel mientras pasa otra cinemática que no es del tutorial
+## (por ejemplo la de entrar a una casa, ver world/casa_enterable.gd).
+func pausar_cartel(si: bool) -> void:
+	_cartel_pausado = si
+	if si:
+		_cartel.visible = false
+	elif _cartel.text != "" and not _en_cinematica:
+		_cartel.visible = true
+
+
 func _mostrar(n: int) -> void:
 	paso = n
 	_t_paso = 0.0
-	_cartel.visible = true
+	_cartel.visible = not _cartel_pausado
 	_cartel.text = (PASOS_MOVIL if Ajustes.movil else PASOS)[n]
 	_cartel.scale = Vector3.ONE * 0.2
 	create_tween().tween_property(_cartel, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

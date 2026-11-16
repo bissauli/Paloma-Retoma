@@ -330,19 +330,29 @@ static func casa_rosada(padre: Node3D) -> Vector3:
 
 ## Edificios bajos alrededor (con techos y cornisas para posarse).
 static func alrededores(padre: Node3D) -> void:
-	# Norte, a los costados de la Catedral
-	edificio(padre, Vector3(-27, 0, -36), Vector3(18, 12, 8), Color("e3b764"), Vector3(0, 0, 1), Color("a85a3c"))
-	edificio(padre, Vector3(-44, 0, -35), Vector3(14, 10, 10), Color("9fd2ab"), Vector3(0, 0, 1))
-	edificio(padre, Vector3(26, 0, -36), Vector3(16, 13, 8), Color("e98a74"), Vector3(0, 0, 1))
-	edificio(padre, Vector3(46, 0, -35), Vector3(16, 11, 10), Color("92c4ea"), Vector3(0, 0, 1), Color("4f7fc0"))
+	# Norte, a los costados de la Catedral: cinco pasajes, cada uno con su escenario. Tienen una
+	# ventana abierta a la plaza y otra atrás, a la vereda de Rivadavia, y la paloma los atraviesa
+	# volando esquivando cosas (con cinemática, ver world/casa_enterable.gd y world/pasaje.gd).
+	# Quedan 4 m adelantados para dejar lugar atrás. Colores y remates del mapa V3.
+	Pasaje.crear(padre, Vector3(-54.5, 0, -31), Vector3(11, 9, 10), Color("f2b5c8"), "Casa de Doña Marta",
+		Color("2f6b8a"), 1.0, ["¡Permiso, Doña Marta!", "Entre sábanas y macetas", "¡Cuidado con el mate!"], "conventillo",
+		Color("a85a3c"))
+	Pasaje.crear(padre, Vector3(-42, 0, -31), Vector3(10, 10, 10), Color("9fd2ab"), "Panadería El Hornero",
+		Color("2f7d5b"), -1.0, ["¡Atajo por la panadería!", "Olor a pan recién hecho... ¡y a la calle!",
+			"Ni el panadero la vio pasar"], "panaderia")
+	Pasaje.crear(padre, Vector3(-27, 0, -32), Vector3(18, 12, 8), Color("e3b764"), "Librería El Palomar",
+		Color("5b3b2a"), -1.0, ["¡Permiso, que pasa la paloma!", "Nadie lee, pero siempre hay migas",
+			"Ni el librero levantó la vista"], "libreria", Color("a85a3c"))
+	Pasaje.crear(padre, Vector3(26, 0, -32), Vector3(16, 13, 8), Color("e98a74"), "Seguros La Cornisa",
+		Color("2b4a6b"), 1.0, ["Como Ezio... pero con alas", "Vuelo asegurado, cobertura total",
+			"¡Abran paso, oficinistas!"], "oficina")
+	Pasaje.crear(padre, Vector3(46, 0, -31), Vector3(16, 11, 10), Color("92c4ea"), "Fiambrería Los Gorriones",
+		Color("b8423a"), 1.0, ["Entrar, esquivar, salir: así se vive en el centro",
+			"¡Perdón, señora, voy apurada!", "Salames a la izquierda, quesos a la derecha"], "fiambreria",
+		Color("4f7fc0"))
 	# Al sur de la avenida, en las dos puntas (dejan la calle libre para los autos)
 	edificio(padre, Vector3(-52, 0, 43), Vector3(12, 9, 12), Color("f0d27a"), Vector3(0, 0, -1), Color("a85a3c"))
 	edificio(padre, Vector3(50, 0, 43), Vector3(18, 12, 10), Color("d3bff0"), Vector3(0, 0, -1))
-	# Carteles de comercios inventados, sobre una tabla pegada a la pared
-	Construir.letrero(padre, Vector3(-27, 4.85, -31.8), "Librería El Palomar", Color.WHITE, Color("5b3b2a"), 48,
-		Vector2(6.4, 0.6))
-	Construir.letrero(padre, Vector3(26, 5.0, -31.8), "Seguros La Cornisa", Color.WHITE, Color("2b4a6b"), 48,
-		Vector2(6.0, 0.6))
 
 
 ## Rota un nodo recién creado sobre un eje ("x", "y" o "z").

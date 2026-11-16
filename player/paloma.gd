@@ -59,6 +59,12 @@ var _tween_aplastar: Tween
 const DURACION_APLASTADA := 1.5
 const CAPA_GENTE := 4       ## Gente y autos (ver world/auto.gd): mientras está chata le pasan por encima
 
+## En escena: una cinemática la mueve a mano (ver world/casa_enterable.gd). No corre la física
+## (ni gravedad ni colisiones), sólo la animación.
+var en_escena := false
+var _escena_modo := 2       ## Animación en escena: 0 suelo, 1 aleteo, 2 planeo
+var _escena_rapidez := 0.0
+
 @onready var modelo: ModeloPaloma = $Modelo
 @onready var camara: CamaraOrbital = $CamaraOrbital
 
@@ -89,6 +95,10 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if en_escena:
+		velocity = Vector3.ZERO
+		modelo.animar(delta, _escena_modo, _escena_rapidez)
+		return
 	var entrada := Vector2.ZERO
 	if controlable and _aplastada <= 0.0:
 		entrada = Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras")
@@ -369,6 +379,55 @@ func volver_al_nido() -> void:
 	reset_physics_interpolation()
 	camara.reubicar()
 	GameState.jugador_volvio_al_nido.emit()
+
+
+# ---------------------------------------------------------------- Escenas (cinemáticas)
+
+## Empieza una escena: la paloma deja de usar la física y se queda donde está hasta que la muevan
+## con escena_mover(). El que la llama también bloquea la cámara y esconde el HUD.
+func escena_empezar() -> void:
+	en_escena = true
+	controlable = false
+	velocity = Vector3.ZERO
+	en_picada = false
+	aleteando = false
+	_escena_modo = 1 if estado == Estado.AIRE else 0
+	_escena_rapidez = 0.0
+
+
+## Pone a la paloma en "pos" (global) mirando hacia "rumbo" (yaw) con la animación "modo"
+## (0 suelo, 1 aleteo, 2 planeo, 3 picada). "cabeceo" inclina el pico (positivo = hacia arriba) y
+## "alabeo" la inclina de costado (al doblar).
+func escena_mover(pos: Vector3, rumbo_nuevo: float, modo: int, rapidez: float, cabeceo := 0.0, alabeo := 0.0) -> void:
+	global_position = pos
+	_rumbo = rumbo_nuevo
+	_escena_modo = modo
+	_escena_rapidez = rapidez
+	_alabeo = alabeo
+	modelo.rotation = Vector3(cabeceo, _rumbo, alabeo)
+
+
+## Termina la escena y le devuelve la física. "en_aire": sale volando con la velocidad "vel"
+## (global); si no, queda parada en el piso. El control (controlable) lo devuelve quien la llamó.
+func escena_terminar(pos: Vector3, rumbo_nuevo: float, en_aire: bool, vel: Vector3) -> void:
+	en_escena = false
+	global_position = pos
+	_rumbo = rumbo_nuevo
+	modelo.rotation = Vector3(0.0, _rumbo, 0.0)
+	en_picada = false
+	aleteando = false
+	_tiempo_en_aire = 0.0
+	_coyote = 0.0
+	if en_aire:
+		estado = Estado.AIRE
+		floor_snap_length = 0.0
+		velocity = vel
+	else:
+		estado = Estado.SUELO
+		floor_snap_length = 0.25
+		velocity = Vector3.ZERO
+	reset_physics_interpolation()
+	camara.reubicar()
 
 
 ## Un humano la espanta: sale volando de golpe en esa dirección (no gasta stamina).
