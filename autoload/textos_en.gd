@@ -24,6 +24,14 @@ const MAPA := {
 	"BORRAR": "DELETE",
 	# Conversaciones y misiones secundarias (dialogos/catalogo_dialogos.gd, misiones/catalogo_misiones.gd)
 	"HABLAR CON %s": "TALK TO %s",
+	# Rueda de bailes (V)
+	"BAILES": "DANCES",
+	"CLICK O ENTER PARA ELEGIR  ·  V PARA CERRAR": "CLICK OR ENTER TO PICK  ·  V TO CLOSE",
+	"Break dance": "Breakdance",
+	"Salto": "Jump",
+	"Pirueta": "Pirouette",
+	"Cabeceo": "Head bob",
+	"Voltereta": "Somersault",
 	"E · CLICK PARA SEGUIR": "E · CLICK TO CONTINUE",
 	"¡Hola, paloma! Qué flaquita estás... Comé tranquila, que hoy hay para todas.":
 		"Hello, pigeon! You're so skinny... Eat up, there's plenty for everyone today.",

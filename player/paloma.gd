@@ -97,12 +97,38 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	_revisar_contacto(delta)
+	_revisar_baile()
 	_orientar(delta)
 	_acciones(delta)
 	_animar(delta)
 
 	camara.en_aire = estado == Estado.AIRE
 	camara.en_picada = en_picada
+
+
+# ---------------------------------------------------------------- Bailes (rueda de emotes)
+
+## Baila uno de los bailes de Coreografia, mirando hacia la cámara, hasta que se mueva, vuele o picotee.
+func bailar(baile: StringName) -> void:
+	if estado != Estado.SUELO:
+		return
+	velocity.x = 0.0
+	velocity.z = 0.0
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		var d := cam.global_position - global_position
+		_rumbo = atan2(-d.x, -d.z)
+	modelo.bailar(baile)
+
+
+func _revisar_baile() -> void:
+	if not modelo.bailando():
+		return
+	var corta := estado == Estado.AIRE or not GameState.en_partida
+	if controlable and not corta:
+		corta = Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras").length() > 0.1 			or Input.is_action_just_pressed("volar") or Input.is_action_just_pressed("picotear") 			or Input.is_action_just_pressed("arrullar")
+	if corta:
+		modelo.dejar_de_bailar()
 
 
 # ---------------------------------------------------------------- Movimiento

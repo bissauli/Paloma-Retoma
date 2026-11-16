@@ -60,6 +60,11 @@ func ver(nombre: String, variante: String, baile: StringName, t: float) -> void:
 	_aplicar(Coreografia.pose(baile, t))
 
 
+## La imagen del escenario 3D (sólo la paloma y su sombra, fondo transparente).
+func imagen() -> Image:
+	return _vp.get_texture().get_image()
+
+
 func _process(delta: float) -> void:
 	if _activa:
 		_t += delta
@@ -174,9 +179,7 @@ func _poner_modelo(variante: String) -> void:
 	# "La paloma flaca" de los créditos es la de la jugadora: lleva sus colores y accesorios
 	if variante == "Original":
 		AplicadorPaloma.aplicar(_modelo, _esqueleto, PerfilPaloma.actual())
-	_reposo.clear()
-	for i in _esqueleto.get_bone_count():
-		_reposo.append(_esqueleto.get_bone_global_rest(i).basis)
+	_reposo = PoseBaile.reposo_de(_esqueleto)
 
 
 # ---------------------------------------------------------------- Pose
@@ -188,11 +191,4 @@ func _aplicar(p: PoseBaile) -> void:
 	var altura := maxf(p.pos.y, 0.0)
 	_sombra.position = Vector3(p.pos.x, 0.003, p.pos.z)
 	_sombra.scale = Vector3.ONE * clampf(1.0 - altura * 1.3, 0.3, 1.0)
-	var giros := p.giros_de_huesos()
-	for i in _esqueleto.get_bone_count():
-		var delta: Basis = giros.get(_esqueleto.get_bone_name(i), Basis.IDENTITY)
-		var padre := _esqueleto.get_bone_parent(i)
-		var global_padre := _esqueleto.get_bone_global_pose(padre).basis if padre >= 0 else Basis.IDENTITY
-		# Giro en el espacio del modelo -> giro local del hueso (los padres tienen índice menor)
-		var local := global_padre.inverse() * delta * _reposo[i]
-		_esqueleto.set_bone_pose_rotation(i, local.get_rotation_quaternion())
+	p.aplicar_a(_esqueleto, _reposo)

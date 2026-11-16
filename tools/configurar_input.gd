@@ -14,6 +14,7 @@ const TECLAS := {
 	"picada": [KEY_SHIFT],
 	"pausa": [KEY_ESCAPE],
 	"interactuar": [KEY_E],
+	"emotes": [KEY_V],
 }
 const BOTONES := {
 	"picotear": MOUSE_BUTTON_LEFT,

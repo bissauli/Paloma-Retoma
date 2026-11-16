@@ -252,3 +252,9 @@ Sistema pensado para sumar gatos, perros, otras palomas y gente con diálogos y 
 - **Pantalla:** `ui/dialogo_ui.gd` (aviso "E HABLAR CON...", texto que se escribe de a poco, opciones con click, flechas+Enter o teclas 1-4; Esc corta). El aviso se puede tocar (celular).
 - Sólo se habla parado en el piso y con control; mientras se habla la paloma queda quieta y nadie la atrapa.
 - Pendiente a propósito: diario de misiones en pantalla, botón de "hablar" y de elegir opciones en los controles táctiles, que el NPC mire a la paloma (señales `conversacion_iniciada/terminada` ya existen), y los modelos de gato/perro. `tests/test_dialogos.gd` valida que los catálogos sean coherentes (nodos, traducciones al inglés, misiones).
+
+## Rueda de bailes (V)
+- **Qué hace:** V abre una rueda como la de emotes de Fortnite (`ui/rueda_emotes.gd`, autoload `Emotes`, acción `emotes`). Con el mouse (o el stick) se marca un casillero, click o Enter lo elige (soltar V después de mantenerla también), Esc o V de nuevo cierran. Un casillero por cada baile de los créditos (`Coreografia.ORDEN` + `FINAL`); para sumar uno basta agregarlo ahí y en `Coreografia.NOMBRES`.
+- **Baile:** `PalomaJugador.bailar()` → `ModeloPaloma.bailar()` apaga la animación del GLB y gira los huesos con la misma `PoseBaile` de los créditos (`PoseBaile.aplicar_a`, compartido con `Bailarina`). La paloma se da vuelta hacia la cámara y baila en bucle hasta que se mueva, vuele, picotee o arrulle.
+- **Miniaturas:** se sacan la primera vez que se abre con una `Bailarina` en un viewport escondido (paloma de la jugadora, con sus colores). En headless no hay imagen y los casilleros muestran el número.
+- Sólo se abre con la paloma en el piso, con control y sin conversación; mientras está abierta nadie la atrapa. Pendiente: botón en los controles táctiles.

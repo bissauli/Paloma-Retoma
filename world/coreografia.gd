@@ -14,7 +14,17 @@ const DURACION := {
 	&"breakdance": 6.5, &"moonwalk": 5.0, &"disco": 5.0, &"robot": 5.0, &"twist": 5.0,
 	&"salto": 5.0, &"pirueta": 5.5, &"cabeceo": 5.0, &"salsa": 5.0, &"voltereta": 7.0,
 }
+const NOMBRES := {
+	&"breakdance": "Break dance", &"moonwalk": "Moonwalk", &"disco": "Disco", &"robot": "Robot",
+	&"twist": "Twist", &"salto": "Salto", &"pirueta": "Pirueta", &"cabeceo": "Cabeceo",
+	&"salsa": "Salsa", &"voltereta": "Voltereta",
+}
 const YAW := 20.0       ## Cada paloma se ve de tres cuartos, no justo de frente
+
+
+## El nombre del baile para mostrar (en español: es la clave de la traducción).
+static func nombre(baile: StringName) -> String:
+	return NOMBRES.get(baile, String(baile))
 
 
 static func duracion(baile: StringName) -> float:

@@ -47,3 +47,23 @@ func giros_de_huesos() -> Dictionary:
 		&"body": cuerpo, &"head": cabeza, &"tail": cola,
 		&"wing_L": ala_izq, &"wing_R": ala_der, &"leg_L": pata_izq, &"leg_R": pata_der,
 	}
+
+
+## Giro global de cada hueso en reposo (se toma una vez, con el esqueleto sin animar).
+static func reposo_de(esqueleto: Skeleton3D) -> Array[Basis]:
+	var r: Array[Basis] = []
+	for i in esqueleto.get_bone_count():
+		r.append(esqueleto.get_bone_global_rest(i).basis)
+	return r
+
+
+## Gira los huesos del esqueleto según esta pose ("reposo" sale de reposo_de).
+func aplicar_a(esqueleto: Skeleton3D, reposo: Array[Basis]) -> void:
+	var giros := giros_de_huesos()
+	for i in esqueleto.get_bone_count():
+		var delta: Basis = giros.get(esqueleto.get_bone_name(i), Basis.IDENTITY)
+		var padre := esqueleto.get_bone_parent(i)
+		var global_padre := esqueleto.get_bone_global_pose(padre).basis if padre >= 0 else Basis.IDENTITY
+		# Giro en el espacio del modelo -> giro local del hueso (los padres tienen índice menor)
+		var local := global_padre.inverse() * delta * reposo[i]
+		esqueleto.set_bone_pose_rotation(i, local.get_rotation_quaternion())
