@@ -44,7 +44,22 @@ func _ready() -> void:
 	Misiones.mision_cambio.connect(func(_id: String, _e: String) -> void: refrescar())
 	# Algunas misiones se habilitan con el avance de la partida (objetivo_cambio sale en cada avance)
 	GameState.objetivo_cambio.connect(func(_t: String, _a: int, _m: int) -> void: refrescar())
+	conversacion_iniciada.connect(_al_iniciar_conversacion)
+	conversacion_terminada.connect(_al_terminar_conversacion)
 	refrescar()
+
+
+## El NPC (si sabe: atender y dejar_de_atender) se queda quieto y mira a la paloma mientras hablan.
+func _al_iniciar_conversacion(jugador: PalomaJugador) -> void:
+	var npc := get_parent()
+	if npc and npc.has_method("atender"):
+		npc.atender(jugador)
+
+
+func _al_terminar_conversacion() -> void:
+	var npc := get_parent()
+	if npc and npc.has_method("dejar_de_atender"):
+		npc.dejar_de_atender()
 
 
 func nombre() -> String:

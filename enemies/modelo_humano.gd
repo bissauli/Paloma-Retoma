@@ -194,6 +194,28 @@ func animar(delta: float, velocidad: float, agitado := false) -> void:
 	brazo_der.rotation = Vector3(-balanceo - arriba * 0.3, 0, arriba * 0.9)
 
 
+## Altura (local, en metros) de donde apoya el sombrero o la gorra: arriba de la cabeza.
+func altura_sombrero() -> float:
+	var k := alto / 1.75
+	var y_cadera := (0.5 if sentado else 0.85) * k
+	return y_cadera + 0.92 * k + 0.1 * k
+
+
+## Le saca el sombrero o la gorra (se rearma el cuerpo sin accesorio). Devuelve el tipo que tenía.
+func quitar_sombrero() -> String:
+	if accesorio != "sombrero" and accesorio != "gorra":
+		return ""
+	var tenia := accesorio
+	accesorio = "ninguno"
+	for n: Node in [cuerpo, get_node_or_null("CuerpoFisico")]:
+		if n:
+			remove_child(n)
+			n.queue_free()
+	_armar()
+	_crear_cuerpo_fisico()
+	return tenia
+
+
 ## Pasa de parado a sentado (o al revés) rearmando el cuerpo y su cápsula física.
 func cambiar_postura(sentar: bool) -> void:
 	if sentar == sentado:

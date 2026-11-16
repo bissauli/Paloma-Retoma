@@ -49,7 +49,7 @@ func _al_ganar() -> void:
 	_angulo = 0.0  # Arranca justo enfrente del balcón
 	_mover_camara()
 	_camara.current = true
-	AudioManager.reproducir("victoria", 0.0, false)
+	AudioManager.ui("success", -2.0)
 
 	# Título y estadísticas: bajan y se aclaran como el título del menú principal
 	_armar_estadisticas()

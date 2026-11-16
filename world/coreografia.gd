@@ -8,13 +8,30 @@ extends RefCounted
 ## con la paloma flaca. Para sumar uno: escribir su función, agregarlo a DURACION y a pose().
 
 const ORDEN: Array[StringName] = [&"breakdance", &"moonwalk", &"disco", &"robot", &"twist",
-	&"salto", &"pirueta", &"cabeceo", &"salsa"]
+	&"salto", &"pirueta", &"cabeceo", &"salsa", &"cortejo", &"gangnam"]
+## El baño de la fuente (ver world/fuente.gd) usa esta misma maquinaria pero no está en la rueda ni en
+## los créditos: la paloma lo baila sola al meterse al agua.
+const BANO := &"bano"
+## En qué segundo del cortejo la paloma que mira "se enamora" (después del gran final).
+const MOMENTO_CORTEJO := 6.5
 const FINAL := &"voltereta"
 const DURACION := {
 	&"breakdance": 6.5, &"moonwalk": 5.0, &"disco": 5.0, &"robot": 5.0, &"twist": 5.0,
 	&"salto": 5.0, &"pirueta": 5.5, &"cabeceo": 5.0, &"salsa": 5.0, &"voltereta": 7.0,
+	&"cortejo": 8.0, &"bano": 4.8, &"gangnam": 7.0,
+}
+const NOMBRES := {
+	&"breakdance": "Break dance", &"moonwalk": "Moonwalk", &"disco": "Disco", &"robot": "Robot",
+	&"twist": "Twist", &"salto": "Salto", &"pirueta": "Pirueta", &"cabeceo": "Cabeceo",
+	&"salsa": "Salsa", &"voltereta": "Voltereta", &"cortejo": "Cortejo", &"bano": "Baño",
+	&"gangnam": "Gangnam Style",
 }
 const YAW := 20.0       ## Cada paloma se ve de tres cuartos, no justo de frente
+
+
+## El nombre del baile para mostrar (en español: es la clave de la traducción).
+static func nombre(baile: StringName) -> String:
+	return NOMBRES.get(baile, String(baile))
 
 
 static func duracion(baile: StringName) -> float:
@@ -32,6 +49,9 @@ static func pose(baile: StringName, t: float) -> PoseBaile:
 		&"pirueta": return _pirueta(t)
 		&"cabeceo": return _cabeceo(t)
 		&"salsa": return _salsa(t)
+		&"cortejo": return _cortejo(t)
+		&"gangnam": return _gangnam(t)
+		&"bano": return _bano(t)
 		&"voltereta": return _voltereta(t)
 	return PoseBaile.new()
 
@@ -334,6 +354,138 @@ static func _salsa(t: float) -> PoseBaile:
 	p.pata_der = _x(-30.0 * maxf(-sin(beat * 2.0), 0.0))
 	p.cabeza = _y(30.0 * sin(beat + PI / 2.0)) * _z(10.0 * sin(beat))
 	p.cola = _y(20.0 * sin(beat * 2.0))
+	return p
+
+
+# ---------------------------------------------------------------- Gangnam Style
+
+## El baile del caballito (Gangnam Style), 7 s en bucle (arranca y termina igual):
+##   0 - 3 s     El caballito: saltitos alternando las patas (dos de cada lado), el cuerpo rebotando
+##               un poco agachado y las alas cruzadas adelante, como sosteniendo las riendas.
+##   3 - 5 s     El lazo: sigue el caballito, de costado a costado, y un ala revolea arriba de la
+##               cabeza mientras la otra sigue con las riendas.
+##   5 - 6,2 s   Cadera: alas abajo, la cadera se mueve de un lado al otro y la cabeza cabecea.
+##   6,2 - 7 s   Vuelve al caballito.
+static func _gangnam(t: float) -> PoseBaile:
+	var beat := t * TAU * 1.25                         # 2,5 saltitos por segundo
+	var salto := absf(sin(beat))                       # Cada medio ciclo, un saltito
+	# Dos saltitos de cada lado. La pata cambia justo cuando está apoyada (salto = 0), así que puede
+	# cambiar de golpe; el cuerpo, en cambio, va de un costado al otro suave
+	var lado := 1.0 if fmod(t * 1.25, 2.0) < 1.0 else -1.0
+	var costado := sin(t * PI * 1.25)
+	var w_lazo := smoothstep(2.8, 3.2, t) * (1.0 - smoothstep(4.8, 5.2, t))
+	var w_cadera := smoothstep(4.9, 5.3, t) * (1.0 - smoothstep(6.0, 6.4, t))
+	var p := PoseBaile.new()
+	# El caballito: agachado, rebotando, la pata de adelante cambia cada dos saltitos
+	p.pos = Vector3(lerpf(0.05, 0.12, w_lazo) * costado, 0.07 * salto - 0.03, 0.0)
+	p.rot = _y(YAW + 10.0 * costado * (1.0 - w_cadera)) * _x(-10.0 * (1.0 - w_cadera))
+	p.pata_izq = _x(-32.0 * salto if lado > 0.0 else -6.0 * salto)
+	p.pata_der = _x(-32.0 * salto if lado < 0.0 else -6.0 * salto)
+	# Riendas: las dos alas cruzadas adelante, subiendo y bajando con el salto
+	var riendas_izq := _ala_izq(176.0, -22.0 + 14.0 * salto)
+	var riendas_der := _ala_der(176.0, -16.0 + 14.0 * salto)
+	# El lazo: el ala derecha arriba de la cabeza, dando vueltas
+	var lazo := _ala_der(60.0 + 35.0 * sin(t * TAU * 2.0), 80.0 + 8.0 * cos(t * TAU * 2.0))
+	p.ala_izq = riendas_izq
+	p.ala_der = PoseBaile._mezclar_giro(riendas_der, lazo, w_lazo)
+	p.cabeza = _x(12.0 * salto - 4.0) * _y(8.0 * costado)
+	p.cola = _x(18.0 * salto) * _y(-12.0 * costado)
+	# Cadera: alas abajo y la cadera de un lado al otro
+	var cadera := PoseBaile.new()
+	var c := sin(t * TAU * 1.25)
+	cadera.pos = Vector3(0.08 * c, 0.01, 0.0)
+	cadera.rot = _y(YAW) * _z(16.0 * c)
+	cadera.ala_izq = _ala_izq(25.0, -15.0)
+	cadera.ala_der = _ala_der(25.0, -15.0)
+	cadera.pata_izq = _x(-12.0 * maxf(c, 0.0))
+	cadera.pata_der = _x(-12.0 * maxf(-c, 0.0))
+	cadera.cabeza = _x(16.0 * absf(c)) * _z(-10.0 * c)
+	cadera.cola = _y(25.0 * c)
+	return p.mezclar(cadera, w_cadera)
+
+
+# ---------------------------------------------------------------- 10. Cortejo
+
+## El cortejo del palomo, como el de verdad (8 s, y vuelve a empezar igual que arrancó):
+##   0 - 1 s     Se infla: el cuello se hincha (escala de la cabeza), abre la cola en abanico y se endereza.
+##   1,2 - 4 s   Da dos vueltas en círculo pavoneándose, con reverencias rápidas, el buche que "arrulla"
+##               (la cabeza late), pasitos cortos y las alas caídas temblando.
+##   4 - 6 s     Se planta de frente y hace reverencias lentas y profundas.
+##   6 - 7 s     Gran final: una vuelta más con un saltito, alas abiertas, cabeza en alto y la cola al máximo.
+##               En MOMENTO_CORTEJO las palomas sueltas que miran se enamoran (ver Bandada).
+##   7 - 8 s     Se desinfla y cierra con una última reverencia.
+static func _cortejo(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	# Envolventes (0 a 1) de cada tramo
+	var infla := smoothstep(0.0, 1.0, t) * (1.0 - smoothstep(7.2, 7.9, t))
+	var abanico := smoothstep(0.1, 1.1, t) * (1.0 - smoothstep(7.1, 7.9, t))
+	var circula := smoothstep(1.0, 1.4, t) * (1.0 - smoothstep(3.8, 4.2, t))
+	var frente := smoothstep(4.0, 4.5, t) * (1.0 - smoothstep(5.8, 6.2, t))
+	var gran := smoothstep(5.9, 6.3, t) * (1.0 - smoothstep(6.9, 7.4, t))
+	# Dos vueltas en el tramo 2 y una en el gran final: son 1080°, así que termina mirando como empezó
+	var yaw := YAW + 720.0 * smoothstep(1.2, 4.0, t) + 360.0 * smoothstep(5.9, 7.0, t)
+	# Reverencias: rápidas girando, lentas de frente, y una última al cerrar
+	var rapida := pow(maxf(0.5 - 0.5 * cos(TAU * t / 0.9), 0.0), 1.3)
+	var lenta := pow(maxf(0.5 - 0.5 * cos(TAU * (t - 4.0) / 1.6), 0.0), 1.2)
+	var reverencia := clampf(rapida * circula + lenta * frente + _campana(7.2, 8.0, t) * 0.8, 0.0, 1.0)
+	# El buche que late al arrullar (más rápido en el gran final)
+	var pulso := reverencia * (0.5 + 0.5 * sin(t * TAU * 6.5)) + gran * (0.5 + 0.5 * sin(t * TAU * 9.0))
+	var paso := t * TAU * 3.2
+
+	# Cuerpo: gira en círculo (se corre en una órbita chica a medida que gira), se agacha en cada
+	# reverencia y pega un saltito en el final
+	var angulo := deg_to_rad(yaw)
+	p.pos = Vector3(sin(angulo), 0.0, cos(angulo)) * 0.11 * circula
+	p.pos.y = 0.012 * absf(sin(paso)) * circula + 0.015 * infla - 0.025 * reverencia + 0.11 * _campana(6.2, 6.9, t)
+	var cabeceo := 30.0 * reverencia - 7.0 * gran * (1.0 - reverencia) - 6.0 * infla * (1.0 - reverencia)
+	p.rot = _y(yaw) * _z(3.0 * sin(t * TAU * 9.0) * gran) * _x(cabeceo)
+
+	# Cabeza: baja en la reverencia, sube en el final, y el cuello se hincha (escala)
+	p.cabeza = _y(9.0 * sin(t * TAU * 6.5) * reverencia) * _z(8.0 * sin(t * TAU * 0.8) * circula) \
+		* _x(24.0 * reverencia - 14.0 * gran * (1.0 - reverencia) - 5.0 * infla)
+	p.escala_cabeza = Vector3.ONE * (1.0 + 0.22 * infla + 0.07 * pulso)
+
+	# Alas: caídas y temblando mientras se pavonea; abiertas y en alto en el gran final
+	var abrir := 16.0 + 14.0 * infla + 44.0 * gran
+	var subir := -10.0 * infla * (1.0 - gran) + 55.0 * gran
+	p.ala_izq = _ala_izq(abrir + 3.0 * sin(t * TAU * 8.0) * infla, subir + 2.0 * sin(t * TAU * 8.0) * infla)
+	p.ala_der = _ala_der(abrir + 3.0 * sin(t * TAU * 8.0 + 1.3) * infla, subir + 2.0 * sin(t * TAU * 8.0 + 1.3) * infla)
+
+	# Patas: pasitos alternados al girar, listas para saltar en el final
+	var s := sin(paso)
+	p.pata_izq = _x(-22.0 * maxf(s, 0.0) * circula - 8.0 * gran)
+	p.pata_der = _x(-22.0 * maxf(-s, 0.0) * circula - 8.0 * gran)
+
+	# Cola: se levanta, se abre en abanico (escala en el ancho) y tiembla
+	p.cola = _x(12.0 * abanico + 20.0 * reverencia) * _y(5.0 * sin(t * TAU * 2.0) * abanico)
+	p.escala_cola = Vector3(1.0 + 0.95 * abanico + 0.05 * sin(t * TAU * 9.0) * abanico * (0.5 + gran), 1.0, 1.0 + 0.15 * abanico)
+	return p
+
+
+# ---------------------------------------------------------------- Baño (fuentes y charcos)
+
+## Cómo se baña una paloma de verdad (4,8 s en bucle; arranca y termina igual): se agacha en el agua,
+## zambulle el pecho y la cabeza una y otra vez mientras aletea rápido con las alas medio abiertas,
+## se balancea de un lado al otro y, antes de volver a empezar, se sacude con las plumas esponjadas.
+static func _bano(t: float) -> PoseBaile:
+	var p := PoseBaile.new()
+	var zambulle := pow(maxf(0.5 - 0.5 * cos(TAU * t / 1.2), 0.0), 1.2)   # 0 = cabeza arriba, 1 = en el agua
+	var aleteo := sin(t * TAU * 5.0)
+	var aleteo_der := sin(t * TAU * 5.0 + 0.9)
+	var vaiven := sin(t * TAU / 0.6)
+	var sacude := _campana(3.5, 4.6, t)                          # El sacudón de plumas del final
+	var temblor := sin(t * TAU * 10.0) * sacude
+
+	p.pos = Vector3(0.012 * vaiven, -0.04 - 0.012 * zambulle + 0.035 * sacude, 0.0)
+	p.rot = _y(YAW + 16.0 * temblor) * _z(9.0 * vaiven * (1.0 - sacude)) * _x(4.0 + 12.0 * zambulle)
+	p.cabeza = _y(12.0 * sin(t * TAU * 10.0) * zambulle + 14.0 * temblor) * _x(34.0 * zambulle - 8.0 * sacude)
+	p.escala_cabeza = Vector3.ONE * (1.0 + 0.08 * sacude)          # Plumas esponjadas
+	p.ala_izq = _ala_izq(50.0 + 10.0 * zambulle + 9.0 * aleteo + 32.0 * sacude, 12.0 + 18.0 * aleteo + 30.0 * sacude)
+	p.ala_der = _ala_der(50.0 + 10.0 * zambulle + 9.0 * aleteo_der + 32.0 * sacude, 12.0 + 18.0 * aleteo_der + 30.0 * sacude)
+	p.cola = _x(8.0 + 10.0 * zambulle) * _y(20.0 * sin(t * TAU * 5.0 + 1.0))
+	p.escala_cola = Vector3(1.0 + 0.45 * sacude, 1.0, 1.0)
+	p.pata_izq = _x(-10.0 * maxf(vaiven, 0.0))
+	p.pata_der = _x(-10.0 * maxf(-vaiven, 0.0))
 	return p
 
 

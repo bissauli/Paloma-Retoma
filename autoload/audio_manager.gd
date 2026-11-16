@@ -10,12 +10,39 @@ extends Node
 
 const MEZCLA := 22050
 const NOMBRES := ["arrullo", "aleteo", "picoteo", "grito_nene", "silbato",
-	"chillido_halcon", "ambiente", "recoger", "victoria", "bocina", "aplastar", "boing", "ladrido",
-	"trueno", "lluvia"]
+	"chillido_halcon", "ambiente", "recoger", "victoria", "bocina", "salpicadura", "aletazo", "tintineo",
+	"aplastar", "boing", "ladrido", "trueno", "lluvia"]
 const CANALES := 10
 const BUS_VOCES := ["arrullo", "grito_nene", "chillido_halcon"]
 
+## Sonidos de interfaz y de avisos (res://audio/ui/<archivo>.wav, de F:/TESTS/soundsForGames, pasados
+## a 16 bits, recortados y parejos de volumen). Se tocan con ui(): ui("highlight", -8.0). Salen por el
+## bus "Efectos". Si falta un archivo, ese sonido simplemente no suena.
+const UI := {
+	"button": "Button_Pressed",              ## Apretar un botón
+	"cancel": "Cancel",                      ## Cancelar, volver atrás, borrar
+	"click_in": "Clicked_In",                ## Activar una casilla
+	"click_out": "Clicked_Out",              ## Desactivar una casilla
+	"confirm": "Confirm",                    ## Confirmar: empezar a jugar, aceptar una misión
+	"currency": "Currency",                  ## Comida que se suma (entregar en el nido, el choripán)
+	"dialogue_blip": "Dialogue_Blip",        ## Pasar por una opción de un diálogo
+	"dialogue_expression": "Dialogue_Expression",   ## Una línea nueva de diálogo
+	"failure": "Failure",                    ## Te atraparon
+	"highlight": "Highlight",                ## Pasar el foco o el mouse por un botón
+	"lock": "Lock",                          ## Algo bloqueado (el choripán sin bandada)
+	"menu_close": "Menu_Close",
+	"menu_open": "Menu_Open",
+	"pause": "Pause",
+	"unpause": "Unpause",
+	"purchase": "Purchase",                  ## Gastar comida: reclutar palomas
+	"sell": "Sell",
+	"success": "Success",                    ## Victoria, trofeo, misión completada
+	"unlock": "Unlock",                      ## Logro, misión lista, baño completo
+	"warning": "Warning",                    ## Peligro: el halcón
+}
+
 var _sonidos := {}
+var _ui := {}
 var _pool: Array[AudioStreamPlayer] = []
 var _ambiente: AudioStreamPlayer
 var _musica: AudioStreamPlayer
@@ -27,6 +54,10 @@ func _ready() -> void:
 	_rng.seed = 1810
 	for n: String in NOMBRES:
 		_sonidos[n] = _cargar_o_generar(n)
+	for k: String in UI:
+		var ruta := "res://audio/ui/%s.wav" % UI[k]
+		if ResourceLoader.exists(ruta):
+			_ui[k] = load(ruta)
 	for i in CANALES:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
@@ -69,6 +100,22 @@ func reproducir(nombre: String, volumen_db := 0.0, variar_tono := true) -> void:
 	elegido.bus = bus_de(nombre)
 	elegido.volume_db = volumen_db
 	elegido.pitch_scale = _rng.randf_range(0.92, 1.08) if variar_tono else 1.0
+	elegido.play()
+
+
+## Sonido de interfaz o de aviso (ver UI), sin variar el tono.
+func ui(nombre: String, volumen_db := 0.0) -> void:
+	if not _ui.has(nombre):
+		return
+	var elegido: AudioStreamPlayer = _pool[0]
+	for p in _pool:
+		if not p.playing:
+			elegido = p
+			break
+	elegido.stream = _ui[nombre]
+	elegido.bus = &"Efectos"
+	elegido.volume_db = volumen_db
+	elegido.pitch_scale = 1.0
 	elegido.play()
 
 
@@ -137,6 +184,9 @@ func _cargar_o_generar(nombre: String) -> AudioStream:
 		"recoger": return _gen_recoger()
 		"victoria": return _gen_victoria()
 		"bocina": return _gen_bocina()
+		"salpicadura": return _gen_salpicadura()
+		"aletazo": return _gen_aletazo()
+		"tintineo": return _gen_tintineo()
 		"aplastar": return _gen_aplastar()
 		"boing": return _gen_boing()
 		"ladrido": return _gen_ladrido()
@@ -244,6 +294,52 @@ func _gen_silbato() -> AudioStreamWAV:
 		var trino := 0.6 + 0.4 * sin(TAU * 38.0 * t)
 		var f := 2900.0 + sin(TAU * 38.0 * t) * 120.0
 		m[i] = sin(TAU * f * t) * trino * 0.28 * _env(t, dur, 0.02)
+	return _a_wav(m)
+
+
+func _gen_salpicadura() -> AudioStreamWAV:
+	# "Plaf": ruido que se va apagando, con unos burbujeos (tonos cortitos que suben).
+	var dur := 0.4
+	var m := _muestras(dur)
+	var filtrado := 0.0
+	var burbujas: Array[float] = [0.02, 0.09, 0.17]
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		filtrado = lerpf(filtrado, _rng.randf_range(-1.0, 1.0), lerpf(0.5, 0.12, minf(t / 0.3, 1.0)))
+		var s := filtrado * exp(-t * 9.0) * 0.8
+		for b: float in burbujas:
+			var u := t - b
+			if u >= 0.0 and u < 0.06:
+				s += sin(TAU * (500.0 + 6000.0 * u) * u) * exp(-u * 45.0) * 0.35
+		m[i] = s * 0.8 * _env(t, dur, 0.003)
+	return _a_wav(m)
+
+
+func _gen_aletazo() -> AudioStreamWAV:
+	# "Fuch": una ráfaga de aire (ruido que se abre y se cierra) con un golpecito seco de plumas al final.
+	var dur := 0.26
+	var m := _muestras(dur)
+	var filtrado := 0.0
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		var u := t / dur
+		filtrado = lerpf(filtrado, _rng.randf_range(-1.0, 1.0), lerpf(0.12, 0.55, minf(u * 1.6, 1.0)))
+		var viento := sin(u * PI) * pow(u, 0.6)
+		var golpe := exp(-maxf(t - 0.14, 0.0) * 55.0) * (1.0 if t > 0.14 else 0.0)
+		m[i] = (filtrado * viento * 0.7 + filtrado * golpe * 0.6) * _env(t, dur, 0.004)
+	return _a_wav(m)
+
+
+func _gen_tintineo() -> AudioStreamWAV:
+	# "Tin": vidrio o loza que cae, dos tonos agudos que se apagan.
+	var dur := 0.5
+	var m := _muestras(dur)
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		var s := sin(TAU * 2350.0 * t) * exp(-t * 14.0) + 0.6 * sin(TAU * 3480.0 * t) * exp(-t * 18.0) \
+			+ 0.3 * sin(TAU * 5100.0 * t) * exp(-t * 26.0)
+		s += _rng.randf_range(-1.0, 1.0) * exp(-t * 220.0) * 0.5
+		m[i] = s * 0.32 * _env(t, dur, 0.001)
 	return _a_wav(m)
 
 

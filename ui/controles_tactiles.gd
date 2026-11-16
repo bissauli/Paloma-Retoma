@@ -50,6 +50,7 @@ func _ready() -> void:
 		_boton("picotear", &"picotear", "PICOTEAR", Vector2(-372, -112), 68.0, false, Color("ffe58a")),
 		_boton("picada", &"picada", "PICADA", Vector2(-340, -305), 66.0, true, Color("ffad66")),
 		_boton("arrullar", &"arrullar", "ARRULLAR", Vector2(-145, -378), 64.0, false, Color("ff9ecb")),
+		_boton("aletazo", &"aletazo", "ALETAZO", Vector2(-545, -215), 58.0, false, Color("a6f0a0")),
 		_boton("pausa", &"", "II", Vector2(-62, 0), 42.0, false, Color(1, 1, 1)),
 	]
 	GameState.victoria.connect(func() -> void: _fin = true)
@@ -61,9 +62,9 @@ func _buscar_jugador() -> void:
 	_jugador = GameState.jugador
 
 
-func _boton(id: String, accion: StringName, texto: String, offset: Vector2, radio: float,
+func _boton(id: String, accion: StringName, texto: String, desplazamiento: Vector2, radio: float,
 		mantener: bool, color: Color) -> Dictionary:
-	return {"id": id, "accion": accion, "texto": texto, "offset": offset, "radio": radio,
+	return {"id": id, "accion": accion, "texto": texto, "offset": desplazamiento, "radio": radio,
 		"mantener": mantener, "color": color, "toque": -1, "desde": 0.0}
 
 

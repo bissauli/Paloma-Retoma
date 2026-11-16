@@ -53,6 +53,8 @@ var lado_callejon := 1.0      ## Hacia dónde dobla al salir al callejón (+1 = 
 var activa := false
 var estilo := Estilo.PERSECUCION       ## La coreografía de la cinemática
 var nombre := ""                       ## El nombre del local (la placa de título)
+var tema := ""                         ## Qué escenario es (ver Pasaje.ESCENARIOS)
+var piso := 0                          ## En qué piso del edificio está la sala
 var colgantes: Array[Node3D] = []      ## Pivotes de lo que cuelga del techo (se hamacan)
 var mesas: Array[Vector3] = []         ## Tapas de las mesas (locales): de ahí vuelan los papeles
 var salames: Array[Vector3] = []       ## Dónde cuelgan los salames (locales)
@@ -178,6 +180,7 @@ func _physics_process(delta: float) -> void:
 	var cerca := global_position.distance_to(j.global_position) < 34.0
 	if luz:
 		luz.visible = cerca
+		luz.shadow_enabled = activa   # Sombras de los muebles sólo mientras pasa la paloma (cuestan)
 	if cerca or activa:
 		_animar_colgantes(delta)
 	if _corriendo:

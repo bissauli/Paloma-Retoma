@@ -12,8 +12,19 @@ func _ready() -> void:
 	add_child(main)
 	paloma = main.get_node("Paloma")
 	await _cuadros(20)
+	var inicio := paloma.global_position   # Donde arranca la partida: en el piso, con lugar alrededor
 	for c in get_tree().get_nodes_in_group("casa_enterable"):
 		await _pasada(c as CasaEnterable)
+	# Al final, de vuelta en el piso, baila el Gangnam Style (el baile nuevo de la rueda)
+	paloma.global_position = inicio
+	paloma.reset_physics_interpolation()
+	paloma.velocity = Vector3.ZERO
+	paloma.estado = PalomaJugador.Estado.SUELO
+	paloma.camara.pitch = -0.12
+	paloma.camara.reubicar()
+	await _cuadros(30)
+	paloma.bailar(&"gangnam")
+	await _cuadros(int(Coreografia.duracion(&"gangnam") * 30.0) + 10)
 	get_tree().quit()
 
 

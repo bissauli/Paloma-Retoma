@@ -12,7 +12,7 @@ const SLOT_PREFIJO := "Slot_"
 ## Luminancia media (lineal) de cada zona en la textura original, que el shader usa para repartir
 ## el tinte sin aplanar el sombreado. Se calcula con la textura y la máscara (el test lo comprueba:
 ## si se cambia la textura o se regenera la máscara hay que actualizar estos números).
-const LUZ_BASE := [0.0, 0.50251811742783, 0.33363220095634, 0.52032446861267, 0.2343718111515, 0.13425998389721, 0.41131654381752]
+const LUZ_BASE := [0.0, 0.50275588571081, 0.33601290863237, 0.48082680767727, 0.23752745612212, 0.13426012578215, 0.41381328247014]
 
 static var _sin_pintura: ImageTexture   ## Pintura vacía de 1x1 que comparten los materiales sin pintar
 

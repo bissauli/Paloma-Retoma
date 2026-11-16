@@ -30,21 +30,21 @@ func _init() -> void:
 	_detalle = Label.new()
 	_detalle.theme_type_variation = &"TextoChico"
 	caja.add_child(_detalle)
-	var fila := HBoxContainer.new()
-	fila.add_theme_constant_override("separation", 14)
-	fila.alignment = BoxContainer.ALIGNMENT_END
-	caja.add_child(fila)
+	var botones := HBoxContainer.new()
+	botones.add_theme_constant_override("separation", 14)
+	botones.alignment = BoxContainer.ALIGNMENT_END
+	caja.add_child(botones)
 	_boton_borrar = Button.new()
 	_boton_borrar.text = "BORRAR"
 	_boton_borrar.custom_minimum_size = Vector2(150, 42)
 	_boton_borrar.pressed.connect(_borrar)
 	_boton_borrar.focus_exited.connect(func() -> void: _reiniciar_borrado())
-	fila.add_child(_boton_borrar)
+	botones.add_child(_boton_borrar)
 	_boton_cargar = Button.new()
 	_boton_cargar.text = "CARGAR"
 	_boton_cargar.custom_minimum_size = Vector2(170, 42)
 	_boton_cargar.pressed.connect(_cargar)
-	fila.add_child(_boton_cargar)
+	botones.add_child(_boton_cargar)
 	for b: Button in [_boton_borrar, _boton_cargar]:
 		b.mouse_entered.connect(b.grab_focus)
 
@@ -81,7 +81,7 @@ func _cargar() -> void:
 	if d.is_empty():
 		_refrescar()
 		return
-	AudioManager.reproducir("arrullo", -6.0)
+	AudioManager.ui("confirm", -6.0)
 	visible = false   # Sin emitir "cerrada": el menú se va con la transición al juego
 	cargar.emit(d)
 
@@ -91,10 +91,10 @@ func _borrar() -> void:
 	if not _confirmar_borrado:
 		_confirmar_borrado = true
 		_boton_borrar.text = "¿SEGURO?"
-		AudioManager.reproducir("picoteo")
+		AudioManager.ui("warning", -8.0)
 		return
 	GameState.borrar_partida()
-	AudioManager.reproducir("picoteo")
+	AudioManager.ui("cancel", -6.0)
 	_refrescar()
 	volver.grab_focus()
 

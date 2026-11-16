@@ -27,21 +27,23 @@ func _ready() -> void:
 
 func _pasada(casa: CasaEnterable, n: int) -> void:
 	# La fachada, desde la plaza
-	paloma.global_position = casa.to_global(Vector3(0, 3.0, casa.fondo / 2.0 + 14.0))
+	# (La sala está en un piso al azar: se la mira desde lejos, un poco más abajo y hacia arriba)
+	paloma.global_position = casa.to_global(Vector3(0, 1.0, casa.fondo / 2.0 + 22.0))
 	paloma.reset_physics_interpolation()
 	paloma.estado = PalomaJugador.Estado.AIRE
 	paloma.velocity = Vector3.ZERO
-	paloma.camara.yaw = 0.0
-	paloma.camara.pitch = -0.02
+	paloma.camara.yaw = casa.rotation.y
+	paloma.camara.pitch = 0.25
 	paloma.camara.reubicar()
 	await _frames(25)
 	_foto("%d_%s_fachada" % [n, String(casa.name).replace("Entrada_", "")])
 	paloma.global_position = casa.to_global(Vector3(casa.x_frente, CasaEnterable.Y_PASO, casa.fondo / 2.0 + 2.8))
 	paloma.reset_physics_interpolation()
-	paloma.camara.yaw = 0.0
+	paloma.camara.yaw = casa.rotation.y
+	paloma.camara.pitch = 0.0
 	paloma.estado = PalomaJugador.Estado.SUELO
 	paloma.despegar()
-	paloma.velocity = Vector3(0, 0, -7)
+	paloma.velocity = casa.global_transform.basis * Vector3(0, 0, -7)
 	Input.action_press("mover_adelante")
 	while not casa.activa:
 		await get_tree().physics_frame

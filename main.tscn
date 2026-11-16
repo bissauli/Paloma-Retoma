@@ -9,7 +9,7 @@
 [ext_resource type="PackedScene" path="res://ui/hud.tscn" id="7"]
 [ext_resource type="PackedScene" path="res://ui/pausa.tscn" id="8"]
 [ext_resource type="PackedScene" path="res://ui/victoria.tscn" id="9"]
-[ext_resource type="Script" path="res://ui/menu/camara_menu.gd" id="10_camara_menu"]
+[ext_resource type="Script" uid="uid://iayrt076e2ur" path="res://ui/menu/camara_menu.gd" id="10_camara_menu"]
 [ext_resource type="PackedScene" path="res://ui/menu/menu_principal.tscn" id="11_menu"]
 
 [node name="Main" type="Node3D" unique_id=137852250]
@@ -20,7 +20,7 @@ script = ExtResource("1")
 [node name="Paloma" parent="." unique_id=58284266 instance=ExtResource("3")]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -35.95, 0.5, 3)
 
-[node name="CamaraMenu" type="Camera3D" parent="."]
+[node name="CamaraMenu" type="Camera3D" parent="." unique_id=1472494454]
 fov = 36.0
 near = 0.03
 far = 400.0
@@ -41,4 +41,4 @@ script = ExtResource("6")
 
 [node name="Victoria" parent="." unique_id=1364636341 instance=ExtResource("9")]
 
-[node name="MenuPrincipal" parent="." instance=ExtResource("11_menu")]
+[node name="MenuPrincipal" parent="." unique_id=1882963345 instance=ExtResource("11_menu")]

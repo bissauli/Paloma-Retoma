@@ -8,23 +8,40 @@ var paloma: PalomaJugador
 var fallas := 0
 var _terminada := false
 var _ultima_desde_frente := false
+var _hamaca_max := 0.0
 
 
 func _ready() -> void:
+	# Los locales y los pisos se sortean en cada partida: acá con una semilla fija (o la que se pase)
+	if OS.get_environment("PALOMA_SEMILLA") == "":
+		OS.set_environment("PALOMA_SEMILLA", "7")
 	var main: Node = load("res://main.tscn").instantiate()
 	add_child(main)
 	paloma = main.get_node("Paloma")
 	await _frames(20)
 
 	var casas := get_tree().get_nodes_in_group("casa_enterable")
-	_check("hay 5 pasajes (5 escenarios)", casas.size() == 5)
-	var casa_a := _casa_en(Vector3(-27, 0, -32))   # Librería El Palomar
-	var casa_b := _casa_en(Vector3(26, 0, -32))    # Seguros La Cornisa
-	var casa_c := _casa_en(Vector3(-42, 0, -31))   # Panadería El Hornero
-	_check("encuentra los pasajes", casa_a != null and casa_b != null and casa_c != null)
-	if casa_a == null or casa_b == null or casa_c == null:
+	_check("hay un local por cada edificio de alrededor (%d)" % casas.size(), casas.size() == Edificios.ALREDEDORES.size())
+	if casas.size() < 4:
 		get_tree().quit(1)
 		return
+	var casa_a := casas[0] as CasaEnterable
+	var casa_b := casas[3] as CasaEnterable
+	var casa_c := casas[1] as CasaEnterable
+	# --- Pisos al azar y locales distintos
+	var temas := {}
+	var pisos := {}
+	for c in casas:
+		var casa := c as CasaEnterable
+		temas[casa.tema] = true
+		pisos[casa.piso] = true
+		print("  %s: %s en el piso %d" % [casa.name, casa.tema, casa.piso])
+		_check("%s: la sala está en un piso del %d al %d" % [casa.name, Pasaje.PISO_MIN, Pasaje.PISO_MAX],
+			casa.piso >= Pasaje.PISO_MIN and casa.piso <= Pasaje.PISO_MAX)
+		_check("%s: la sala está a la altura de su piso" % casa.name,
+			absf(casa.global_position.y - casa.piso * Pasaje.ALTO_PISO) < 0.01)
+	_check("cada edificio tiene un local distinto (%d)" % temas.size(), temas.size() == casas.size())
+	_check("los pisos no son todos iguales (%d distintos)" % pisos.size(), pisos.size() > 1)
 
 	# --- Huecos de verdad, ruta libre, obstáculos y lugar para salir
 	for c in casas:
@@ -42,15 +59,15 @@ func _ready() -> void:
 			_check("%s: la ruta %s no toca ningún mueble%s" % [casa.name, "adelante->atrás" if desde_frente else "atrás->adelante",
 				"" if choque == "" else " (" + choque + ")"], choque == "")
 		var atras := casa.to_global(Vector3(0, 1, -casa.fondo / 2.0 - CasaEnterable.CALLEJON + 0.1))
-		_check("%s: atrás hay lugar para salir (dentro de la ciudad)" % casa.name, atras.z > Ciudad.Z_MIN)
+		_check("%s: atrás hay lugar para salir (dentro de la ciudad)" % casa.name, atras.z > Ciudad.Z_MIN and atras.z < Ciudad.Z_MAX)
 
-	# Cada escenario tiene su coreografía
+	# Los escenarios tienen coreografías variadas
 	var estilos := {}
 	for c in casas:
 		estilos[(c as CasaEnterable).estilo] = true
-	_check("los 5 escenarios tienen coreografías distintas (%d)" % estilos.size(), estilos.size() == 5)
+	_check("hay al menos 3 coreografías distintas (%d)" % estilos.size(), estilos.size() >= 3)
 
-	# --- Los 5 escenarios, de punta a punta (adelante -> atrás)
+	# --- Todos los escenarios, de punta a punta (adelante -> atrás)
 	for c in casas:
 		var casa := c as CasaEnterable
 		await _lanzar(casa, Vector3(casa.x_frente, Y, casa.fondo / 2.0 + 2.6), Vector3(0, 0, -7), 0.0, "mover_adelante")
@@ -63,15 +80,14 @@ func _ready() -> void:
 			arranco and cruzo and _terminada and casa.to_local(paloma.global_position).z < -casa.fondo / 2.0)
 		_check("%s: dura lo justo (menos de 8 s, con el plano final y la vuelta a la cámara)" % casa.name, seg < 8.0)
 		# Lo que cuelga se hamaca después de que pasa (los ventiladores giran, no se hamacan)
-		var hamaca := 0.0
+		var hamaca := _hamaca_max
 		var hay := false
 		for piv in casa.colgantes:
 			if not piv.has_meta(&"gira"):
 				hay = true
-				hamaca = maxf(hamaca, maxf(absf(piv.rotation.x), absf(piv.rotation.z)))
 		if hay:
 			_check("%s: lo que cuelga se hamaca al pasar (%.2f rad)" % [casa.name, hamaca], hamaca > 0.02)
-		if casa.estilo == CasaEnterable.Estilo.CENITAL:
+		if casa.estilo == CasaEnterable.Estilo.CENITAL and not casa.salames.is_empty():
 			_check("%s: se roba un salame" % casa.name, casa.robo)
 		if casa.estilo == CasaEnterable.Estilo.DE_FRENTE:
 			_check("%s: tiene escritorios de donde vuelan papeles" % casa.name, casa.mesas.size() > 0)
@@ -182,6 +198,7 @@ func _lanzar(casa: CasaEnterable, pos_local: Vector3, vel: Vector3, yaw: float, 
 	paloma.despegar()
 	paloma.velocity = casa.global_transform.basis * vel
 	_terminada = false
+	_hamaca_max = 0.0
 	casa.escena_terminada.connect(_al_terminar, CONNECT_ONE_SHOT)
 	Input.action_press(tecla)
 	await get_tree().physics_frame
@@ -208,6 +225,10 @@ func _esperar_fin(casa: CasaEnterable, max_frames := 1500) -> bool:
 	while not _terminada and n < max_frames:
 		await get_tree().physics_frame
 		adentro = adentro or casa.esta_adentro(paloma.global_position)
+		# Cuánto se hamacó lo que cuelga (lo máximo en toda la pasada: al final ya casi se frenó)
+		for piv in casa.colgantes:
+			if not piv.has_meta(&"gira"):
+				_hamaca_max = maxf(_hamaca_max, maxf(absf(piv.rotation.x), absf(piv.rotation.z)))
 		n += 1
 	await _frames(4)
 	return adentro

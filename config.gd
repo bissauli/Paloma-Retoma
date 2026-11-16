@@ -36,6 +36,8 @@ const COMIDA_CHORIPAN := 12
 const COSTO_RECLUTAR := 1          ## Comida por paloma reclutada
 const RADIO_ARRULLO := 7.0         ## Radio en metros del arrullo
 const RADIO_NIDO := 6.0            ## Radio del nido para entregar comida
+const RADIO_CORTEJO := 9.0         ## Hasta dónde llega el cortejo (el baile) para enamorar palomas sueltas
+const CORTEJO_MAX := 3             ## Palomas que se suman gratis por cada cortejo
 
 # --- Penalizaciones ---
 const PERDIDA_NENE := 0.25         ## Fracción de la bandada que dispersa el nene

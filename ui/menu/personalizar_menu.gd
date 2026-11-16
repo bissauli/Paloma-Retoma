@@ -179,51 +179,19 @@ func _nuevo_panel(padre: Control) -> VBoxContainer:
 	return p
 
 
-## Botón de acción: caja redondeada y translúcida del color de "acento" (cyan por defecto), con
-## borde claro, sombra y el foco como un aro blanco. Más prolijo que las barras inclinadas de VOLVER
-## y del menú, que están hechas para ir solas y se pisan cuando hay varias en fila.
+## Botón de acción con el estilo de EstiloUI.estilizar_boton ("acento" es su color).
 func _boton(texto: String, padre: Control, ancho := 190.0, tam_fuente := 18, acento := Color(0.247, 0.722, 0.839)) -> Button:
 	var b := Button.new()
 	b.text = texto
 	b.add_theme_font_size_override("font_size", tam_fuente)
-	b.add_theme_color_override("font_color", Color.WHITE)
-	b.add_theme_color_override("font_hover_color", Color.WHITE)
-	b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.4))
 	b.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	b.custom_minimum_size = Vector2(ancho, 44)
-	b.add_theme_stylebox_override("normal", _caja_boton(acento.lerp(Color(0, 0.05, 0.1), 0.15), 0.78, 0.55))
-	b.add_theme_stylebox_override("hover", _caja_boton(acento.lightened(0.22), 0.92, 1.0))
-	b.add_theme_stylebox_override("pressed", _caja_boton(acento.darkened(0.25), 0.95, 1.0))
-	b.add_theme_stylebox_override("hover_pressed", _caja_boton(acento.darkened(0.25), 0.95, 1.0))
-	b.add_theme_stylebox_override("disabled", _caja_boton(Color(0.35, 0.5, 0.56), 0.22, 0.2))
-	var foco := StyleBoxFlat.new()
-	foco.draw_center = false
-	foco.set_border_width_all(3)
-	foco.border_color = Color.WHITE
-	foco.set_corner_radius_all(11)
-	foco.set_expand_margin_all(2)
-	b.add_theme_stylebox_override("focus", foco)
+	EstiloUI.estilizar_boton(b, acento)
 	b.mouse_entered.connect(func() -> void:
 		if not b.disabled:
 			b.grab_focus())
 	padre.add_child(b)
 	return b
-
-
-func _caja_boton(color: Color, alfa: float, borde: float) -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
-	s.bg_color = Color(color.r, color.g, color.b, alfa)
-	s.set_corner_radius_all(9)
-	s.set_border_width_all(2)
-	s.border_color = Color(1, 1, 1, borde)
-	s.content_margin_left = 18.0
-	s.content_margin_right = 18.0
-	s.content_margin_top = 8.0
-	s.content_margin_bottom = 8.0
-	s.shadow_color = Color(0, 0.03, 0.06, 0.4)
-	s.shadow_size = 6
-	s.shadow_offset = Vector2(0, 3)
-	return s
 
 
 ## Una fila centrada de botones (con un poco de aire arriba).
@@ -298,7 +266,9 @@ func _armar_avanzado() -> void:
 	fila("Tamaño", _sel_tam)
 	_chk_simetria = CheckBox.new()
 	_chk_simetria.button_pressed = _simetria
-	_chk_simetria.toggled.connect(func(on: bool) -> void: _simetria = on)
+	_chk_simetria.toggled.connect(func(on: bool) -> void:
+		_simetria = on
+		AudioManager.ui("click_in" if on else "click_out", -8.0))
 	fila("Simetría", _chk_simetria)
 	var nombres_vista: Array[String] = []
 	for v: Array in VISTAS:
@@ -683,7 +653,7 @@ func _poner_color(c: Color) -> void:
 ## Hace un cambio en el perfil (el perfil avisa y la pantalla se refresca y guarda sola).
 func _cambio(accion: Callable) -> void:
 	accion.call()
-	AudioManager.reproducir("picoteo", -16.0)
+	AudioManager.ui("button", -10.0)
 
 
 func _refrescar() -> void:

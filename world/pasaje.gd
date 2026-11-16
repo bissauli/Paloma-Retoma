@@ -1,9 +1,11 @@
 class_name Pasaje
 extends RefCounted
-## Arma un "pasaje": una casa porteña con la planta baja hueca, una ventana abierta adelante (a la
-## plaza) y otra atrás (al callejón), y adentro un escenario con obstáculos que la paloma esquiva en
-## la cinemática de world/casa_enterable.gd. Hay 5 escenarios (librería, panadería, conventillo,
-## oficina y fiambrería), cada uno con su ruta en zigzag, sus alturas y sus obstáculos.
+## Arma un "pasaje": un edificio con un local en un piso al azar (del 1 al 7), con una ventana abierta
+## adelante y otra atrás, y adentro un escenario con obstáculos que la paloma esquiva en la cinemática
+## de world/casa_enterable.gd. Hay 11 escenarios (librería, panadería, conventillo, oficina,
+## fiambrería, supermercado, verdulería, casa, café, restaurante y consultorio), cada uno con su ruta
+## en zigzag, sus alturas, sus obstáculos, sus texturas y su luz. Los edificios de alrededor de la
+## plaza (Edificios.ALREDEDORES) se arman así: cada partida sortea qué local va en cada uno y en qué piso.
 ##
 ## Los obstáculos se ubican SOBRE la ruta real (la misma curva que recorre la cinemática):
 ## - "costado": en cada vuelta del zigzag, del lado de adentro (la paloma lo rodea).
@@ -12,7 +14,8 @@ extends RefCounted
 ## - "entre": las dos cosas a la vez (pasa por el medio): ahí va la cámara lenta.
 ## Cada uno se valida contra la ruta (en los dos sentidos): si queda a menos de MARGEN, se corre o se
 ## achica, y si no entra, no se pone. Así ninguna ruta choca nunca (lo confirma tests/test_casas.gd).
-## La fachada mira a +Z.
+## La fachada mira a +Z local (el edificio se gira según su frente). La sala es un nodo "Sala" a la
+## altura de su piso: todo lo de adentro está en sus coordenadas (el piso de la sala es y = 0).
 
 const C_MARCO := Color("e9e2d2")
 const C_BLANCO := Color("f4f1e8")
@@ -20,54 +23,154 @@ const C_VENTANA := Color("3b4250")
 const C_MADERA := Color("8a5a35")
 const C_METAL := Color("3f4a45")
 const C_ORO := Color("d8b04a")
-const PLANTA_BAJA := 6.0   ## Alto del cuarto (arriba es macizo)
+const PLANTA_BAJA := 6.0   ## Alto de la sala (ocupa casi dos pisos)
+const ALTO_PISO := 3.2     ## Alto de cada piso del edificio (como Edificios.ventanas)
+const PISO_MIN := 1        ## La sala nunca está en la planta baja...
+const PISO_MAX := 7        ## ...y a lo sumo en el 7.º piso
 const MARGEN := 0.45       ## Distancia mínima entre la ruta y cualquier obstáculo
 
 ## Cada escenario: alturas de las vueltas del zigzag (una por vuelta), amplitud del zigzag
 ## (fracción de la profundidad), qué va entre vuelta y vuelta, y los colores del cuarto.
-## Además: "estilo" (la coreografía de la cinemática, ver CasaEnterable), el piso ("tablas" o
-## "baldosas", con sus dos colores), el zócalo, si hay vigas en el techo, el toldo y las cortinas.
+## Además: "estilo" (la coreografía de la cinemática, ver CasaEnterable), el piso ("tablas",
+## "baldosas" o "porcelanato", con sus dos colores), la pared ("lisa", "empapelado", "ladrillo" o
+## "azulejo", ver TexturasInterior), el zócalo, si hay vigas en el techo, el toldo, las cortinas, el
+## color de la luz, los nombres posibles del local, el color de los postigos y los textos de la cinemática.
 const ESCENARIOS := {
 	"libreria": {"alturas": [2.2, 2.9, 2.0, 2.8], "amp": 0.45, "medios": ["arriba", "entre", "abajo"],
 		"piso": Color("8a5a35"), "piso2": Color("6f4528"), "suelo": "tablas", "zocalo": Color("6b4a32"),
-		"pared": Color("efe4c8"), "vigas": true, "toldo": "toldo_rayas_verde", "cortina": "cortina_verde",
-		"cartel": "SILENCIO, POR FAVOR", "estilo": CasaEnterable.Estilo.PERSECUCION},
+		"pared": Color("efe4c8"), "pared_tex": "empapelado", "vigas": true, "toldo": "toldo_rayas_verde",
+		"cortina": "cortina_verde", "cartel": "SILENCIO, POR FAVOR", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"luz": Color("ffd9a0"), "postigo": Color("5b3b2a"), "nombres": ["Librería El Palomar", "Libros El Vuelo"],
+		"textos": ["¡Permiso, que pasa la paloma!", "Nadie lee, pero siempre hay migas", "Ni el librero levantó la vista"]},
 	"panaderia": {"alturas": [2.9, 1.9, 2.8], "amp": 0.32, "medios": ["entre", "arriba"],
 		"piso": Color("e9dcc0"), "piso2": Color("c96f4a"), "suelo": "baldosas", "zocalo": Color("c96f4a"),
-		"pared": Color("f3e3c3"), "vigas": true, "toldo": "toldo_rayas_amarillo", "cortina": "cortina_crema",
-		"cartel": "PAN CALIENTE", "estilo": CasaEnterable.Estilo.TIRABUZON},
+		"pared": Color("f3e3c3"), "pared_tex": "azulejo", "vigas": true, "toldo": "toldo_rayas_amarillo",
+		"cortina": "cortina_crema", "cartel": "PAN CALIENTE", "estilo": CasaEnterable.Estilo.TIRABUZON,
+		"luz": Color("ffd59a"), "postigo": Color("2f7d5b"), "nombres": ["Panadería El Hornero", "Panadería La Miga"],
+		"textos": ["¡Atajo por la panadería!", "Olor a pan recién hecho... ¡y a la calle!", "Ni el panadero la vio pasar"]},
 	"conventillo": {"alturas": [2.0, 2.9, 2.1], "amp": 0.32, "medios": ["arriba", "entre"],
 		"piso": Color("7c5a3e"), "piso2": Color("9a6b43"), "suelo": "tablas", "zocalo": Color("2f6b8a"),
-		"pared": Color("c9e0d0"), "vigas": true, "toldo": "toldo_rayas_rojo", "cortina": "cortina_roja",
-		"cartel": "CASA DE DOÑA MARTA", "estilo": CasaEnterable.Estilo.GRUA},
+		"pared": Color("c9e0d0"), "pared_tex": "lisa", "vigas": true, "toldo": "toldo_rayas_rojo",
+		"cortina": "cortina_roja", "cartel": "CASA DE DOÑA MARTA", "estilo": CasaEnterable.Estilo.GRUA,
+		"luz": Color("ffdcae"), "postigo": Color("2f6b8a"), "nombres": ["Casa de Doña Marta"],
+		"textos": ["¡Permiso, Doña Marta!", "Entre sábanas y macetas", "¡Cuidado con el mate!"]},
 	"oficina": {"alturas": [2.6, 1.9, 2.8, 2.0], "amp": 0.45, "medios": ["abajo", "entre", "arriba"],
-		"piso": Color("8f969c"), "piso2": Color("7f868c"), "suelo": "baldosas", "zocalo": Color("5f666b"),
-		"pared": Color("e6eaee"), "vigas": false, "toldo": "toldo_rayas_azul", "cortina": "cortina_azul",
-		"cartel": "ATENCIÓN AL CLIENTE", "estilo": CasaEnterable.Estilo.DE_FRENTE},
+		"piso": Color("8f969c"), "piso2": Color("7f868c"), "suelo": "porcelanato", "zocalo": Color("5f666b"),
+		"pared": Color("e6eaee"), "pared_tex": "lisa", "vigas": false, "toldo": "toldo_rayas_azul",
+		"cortina": "cortina_azul", "cartel": "ATENCIÓN AL CLIENTE", "estilo": CasaEnterable.Estilo.DE_FRENTE,
+		"luz": Color("f2f5ff"), "postigo": Color("2b4a6b"), "nombres": ["Seguros La Cornisa", "Estudio Pichón & Asoc."],
+		"textos": ["Como Ezio... pero con alas", "Vuelo asegurado, cobertura total", "¡Abran paso, oficinistas!"]},
 	"fiambreria": {"alturas": [2.0, 2.8, 1.9, 2.7], "amp": 0.4, "medios": ["arriba", "entre", "abajo"],
 		"piso": Color("f4f1e8"), "piso2": Color("3a3c40"), "suelo": "baldosas", "zocalo": Color("b8423a"),
-		"pared": Color("f1ead8"), "vigas": false, "toldo": "toldo_rayas_rojo", "cortina": "cortina_crema",
-		"cartel": "FIAMBRES Y QUESOS", "estilo": CasaEnterable.Estilo.CENITAL},
+		"pared": Color("f1ead8"), "pared_tex": "azulejo", "vigas": false, "toldo": "toldo_rayas_rojo",
+		"cortina": "cortina_crema", "cartel": "FIAMBRES Y QUESOS", "estilo": CasaEnterable.Estilo.CENITAL,
+		"luz": Color("fff0d0"), "postigo": Color("b8423a"), "nombres": ["Fiambrería Los Gorriones"],
+		"textos": ["Entrar, esquivar, salir: así se vive en el centro", "¡Perdón, señora, voy apurada!",
+			"Salames a la izquierda, quesos a la derecha"]},
+	"supermercado": {"alturas": [2.4, 2.9, 1.9, 2.7], "amp": 0.42, "medios": ["arriba", "entre", "abajo"],
+		"piso": Color("f2f2ee"), "piso2": Color("d9dcd6"), "suelo": "porcelanato", "zocalo": Color("4f9a5a"),
+		"pared": Color("e8f2e4"), "pared_tex": "lisa", "vigas": false, "toldo": "toldo_rayas_verde",
+		"cortina": "cortina_verde", "cartel": "OFERTAS DE LA SEMANA", "estilo": CasaEnterable.Estilo.TIRABUZON,
+		"luz": Color("f4f8ff"), "postigo": Color("3f7d4a"), "nombres": ["Súper Don Pichón", "Supermercado El Gorrión"],
+		"textos": ["¡Pasillo 3, sin frenar!", "Nadie pagó, pero nadie la vio", "Ofertas a toda velocidad"]},
+	"verduleria": {"alturas": [2.1, 2.8, 2.2], "amp": 0.36, "medios": ["entre", "arriba"],
+		"piso": Color("b7b2a8"), "piso2": Color("a29d93"), "suelo": "baldosas", "zocalo": Color("6b8f3a"),
+		"pared": Color("f1e6d0"), "pared_tex": "lisa", "vigas": true, "toldo": "toldo_rayas_verde",
+		"cortina": "cortina_verde", "cartel": "FRUTAS Y VERDURAS DE ESTACIÓN", "estilo": CasaEnterable.Estilo.CENITAL,
+		"luz": Color("fff2cf"), "postigo": Color("6b8f3a"), "nombres": ["Verdulería Doña Rosa", "Frutas El Palomar"],
+		"textos": ["¡Esas bananas casi me tapan!", "La fruta más fresca, la paloma más rápida", "¡Ni un tomate tocó!"]},
+	"casa": {"alturas": [2.5, 2.0, 2.9], "amp": 0.34, "medios": ["arriba", "entre"],
+		"piso": Color("b07a4a"), "piso2": Color("94603a"), "suelo": "tablas", "zocalo": Color("8a5a35"),
+		"pared": Color("f4e3cf"), "pared_tex": "empapelado", "vigas": false, "toldo": "toldo_rayas_amarillo",
+		"cortina": "cortina_crema", "cartel": "HOGAR, DULCE HOGAR", "estilo": CasaEnterable.Estilo.GRUA,
+		"luz": Color("ffd9a8"), "postigo": Color("4f7fc0"), "nombres": ["Casa de los Pérez", "Departamento 4.º B"],
+		"textos": ["¡Perdón por entrar sin tocar!", "Living, comedor... ¡y afuera!", "Nadie se despertó"]},
+	"cafe": {"alturas": [2.3, 2.9, 2.0, 2.6], "amp": 0.4, "medios": ["arriba", "entre", "abajo"],
+		"piso": Color("8d9198"), "piso2": Color("7a7e85"), "suelo": "porcelanato", "zocalo": Color("8a5a35"),
+		"pared": Color("f1cf9c"), "pared_tex": "lisa", "vigas": false, "toldo": "toldo_rayas_rojo",
+		"cortina": "cortina_roja", "cartel": "CAFÉ Y MEDIALUNAS", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"luz": Color("ffcf8f"), "postigo": Color("7a3f2a"), "nombres": ["Café La Medialuna", "Café Tortoni Chico"],
+		"textos": ["¡Un cortado para llevar!", "Ni una miga en el piso", "Café al paso, bien al paso"]},
+	"restaurante": {"alturas": [2.4, 2.0, 2.8, 2.1], "amp": 0.42, "medios": ["abajo", "entre", "arriba"],
+		"piso": Color("8a5a35"), "piso2": Color("744a2c"), "suelo": "tablas", "zocalo": Color("6b3a2c"),
+		"pared": Color("b8634e"), "pared_tex": "ladrillo", "vigas": false, "toldo": "toldo_rayas_rojo",
+		"cortina": "cortina_roja", "cartel": "MENÚ DEL DÍA", "estilo": CasaEnterable.Estilo.DE_FRENTE,
+		"luz": Color("ffc98a"), "postigo": Color("7a2f2a"), "nombres": ["Cantina Don Pichón", "Restaurante La Plaza"],
+		"textos": ["¡Mesa para una, de pasada!", "Servilletas volando, ¡perdón!", "La especialidad: el atajo"]},
+	"consultorio": {"alturas": [2.6, 2.0, 2.8], "amp": 0.38, "medios": ["abajo", "entre"],
+		"piso": Color("d8e6ea"), "piso2": Color("b9cfd6"), "suelo": "porcelanato", "zocalo": Color("3f7fb0"),
+		"pared": Color("eef6f6"), "pared_tex": "azulejo", "vigas": false, "toldo": "toldo_rayas_azul",
+		"cortina": "cortina_azul", "cartel": "SILENCIO - CONSULTORIOS", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"luz": Color("eef8ff"), "postigo": Color("3f7fb0"), "nombres": ["Consultorios Plaza", "Clínica La Pluma"],
+		"textos": ["¡Que pase la siguiente!", "Turno express", "Control de vuelo: todo en orden"]},
 }
+
+## Qué edificio de Edificios.ALREDEDORES tiene qué local: índice -> [tema, piso, nombre]. Lo llena
+## alrededores() y lo consulta NivelMedio (para no ponerle balcones donde está la sala).
+static var interiores := {}
+
+
+## ¿El edificio "k" de Edificios.ALREDEDORES tiene un local adentro (y no lleva balcones ni toldos)?
+static func tiene_interior(k: int) -> bool:
+	return interiores.has(k)
+
+
+## Arma los edificios de alrededor de la plaza, cada uno con un local distinto en un piso al azar.
+## Cada partida sortea los locales y los pisos (con la variable de entorno PALOMA_SEMILLA se puede fijar).
+static func alrededores(padre: Node3D) -> Array[CasaEnterable]:
+	interiores.clear()
+	var rng := RandomNumberGenerator.new()
+	var semilla := OS.get_environment("PALOMA_SEMILLA")
+	if semilla.is_valid_int():
+		rng.seed = int(semilla)
+	else:
+		rng.randomize()
+	var temas: Array = ESCENARIOS.keys()
+	# Mezcla de Fisher-Yates con el rng (así la semilla la fija)
+	for i in range(temas.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var t: String = temas[i]
+		temas[i] = temas[j]
+		temas[j] = t
+	var out: Array[CasaEnterable] = []
+	for k in Edificios.ALREDEDORES.size():
+		var e: Array = Edificios.ALREDEDORES[k]
+		var tema: String = temas[k % temas.size()]
+		var esc: Dictionary = ESCENARIOS[tema]
+		var piso := rng.randi_range(PISO_MIN, PISO_MAX)
+		var nombre: String = esc["nombres"][rng.randi_range(0, esc["nombres"].size() - 1)]
+		var base: Vector3 = e[0]
+		var lado := 1.0 if base.x >= 0.0 else -1.0   # Al salir por atrás dobla hacia afuera de la plaza
+		interiores[k] = [tema, piso, nombre]
+		out.append(crear(padre, base, e[1], e[2], nombre, esc["postigo"], lado, esc["textos"], tema, e[4], piso, e[3]))
+	return out
 
 
 ## Crea el pasaje y devuelve el nodo que dispara la cinemática.
-## "lado_callejon": hacia dónde dobla la paloma al salir por atrás (+1 = este, -1 = oeste).
+## "lado_callejon": hacia dónde dobla la paloma al salir por atrás (+1 = +X local, -1 = -X local).
 ## "color_remate": el borde de color de la azotea y las cornisas (estilo del mapa V3).
+## "piso": en qué piso está la sala (0 = planta baja). "frente": hacia dónde mira la fachada.
 static func crear(padre: Node3D, base: Vector3, tam: Vector3, color: Color, nombre: String,
 		color_postigo: Color, lado_callejon: float, textos: Array, tema: String,
-		color_remate := C_BLANCO) -> CasaEnterable:
-	var w := tam.x
-	var h := tam.y
-	var d := tam.z
-	var esp := CasaEnterable.ESPESOR
+		color_remate := C_BLANCO, piso := 0, frente := Vector3(0, 0, 1)) -> CasaEnterable:
+	var w := tam.x if absf(frente.z) > 0.5 else tam.z
+	var d := tam.z if absf(frente.z) > 0.5 else tam.x
+	var y0 := piso * ALTO_PISO
 	var pb := PLANTA_BAJA
+	# El edificio crece lo que haga falta para que la sala entre con un piso más arriba
+	var h := maxf(tam.y, y0 + pb + ALTO_PISO)
+	var esp := CasaEnterable.ESPESOR
 	var esc: Dictionary = ESCENARIOS[tema]
-	var pared_int: Color = esc["pared"]
+	var mat_pared := TexturasInterior.pared(esc["pared_tex"], esc["pared"])
 	var casa := Node3D.new()
 	casa.name = "Pasaje_" + nombre.replace(" ", "_")
 	padre.add_child(casa)
 	casa.position = base
+	casa.rotation.y = atan2(frente.x, frente.z)
+	var sala := Node3D.new()
+	sala.name = "Sala"
+	casa.add_child(sala)
+	sala.position.y = y0
 
 	# --- El nodo de la cinemática (con la ruta, que los obstáculos necesitan)
 	var ce := CasaEnterable.new()
@@ -79,26 +182,33 @@ static func crear(padre: Node3D, base: Vector3, tam: Vector3, color: Color, nomb
 	ce.lado_callejon = lado_callejon
 	ce.estilo = esc["estilo"]
 	ce.nombre = nombre
+	ce.tema = tema
+	ce.piso = piso
 	ce.ruta = ruta_zigzag(w, d, ce.x_frente, ce.x_fondo, esc["alturas"], esc["amp"])
 	for t in textos:
 		ce.textos.append(str(t))
 
-	# --- Cáscara: piso, costados, fachada y contrafachada con ventana, piso de arriba macizo
-	Construir.caja(casa, Vector3(0, -0.13, 0), Vector3(w - 2 * esp, 0.3, d - 2 * esp), esc["piso"])
+	# --- El edificio: macizo abajo y arriba de la sala
+	if y0 > 0.0:
+		Construir.caja(casa, Vector3(0, y0 / 2.0, 0), Vector3(w, y0, d), color)
+	Construir.caja(casa, Vector3(0, (y0 + pb + h) / 2.0, 0), Vector3(w, h - y0 - pb, d), color)
+	# --- La sala: piso, costados, fachada y contrafachada con ventana, cielorraso
+	Construir.caja(sala, Vector3(0, -0.13, 0), Vector3(w - 2 * esp, 0.3, d - 2 * esp), esc["piso"])
 	for sx in [-1.0, 1.0]:
-		Construir.caja(casa, Vector3(sx * (w / 2.0 - esp / 2.0), pb / 2.0, 0), Vector3(esp, pb, d - 2 * esp), color)
-		Construir.caja(casa, Vector3(sx * (w / 2.0 - esp - 0.01), pb / 2.0, 0), Vector3(0.02, pb, d - 2 * esp), pared_int, false)
-	_pared_con_ventana(casa, w, d / 2.0 - esp / 2.0, ce.x_frente, 1.0, color, pared_int)
-	_pared_con_ventana(casa, w, -d / 2.0 + esp / 2.0, ce.x_fondo, -1.0, color, pared_int)
-	Construir.caja(casa, Vector3(0, (pb + h) / 2.0, 0), Vector3(w, h - pb, d), color)
-	Construir.caja(casa, Vector3(0, pb - 0.01, 0), Vector3(w - 2 * esp, 0.02, d - 2 * esp), C_BLANCO, false)
+		Construir.caja(sala, Vector3(sx * (w / 2.0 - esp / 2.0), pb / 2.0, 0), Vector3(esp, pb, d - 2 * esp), color)
+		Construir.caja_mat(sala, Vector3(sx * (w / 2.0 - esp - 0.01), pb / 2.0, 0), Vector3(0.02, pb, d - 2 * esp), mat_pared, false)
+	_pared_con_ventana(sala, w, d / 2.0 - esp / 2.0, ce.x_frente, 1.0, color, mat_pared)
+	_pared_con_ventana(sala, w, -d / 2.0 + esp / 2.0, ce.x_fondo, -1.0, color, mat_pared)
+	Construir.caja(sala, Vector3(0, pb - 0.01, 0), Vector3(w - 2 * esp, 0.02, d - 2 * esp), C_BLANCO, false)
 
-	# --- Exterior: marcos y postigos, cornisas, ventanas de adorno y cartel
-	_marco_ventana(casa, ce.x_frente, d / 2.0, 1.0, color_postigo)
-	_marco_ventana(casa, ce.x_fondo, -d / 2.0, -1.0, color_postigo)
+	# --- Exterior: marcos y postigos, cornisas que enmarcan la sala, ventanas de los otros pisos y carteles
+	_marco_ventana(sala, ce.x_frente, d / 2.0, 1.0, color_postigo)
+	_marco_ventana(sala, ce.x_fondo, -d / 2.0, -1.0, color_postigo)
 	for e in [1.0, -1.0]:
-		Construir.caja(casa, Vector3(0, pb + 0.15, e * (d / 2.0 + 0.2)), Vector3(w + 0.2, 0.3, 0.6), color_remate)
-	_fachada(casa, ce, w, h, d, esc)
+		Construir.caja(casa, Vector3(0, y0 + pb + 0.15, e * (d / 2.0 + 0.2)), Vector3(w + 0.2, 0.3, 0.6), color_remate)
+		if y0 > 0.0:
+			Construir.caja(casa, Vector3(0, y0 - 0.12, e * (d / 2.0 + 0.15)), Vector3(w + 0.1, 0.24, 0.5), color_remate)
+	_fachada(casa, ce, w, h, d, esc, y0)
 	# Azotea gris con el borde de color (para posarse) y un aire acondicionado, como Edificios.edificio
 	Construir.caja(casa, Vector3(0, h + 0.05, 0), Vector3(w, 0.1, d), Edificios.C_TECHO)
 	const B := 0.55
@@ -108,18 +218,24 @@ static func crear(padre: Node3D, base: Vector3, tam: Vector3, color: Color, nomb
 	Construir.caja(casa, Vector3(w / 2.0 - 2.2, h + 0.5, -d / 4.0), Vector3(1.5, 0.8, 1.0), Color("e8eaea"))
 	for dx in [-0.38, 0.38]:
 		Construir.cilindro(casa, Vector3(w / 2.0 - 2.2 + dx, h + 0.92, -d / 4.0), 0.32, 0.04, Color("5f666b"), false, 10)
-	# El cartel va arriba de la puerta (sobre la ventana está el toldo)
-	Construir.letrero(casa, Vector3(_x_puerta(w), 4.75, d / 2.0 + 0.12), nombre, Color.WHITE, color_postigo.darkened(0.4), 44,
-		Vector2(minf(w * 0.42, 6.0), 0.6))
+	# Cartel en la planta baja, sobre la puerta, que dice en qué piso está el local; y otro sobre el toldo
+	var texto := nombre if piso == 0 else "%s · %d.º piso" % [nombre, piso]
+	var y_cartel := 4.75 if piso == 0 else 3.55
+	Construir.letrero(casa, Vector3(_x_puerta(w), y_cartel, d / 2.0 + 0.12), texto, Color.WHITE, color_postigo.darkened(0.4), 40,
+		Vector2(minf(w * 0.44, 6.6), 0.6))
+	if piso > 0:
+		Construir.letrero(sala, Vector3(ce.x_frente, 5.45, d / 2.0 + 0.12), nombre, Color.WHITE, color_postigo.darkened(0.3), 36,
+			Vector2(minf(w * 0.34, 4.4), 0.5))
 
 	# --- Adentro: piso, paredes y techo del escenario; obstáculos sobre la ruta; adornos y luz
-	_interior(casa, ce, w, d, esc)
-	ce.obstaculos = _obstaculos(casa, ce, tema)
-	ce.luz = _adornos(casa, ce, tema, esc["cartel"])
-	_mas_adornos(casa, ce, tema)
+	_interior(sala, ce, w, d, esc)
+	ce.obstaculos = _obstaculos(sala, ce, tema)
+	ce.luz = _adornos(sala, ce, tema, esc["cartel"])
+	_mas_adornos(sala, ce, tema)
 	padre.add_child(ce)
-	ce.position = base
+	ce.transform = casa.transform * Transform3D(Basis.IDENTITY, Vector3(0, y0, 0))
 	return ce
+
 
 
 ## La ruta por adentro: de la ventana de adelante a la de atrás, cruzando el cuarto de punta a punta
@@ -260,16 +376,26 @@ static func _obstaculos(casa: Node3D, ce: CasaEnterable, tema: String) -> int:
 ## Lo que cuelga va en un pivote en el techo que no se fusiona: así se hamaca cuando pasa la paloma
 ## (o gira, el ventilador). Las mesas y los salames se anotan para los efectos de la cinemática.
 static func _poner(casa: Node3D, ce: CasaEnterable, tema: String, tipo: String, c: Vector3, e: Vector3, giro: float, i: int) -> void:
+	var nombre := _mueble_obstaculo(tema, tipo, i)
+	if tipo != "arriba":
+		var s := _mueble_en_caja(casa, nombre, c, e, giro)
+		# La colisión, del tamaño del mueble de verdad (más chico o igual que la caja que validó la
+		# ruta: la paloma sigue pasando con más lugar). Si no, un mueble bajo tendría una pared
+		# invisible arriba que le tapa la vista a la cámara.
+		var tam: Vector3 = MueblesDatos.PIEZAS[nombre]["tam"] * s
+		var ev := Vector3(minf(e.x, tam.x / 2.0), minf(e.y, tam.y / 2.0), minf(e.z, tam.z / 2.0))
+		var cv := Vector3(c.x, c.y - e.y + ev.y, c.z)
+		var forma_v := BoxShape3D.new()
+		forma_v.size = ev * 2.0
+		Construir.colision(casa, cv, forma_v, Vector3(0, giro, 0))
+		ce.cajas.append([cv, ev, giro])
+		if tipo == "abajo":
+			ce.mesas.append(Vector3(c.x, c.y + e.y, c.z))
+		return
 	var forma := BoxShape3D.new()
 	forma.size = e * 2.0
 	Construir.colision(casa, c, forma, Vector3(0, giro, 0))
 	ce.cajas.append([c, e, giro])
-	var nombre := _mueble_obstaculo(tema, tipo, i)
-	if tipo != "arriba":
-		_mueble_en_caja(casa, nombre, c, e, giro)
-		if tipo == "abajo":
-			ce.mesas.append(Vector3(c.x, c.y + e.y, c.z))
-		return
 	var pivote := Node3D.new()
 	pivote.name = "Colgante_%d" % ce.colgantes.size()
 	pivote.set_meta(&"no_fusionar", true)
@@ -296,6 +422,12 @@ static func _mueble_obstaculo(tema: String, tipo: String, i: int) -> String:
 		"conventillo": {"costado": "torre_macetas", "arriba": "sabana", "abajo": "mesa_mate"},
 		"oficina": {"costado": "archivero" if i % 2 == 0 else "planta_alta", "arriba": "ventilador", "abajo": "escritorio_pc"},
 		"fiambreria": {"costado": "heladera_vitrina", "arriba": "salames", "abajo": "mostrador_quesos"},
+		"supermercado": {"costado": "gondola" if i % 3 != 2 else "heladera_bebidas", "arriba": "cartel_oferta", "abajo": "caja_super"},
+		"verduleria": {"costado": "estante_cajones", "arriba": "racimo_bananas", "abajo": "puesto_frutas"},
+		"casa": {"costado": "ropero" if i % 2 == 0 else "planta_alta", "arriba": "lampara_techo", "abajo": "mesa_comedor"},
+		"cafe": {"costado": "heladera_bebidas" if i % 2 == 0 else "planta_alta", "arriba": "lampara_colgante", "abajo": "vitrina_tortas"},
+		"restaurante": {"costado": "jardinera_alta", "arriba": "lampara_colgante", "abajo": "mesa_mantel"},
+		"consultorio": {"costado": "armario_medico" if i % 2 == 0 else "planta_alta", "arriba": "lampara_quirofano", "abajo": "camilla"},
 	}
 	return tabla[tema][tipo]
 
@@ -319,7 +451,7 @@ static func _mueble_en_caja(destino: Node3D, nombre: String, c: Vector3, e: Vect
 
 ## Pared de la planta baja con una ventana centrada en "cx" (y su lámina de pintura interior).
 ## "afuera" = +1 si la cara exterior mira a +Z.
-static func _pared_con_ventana(casa: Node3D, w: float, z: float, cx: float, afuera: float, color: Color, pintura: Color) -> void:
+static func _pared_con_ventana(casa: Node3D, w: float, z: float, cx: float, afuera: float, color: Color, pintura: Material) -> void:
 	var esp := CasaEnterable.ESPESOR
 	var pb := PLANTA_BAJA
 	var an := CasaEnterable.VENTANA_ANCHO
@@ -335,7 +467,7 @@ static func _pared_con_ventana(casa: Node3D, w: float, z: float, cx: float, afue
 		var pos: Vector3 = p[0]
 		var tam: Vector3 = p[1]
 		Construir.caja(casa, pos, tam, color)
-		Construir.caja(casa, pos - Vector3(0, 0, afuera * (esp / 2.0 + 0.01)), Vector3(tam.x, tam.y, 0.02), pintura, false)
+		Construir.caja_mat(casa, pos - Vector3(0, 0, afuera * (esp / 2.0 + 0.01)), Vector3(tam.x, tam.y, 0.02), pintura, false)
 
 
 ## Marco, alféizar y dos postigos abiertos (clásico porteño) de una ventana en la cara z_cara.
@@ -394,7 +526,20 @@ const DECO := {
 	"conventillo": ["torre_macetas", "silla", "jaula", "maceta", "mesa_mate", "lampara_pie", "torre_macetas", "cajas"],
 	"oficina": ["archivero", "silla", "maceta", "dispenser", "planta_alta", "lampara_pie", "archivero", "cajas"],
 	"fiambreria": ["barril", "heladera_vitrina", "cajas", "barril", "silla", "maceta", "estante_panes"],
+	"supermercado": ["heladera_bebidas", "gondola", "canasto_super", "heladera_bebidas", "cajon_frutas", "gondola", "cajas"],
+	"verduleria": ["cajon_frutas", "estante_cajones", "cajon_verduras", "canasto_panes", "cajon_frutas", "maceta", "cajas"],
+	"casa": ["mueble_tv", "mesita_luz", "cama", "mesita_luz", "maceta", "lampara_pie", "ropero", "sillon_azul"],
+	"cafe": ["mesa_cafe", "maceta", "mesa_cafe", "tacho", "heladera_bebidas", "mesa_cafe", "lampara_pie"],
+	"restaurante": ["mesa_mantel", "silla", "jardinera_alta", "mesa_mantel", "silla", "maceta", "barril"],
+	"consultorio": ["sillas_espera", "maceta", "balanza_medica", "silla_ruedas", "armario_medico", "sillas_espera", "dispenser"],
 }
+## Lo que va en el rincón de atrás a la izquierda (si no está, el sillón con el gato y la lámpara).
+const RINCON := {"supermercado": "heladera_bebidas", "verduleria": "cajon_verduras", "consultorio": "sillas_espera",
+	"restaurante": "mesa_mantel", "fiambreria": "barril", "panaderia": "canasto_panes", "cafe": "mesa_cafe"}
+## Algo propio de cada lugar, contra la pared derecha.
+const PROPIO := {"panaderia": "horno", "oficina": "dispenser", "fiambreria": "barril", "conventillo": "jaula",
+	"libreria": "mesa_ratona", "supermercado": "caja_super", "verduleria": "puesto_frutas", "casa": "mesa_comedor",
+	"cafe": "vitrina_tortas", "restaurante": "mesa_mantel", "consultorio": "camilla"}
 const DECO_ALTO_MAX := 2.5   ## Lo alto se achica a esto: así no le tapa el cuarto a la cámara
 
 
@@ -454,20 +599,26 @@ static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: Stri
 	var ruta := _muestras(ce)
 	# Alfombra en el medio (abajo de todo: nunca tapa la ruta)
 	Kit.colocar(casa, "alfombra", Vector3(0, 0.02, 0), 0.0, Vector3(minf(w * 0.3, 2.2), 1.0, minf(d * 0.35, 2.0)) / Vector3(2.4, 1.0, 1.6) * 1.6)
-	# Rincón de atrás a la izquierda: sillón contra la pared, el gato encima y una lámpara
-	var sillon := "sillon_amarillo" if tema in ["libreria", "conventillo"] else "sillon_azul"
-	var ps := Vector3(-hx + 0.5, 0.02, -hz + 1.15)
-	if _adorno(casa, ce, ruta, sillon, ps, PI / 2.0):
-		Kit.colocar(casa, "gato", ps + Vector3(0.05, 0.45, -0.4), PI / 2.0 + 0.4)
-		_adorno(casa, ce, ruta, "lampara_pie", Vector3(-hx + 0.35, 0.02, -hz + 2.6), 0.0)
+	# Rincón de atrás a la izquierda: algo del lugar, o el sillón con el gato encima y una lámpara
+	if RINCON.has(tema):
+		var nombre_r: String = RINCON[tema]
+		var tam_r: Vector3 = MueblesDatos.PIEZAS[nombre_r]["tam"]
+		_adorno(casa, ce, ruta, nombre_r, Vector3(-hx + tam_r.z / 2.0 + 0.08, 0.02, -hz + tam_r.x / 2.0 + 0.3), PI / 2.0,
+			minf(1.0, DECO_ALTO_MAX / float(MueblesDatos.PIEZAS[nombre_r]["y1"])))
+	else:
+		var sillon := "sillon_amarillo" if tema in ["libreria", "conventillo"] else "sillon_azul"
+		var ps := Vector3(-hx + 0.5, 0.02, -hz + 1.15)
+		if _adorno(casa, ce, ruta, sillon, ps, PI / 2.0):
+			Kit.colocar(casa, "gato", ps + Vector3(0.05, 0.45, -0.4), PI / 2.0 + 0.4)
+			_adorno(casa, ce, ruta, "lampara_pie", Vector3(-hx + 0.35, 0.02, -hz + 2.6), 0.0)
 	# Rincones de adelante a la derecha y de atrás a la derecha: plantas y cajas
 	_adorno(casa, ce, ruta, "maceta", Vector3(hx - 0.4, 0.02, hz - 0.4), 0.0)
 	_adorno(casa, ce, ruta, "maceta", Vector3(-hx + 0.4, 0.02, hz - 0.4), 1.0)
 	_adorno(casa, ce, ruta, "cajas", Vector3(hx - 0.5, 0.02, -hz + 0.5), 0.3)
 	# Algo propio de cada lugar, contra la pared derecha
-	var propio := {"panaderia": "horno", "oficina": "dispenser", "fiambreria": "barril", "conventillo": "jaula",
-		"libreria": "mesa_ratona"}
-	_adorno(casa, ce, ruta, propio[tema], Vector3(hx - 0.65, 0.02, 0.0), -PI / 2.0)
+	var propio: String = PROPIO[tema]
+	var tam_p: Vector3 = MueblesDatos.PIEZAS[propio]["tam"]
+	_adorno(casa, ce, ruta, propio, Vector3(hx - tam_p.z / 2.0 - 0.1, 0.02, 0.0), -PI / 2.0)
 	# Estantes en las paredes de adelante y de atrás (salvo frente a las ventanas) y cuadros a los costados
 	for lado in [-1.0, 1.0]:
 		var z: float = lado * (hz - 0.17)
@@ -484,13 +635,26 @@ static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: Stri
 	var l := Construir.cartel(casa, Vector3(-hx + 0.03, 4.9, 0), cartel, Color("3a2a1e"), 56)
 	l.rotation.y = PI / 2.0
 	l.outline_size = 0
+	# Luz: una principal del color del lugar (con sombras sólo mientras la paloma pasa, ver
+	# CasaEnterable) y dos de relleno más suaves cerca de las ventanas, como la luz que entra de la calle
+	var color_luz: Color = ESCENARIOS[tema]["luz"]
 	var luz := OmniLight3D.new()
-	luz.light_color = Color("ffd9a0")
-	luz.light_energy = 1.2
-	luz.omni_range = maxf(w, d) * 0.9
+	luz.name = "Luz"
+	luz.light_color = color_luz
+	luz.light_energy = 1.15
+	luz.omni_range = maxf(w, d) * 0.85
+	luz.omni_attenuation = 0.8
 	luz.shadow_enabled = false
 	casa.add_child(luz)
-	luz.position = Vector3(0, PLANTA_BAJA - 1.0, 0)
+	luz.position = Vector3(0, PLANTA_BAJA - 0.9, 0)
+	for ventana in [[ce.x_frente, hz - 1.2], [ce.x_fondo, -hz + 1.2]]:
+		var relleno := OmniLight3D.new()
+		relleno.light_color = color_luz.lerp(Color("cfe4ff"), 0.45)
+		relleno.light_energy = 0.38
+		relleno.omni_range = minf(w, d) * 0.8
+		relleno.shadow_enabled = false
+		luz.add_child(relleno)   # Se prende y se apaga con la principal
+		relleno.position = Vector3(float(ventana[0]), CasaEnterable.Y_PASO, float(ventana[1])) - luz.position
 	return luz
 
 
@@ -500,32 +664,41 @@ static func _x_puerta(w: float) -> float:
 	return w * 0.27
 
 
-## Fachada: ventanas con vidrio y persiana en los pisos de arriba (con un balcón con macetas en el
-## medio), el toldo a rayas sobre la ventana abierta de adelante, la puerta del local con su farolito,
-## y un macetón y una bici en la vereda. Atrás, lo mismo sin toldo. Todo sin colisión.
-static func _fachada(casa: Node3D, ce: CasaEnterable, w: float, h: float, d: float, esc: Dictionary) -> void:
+## Fachada: una fila de ventanas con vidrio y persiana por piso (con balcones con macetas en algunos
+## pisos), salvo en la planta baja y en los dos pisos de la sala; el toldo a rayas sobre la ventana
+## abierta de la sala, la puerta del edificio con su farolito, y un macetón y una bici en la vereda.
+## Atrás, lo mismo sin toldo. Todo sin colisión. "y0": altura del piso de la sala.
+static func _fachada(casa: Node3D, ce: CasaEnterable, w: float, h: float, d: float, esc: Dictionary, y0 := 0.0) -> void:
 	var pb := PLANTA_BAJA
 	var n_col := maxi(int(w / 3.0), 1)
 	var filas: Array[float] = []
-	if h - pb >= 2.8:
-		filas.append(pb + 0.7)
-	if h - pb >= 5.6:
-		filas.append(pb + 3.5)
+	var k := 1
+	while k * ALTO_PISO + 0.6 + 2.0 < h - 0.2:
+		var yv := k * ALTO_PISO + 0.6
+		if yv + 2.1 < y0 - 0.25 or yv > y0 + pb + 0.35:
+			filas.append(yv)
+		k += 1
 	for e in [1.0, -1.0]:
 		var z: float = e * d / 2.0
 		var rot: float = 0.0 if e > 0.0 else PI
 		for f in filas.size():
 			for c in n_col:
 				var off := (c - (n_col - 1) / 2.0) * (w / n_col)
-				var balcon := f == 0 and c == n_col / 2
+				var balcon := f % 3 == 0 and c == n_col / 2
 				Kit.colocar(casa, "ventana_balcon" if balcon else "ventana_vidrio",
 					Vector3(off, filas[f] - (0.35 if balcon else 0.0), z), rot)
-		# Puerta del local, del lado contrario a la ventana abierta de esa cara
+		# Puerta del edificio, del lado contrario a la ventana abierta de esa cara
 		var xp: float = e * _x_puerta(w)
 		Kit.colocar(casa, "puerta_local", Vector3(xp, 0.14, z), rot)
 		Kit.colocar(casa, "maceton_flores", Vector3(xp + e * 1.3, 0.0, z + e * 0.6), 0.0)
+		# En la planta baja, si la sala está arriba, una vidriera a cada lado de la puerta
+		if y0 > 0.0:
+			for lado in [-1.0, 1.0]:
+				var xv: float = -e * _x_puerta(w) + lado * 1.6
+				if absf(xv) < w / 2.0 - 0.9:
+					Kit.colocar(casa, "ventana_vidrio", Vector3(xv, 0.6, z), rot)
 	# Toldo a rayas sobre la ventana de adelante: la paloma entra por debajo
-	Kit.colocar(casa, esc["toldo"], Vector3(ce.x_frente, 4.2, d / 2.0), 0.0)
+	Kit.colocar(casa, esc["toldo"], Vector3(ce.x_frente, y0 + 4.2, d / 2.0), 0.0)
 	Kit.colocar(casa, "bici_azul", Vector3(_x_puerta(w) - 1.7, 0.0, d / 2.0 + 0.45), 0.0)
 
 
@@ -536,30 +709,9 @@ static func _interior(casa: Node3D, ce: CasaEnterable, w: float, d: float, esc: 
 	var hx := w / 2.0 - esp
 	var hz := d / 2.0 - esp
 	var pb := PLANTA_BAJA
-	var c1: Color = esc["piso"]
-	var c2: Color = esc["piso2"]
-	if esc["suelo"] == "baldosas":
-		# Damero: el piso de abajo ya tiene el primer color, encima van las baldosas del segundo
-		var t := 0.8
-		for i in ceili(hx * 2.0 / t):
-			for j in ceili(hz * 2.0 / t):
-				if (i + j) % 2 == 1:
-					continue
-				var x0 := -hx + i * t
-				var z0 := -hz + j * t
-				var sx := minf(t, hx - x0)
-				var sz := minf(t, hz - z0)
-				Construir.caja(casa, Vector3(x0 + sx / 2.0, 0.035, z0 + sz / 2.0), Vector3(sx, 0.01, sz), c2, false)
-	else:
-		# Tablas de madera en tres tonos
-		var tonos := [c1, c2, c1.lerp(c2, 0.5)]
-		var z := -hz
-		var k := 0
-		while z < hz - 0.01:
-			var sz := minf(0.32, hz - z)
-			Construir.caja(casa, Vector3(0, 0.035, z + sz / 2.0), Vector3(hx * 2.0, 0.01, sz - 0.02), tonos[k % 3], false)
-			z += 0.32
-			k += 1
+	# El piso: una sola lámina con textura (tablas, damero o porcelanato; ver TexturasInterior)
+	Construir.caja_mat(casa, Vector3(0, 0.035, 0), Vector3(hx * 2.0, 0.01, hz * 2.0),
+		TexturasInterior.piso(esc["suelo"], esc["piso"], esc["piso2"]), false)
 	# Zócalo, friso (la parte de abajo de la pared, más oscura) y moldura
 	var zocalo: Color = esc["zocalo"]
 	var friso: Color = (esc["pared"] as Color).darkened(0.12)
@@ -584,7 +736,8 @@ static func _interior(casa: Node3D, ce: CasaEnterable, w: float, d: float, esc: 
 		while x < hx - 0.6:
 			var z := -hz + 1.2
 			while z < hz - 0.6:
-				Construir.caja(casa, Vector3(x, pb - 0.03, z), Vector3(1.0, 0.03, 0.5), Color("fff6dc"), false)
+				Construir.caja_mat(casa, Vector3(x, pb - 0.03, z), Vector3(1.0, 0.03, 0.5),
+					TexturasInterior.panel_luz(esc["luz"]), false)
 				z += 2.4
 			x += 2.4
 	# Apliques con luz en las paredes de los costados (arriba de los cuadros)

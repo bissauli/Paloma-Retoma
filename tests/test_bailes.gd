@@ -14,8 +14,21 @@ var fallas := 0
 func _ready() -> void:
 	var bailes: Array[StringName] = Coreografia.ORDEN.duplicate()
 	bailes.append(Coreografia.FINAL)
+	bailes.append(Coreografia.BANO)   # No está en la rueda ni en los créditos, pero tiene que andar igual de bien
 	_check("hay al menos un baile por cada paloma de los créditos", Coreografia.ORDEN.size() >= 9)
 	_check("el primero es el break dance", Coreografia.ORDEN[0] == &"breakdance")
+	_check("el cortejo está en la rueda", Coreografia.ORDEN.has(&"cortejo"))
+	_check("el cortejo vuelve a empezar igual: la pose final es la inicial", _igual(Coreografia.pose(&"cortejo", 0.0),
+		Coreografia.pose(&"cortejo", Coreografia.duracion(&"cortejo") - 0.0001)))
+	_check("el baño vuelve a empezar igual: la pose final es la inicial", _igual(Coreografia.pose(&"bano", 0.0),
+		Coreografia.pose(&"bano", Coreografia.duracion(&"bano") - 0.0001)))
+	_check("el momento del cortejo cae dentro del baile", Coreografia.MOMENTO_CORTEJO > 0.0
+		and Coreografia.MOMENTO_CORTEJO < Coreografia.duracion(&"cortejo"))
+	var inflado := Coreografia.pose(&"cortejo", 1.0)
+	_check("el cortejo infla el cuello y abre la cola", inflado.escala_cabeza.x > 1.15 and inflado.escala_cola.x > 1.7)
+	_check("el cortejo no engorda el resto del tiempo (empieza y termina sin inflar)",
+		Coreografia.pose(&"cortejo", 0.0).escala_cabeza.distance_to(Vector3.ONE) < 0.001
+		and Coreografia.pose(&"cortejo", 7.99).escala_cola.distance_to(Vector3.ONE) < 0.001)
 	for baile in bailes:
 		_revisar(baile)
 	print("RESULTADO: ", "OK" if fallas == 0 else "%d FALLAS" % fallas)
@@ -54,6 +67,17 @@ func _revisar(baile: StringName) -> void:
 	_check("%s: no se hunde en el piso" % baile, not hundida)
 	_check("%s: sin giros bruscos (peor %.0f° por cuadro, en t=%.2f s)" % [baile, rad_to_deg(peor_giro), t_peor], peor_giro <= MAX_GIRO_POR_CUADRO)
 	_check("%s: sin saltos bruscos de posición (peor %.3f m)" % [baile, peor_salto], peor_salto <= MAX_SALTO_POR_CUADRO)
+
+
+## ¿Dos poses son (casi) la misma? Sirve para ver que un baile en bucle empalma sin tirón.
+func _igual(a: PoseBaile, b: PoseBaile) -> bool:
+	if a.pos.distance_to(b.pos) > 0.001 or a.escala_cabeza.distance_to(b.escala_cabeza) > 0.001 or a.escala_cola.distance_to(b.escala_cola) > 0.001:
+		return false
+	for par in [[a.rot, b.rot], [a.cabeza, b.cabeza], [a.cola, b.cola], [a.ala_izq, b.ala_izq], [a.ala_der, b.ala_der],
+			[a.pata_izq, b.pata_izq], [a.pata_der, b.pata_der]]:
+		if (par[0] as Basis).get_rotation_quaternion().angle_to((par[1] as Basis).get_rotation_quaternion()) > 0.01:
+			return false
+	return true
 
 
 func _check(nombre: String, ok: bool) -> void:

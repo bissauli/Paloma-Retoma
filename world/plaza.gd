@@ -43,8 +43,15 @@ func _crear_piso() -> void:
 	# Plaza de baldosas grises: sólo su manzana (alrededor están las calles y veredas de la ciudad,
 	# ver world/ciudad.gd)
 	var baldosas := Construir.material_lajas("lajas_plaza", 5.0)
+	# Con el hueco de la escalera del subte (las lajas van en coordenadas del mundo: no se notan los cortes)
+	for r: Rect2 in Edificios.partir(Ciudad.PLAZA, Edificios.hueco_subte(true)):
+		Construir.caja_mat(piso, Vector3(r.get_center().x, -0.5, r.get_center().y), Vector3(r.size.x, 1.0, r.size.y), baldosas)
+	# La tira de piso donde sale la rampa de la escalera: sólo se ve
+	var h := Edificios.hueco_subte()
+	var tira := Rect2(h.position.x, h.end.y, h.size.x, Edificios.hueco_subte(true).end.y - h.end.y)
+	Construir.caja_mat(piso, Vector3(tira.get_center().x, -0.5, tira.get_center().y), Vector3(tira.size.x, 1.0, tira.size.y),
+		baldosas, false)
 	var r := Ciudad.PLAZA
-	Construir.caja_mat(piso, Vector3(r.get_center().x, -0.5, r.get_center().y), Vector3(r.size.x, 1.0, r.size.y), baldosas)
 	# Avenida al sur (asfalto con líneas): cruza la manzana y llega hasta Bolívar y Paseo Colón
 	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(128, 0.01, 8), C_ASFALTO, false)
 	for i in range(-6, 7):
@@ -89,14 +96,20 @@ func _crear_zonas() -> void:
 	Edificios.cabildo(edif)
 	Edificios.catedral(edif)
 	Edificios.alrededores(edif)
-	Edificios.subte(edif, Vector3(34, 0, -22))
+	Edificios.subte(edif, Edificios.SUBTE)
 	posicion_balcon = Edificios.casa_rosada(edif)
 	var mesas := Edificios.cafes(edif)
+	# Nivel inferior (Fase 1): pasajes entre los cafés, galería del Cabildo y mercado
+	NivelInferior.armar(self)
 	# La ciudad alrededor de la plaza (mapa V2): arma y fusiona sus propias piezas
 	add_child(Ciudad.new())
+	# Nivel medio (Fase 2): toldos de los cafés, balcones alrededor, columnas de farol y árboles altos
+	# (después de la ciudad: al armarse, la ciudad pone en cero las cuentas que miran las pruebas)
+	NivelMedio.plaza(self)
 	add_child(Transito.new())
 
 	_crear_jardines()
+	_crear_fuentes()
 	_crear_nido()
 	_crear_balcon_meta()
 	_crear_comida(mesas)
@@ -141,6 +154,19 @@ func _crear_jardines() -> void:
 		Edificios.farol(j, p)
 
 
+## Dos fuentes sobre el eje de la plaza (a cada lado de la Pirámide, entre los canteros) y charcos en
+## las baldosas: lugares donde la paloma se puede dar un baño de agua (ver Fuente).
+func _crear_fuentes() -> void:
+	var f := Node3D.new()
+	f.name = "Fuentes"
+	add_child(f)
+	Fuente.crear(f, Vector3(-19, 0, 0), 2.1, 0.3, true)
+	Fuente.crear(f, Vector3(19, 0, 0), 2.1, 0.3, true)
+	for c: Array in [[Vector3(11.5, 0, 19.5), 1.3], [Vector3(-10, 0, 19), 1.5],
+			[Vector3(27, 0, 2.5), 1.2], [Vector3(-27.5, 0, -2.0), 1.3]]:
+		Fuente.crear(f, c[0], c[1])
+
+
 func _crear_nido() -> void:
 	var nido := Node3D.new()
 	nido.name = "Nido"
@@ -177,6 +203,10 @@ func _crear_comida(mesas: Array[Vector3]) -> void:
 		com.tiempo_reaparicion = 40.0
 		c.add_child(com)
 		com.position = mesas[i] + Vector3(randf_range(-0.15, 0.15), 0, randf_range(-0.15, 0.15))
+		# ...y una tacita, un vaso, un florero o una azucarera, para tirar de un aletazo (ver Golpeable)
+		var objeto: String = ["taza", "vaso", "florero", "azucarera"][i % 4]
+		var lado := 1.0 if i % 2 == 0 else -1.0
+		Golpeable.crear(c, objeto, mesas[i] + Vector3(0.27 * lado, 0.0, 0.14 * lado), Color.WHITE, 1.5)
 	# El carrito de choripán sobre la avenida
 	_carrito_choripan(c, Vector3(23, 0.16, 35.2))
 	# Facturas cerca del subte (los oficinistas se las olvidan)
@@ -255,7 +285,7 @@ func _crear_puntos() -> void:
 		"PuntoEscolares": Vector3(-34, 0, 12),
 		"PuntoSenoras": Vector3(0, 0, -18),
 		"PuntoCafes": Vector3(0, 0.16, 35.7),   # Entre las mesas y las vidrieras
-		"PuntoSubte": Vector3(34, 0, -22),
+		"PuntoSubte": Edificios.SUBTE,
 		"PuntoGranaderos": Vector3(40.5, 0, 0),
 		"PuntoCatedral": Vector3(0, 0, -14),      # Marca la brújula
 		"PuntoChoripan": Vector3(23, 0.16, 35.2),   # El carrito (ver _carrito_choripan)

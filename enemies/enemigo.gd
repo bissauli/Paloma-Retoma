@@ -5,6 +5,7 @@ extends Node3D
 
 var _vel := Vector3.ZERO
 var _rumbo := 0.0       ## Ángulo en Y hacia donde mira el modelo (0 = hacia -Z)
+var _atendiendo: Node3D ## Con quién está hablando (la paloma): se queda quieto y la mira
 
 # Caminos (ver world/navegacion.gd): la zona por donde camina y la ruta al destino actual
 var nav_zona := {}                      ## Zona de navegación (vacía = camina en línea recta)
@@ -22,6 +23,26 @@ func _acelerar(objetivo: Vector3, k: float, delta: float) -> void:
 ## Acelera hacia "destino" (en el plano XZ) a "rapidez" m/s.
 func _ir_hacia(destino: Vector3, rapidez: float, k: float, delta: float) -> void:
 	_acelerar(plano(destino - global_position).normalized() * rapidez, k, delta)
+
+
+## Empieza una conversación: se detiene y mira a "con_quien" (lo llama el Interlocutor).
+func atender(con_quien: Node3D) -> void:
+	_atendiendo = con_quien
+
+
+## Terminó la conversación: retoma lo que hacía.
+func dejar_de_atender() -> void:
+	_atendiendo = null
+
+
+## Gira el rumbo hacia quien lo está atendiendo (suave).
+func _mirar_al_atendido(delta: float) -> void:
+	if not is_instance_valid(_atendiendo):
+		_atendiendo = null
+		return
+	var hacia := plano(_atendiendo.global_position - global_position)
+	if hacia.length_squared() > 0.01:
+		_rumbo = lerp_angle(_rumbo, atan2(-hacia.x, -hacia.z), minf(delta * 5.0, 1.0))
 
 
 ## Hacia dónde caminar ahora para llegar a "destino" sin atravesar nada: el próximo punto de la ruta

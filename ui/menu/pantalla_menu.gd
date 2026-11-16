@@ -123,6 +123,7 @@ func abrir() -> void:
 func cerrar() -> void:
 	if not visible:
 		return
+	AudioManager.ui("menu_close", -6.0)
 	if _tween and _tween.is_valid():
 		_tween.kill()
 	_derecha.position.x = _x_base(_derecha)

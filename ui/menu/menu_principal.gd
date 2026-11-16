@@ -16,6 +16,9 @@ const ESTIRAR := 26.0          ## Píxeles que crece la barra hacia la izquierda
 var _opciones: OpcionesMenu
 var _cargar: CargarMenu
 var _personalizar: PersonalizarMenu
+var _logros: LogrosMenu
+var _btn_logros: Button        ## El trofeo de arriba a la izquierda
+var _txt_logros: Label         ## ...con cuántos lleva
 var _confirmar: ConfirmarNueva
 var _idiomas: SelectorIdioma
 var _activo := false
@@ -50,6 +53,10 @@ func _ready() -> void:
 	_personalizar = PersonalizarMenu.new()
 	add_child(_personalizar)
 	_personalizar.cerrada.connect(_al_cerrar_pantalla.bind(%Personalizar))
+	_logros = LogrosMenu.new()
+	add_child(_logros)
+	_logros.cerrada.connect(_al_cerrar_logros)
+	_armar_boton_logros()
 	_confirmar = ConfirmarNueva.new()
 	add_child(_confirmar)
 	_confirmar.confirmada.connect(_al_confirmar_nueva)
@@ -75,6 +82,7 @@ func mostrar() -> void:
 	visible = true
 	_activo = true
 	_actualizar_continuar()
+	_actualizar_logros()
 	raiz.modulate.a = 1.0
 	titulo.modulate.a = 0.0
 	titulo.position.y = _y_base(titulo) - 24.0
@@ -98,6 +106,8 @@ func mostrar() -> void:
 func ocultar() -> void:
 	_activo = false
 	_idiomas.set_activo(false)
+	_btn_logros.focus_mode = Control.FOCUS_NONE
+	_btn_logros.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for b in botones:
 		b.focus_mode = Control.FOCUS_NONE
 		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -112,7 +122,7 @@ func ocultar() -> void:
 
 func _input(event: InputEvent) -> void:
 	# Si se perdió el foco (click en un lugar vacío), las flechas o el mando lo recuperan
-	if not _activo or _opciones.visible or _cargar.visible or _personalizar.visible or _confirmar.visible:
+	if not _activo or _opciones.visible or _cargar.visible or _personalizar.visible or _confirmar.visible or _logros.visible:
 		return
 	if get_viewport().gui_get_focus_owner() == null and (event.is_action_pressed("ui_down")
 			or event.is_action_pressed("ui_up") or event.is_action_pressed("ui_accept")):
@@ -134,7 +144,7 @@ func _preparar_boton(b: Button) -> void:
 func _resaltar(b: Button, si: bool) -> void:
 	_estirar(b, ESTIRAR if si else 0.0, 0.2)
 	if si and _activo:
-		AudioManager.reproducir("picoteo", -16.0)
+		AudioManager.ui("highlight", -8.0)
 
 
 ## La barra crece hacia la izquierda (el texto queda en su lugar, alineado a la derecha).
@@ -161,10 +171,17 @@ func _actualizar_continuar() -> void:
 		var abajo := visibles[(i + 1) % visibles.size()]
 		b.focus_neighbor_top = b.get_path_to(arriba)
 		b.focus_neighbor_bottom = b.get_path_to(abajo)
-		b.focus_neighbor_left = b.get_path()
+		b.focus_neighbor_left = b.get_path_to(_btn_logros)   # Hacia la izquierda está el trofeo
 		b.focus_neighbor_right = b.get_path()
 		b.focus_mode = Control.FOCUS_ALL
 		b.mouse_filter = Control.MOUSE_FILTER_STOP
+	if not visibles.is_empty():
+		_btn_logros.focus_neighbor_right = _btn_logros.get_path_to(visibles[0])
+		_btn_logros.focus_neighbor_bottom = _btn_logros.get_path_to(visibles[0])
+	_btn_logros.focus_neighbor_left = _btn_logros.get_path()
+	_btn_logros.focus_neighbor_top = _btn_logros.get_path()
+	_btn_logros.focus_mode = Control.FOCUS_ALL
+	_btn_logros.mouse_filter = Control.MOUSE_FILTER_STOP
 
 
 func _enfocar_primero() -> void:
@@ -194,10 +211,11 @@ func _nueva() -> void:
 	if datos.is_empty():
 		_arrancar(nueva_partida.emit)
 		return
-	AudioManager.reproducir("picoteo")
+	AudioManager.ui("button", -6.0)
 	for b in botones:
 		b.focus_mode = Control.FOCUS_NONE
 		_resaltar(b, false)
+	_btn_logros.focus_mode = Control.FOCUS_NONE
 	_desvanecer(0.0)
 	preguntando.emit(true)
 	_confirmar.abrir(datos)
@@ -211,6 +229,7 @@ func _al_confirmar_nueva() -> void:
 
 
 func _al_cancelar_nueva() -> void:
+	AudioManager.ui("cancel", -6.0)
 	preguntando.emit(false)
 	_al_cerrar_pantalla(%NuevaPartida)
 
@@ -218,7 +237,7 @@ func _al_cancelar_nueva() -> void:
 func _arrancar(aviso: Callable) -> void:
 	if not _activo:
 		return
-	AudioManager.reproducir("arrullo", -4.0)
+	AudioManager.ui("confirm", -4.0)
 	ocultar()
 	aviso.call()
 
@@ -230,16 +249,19 @@ func _salir() -> void:
 # ---------------------------------------------------------------- Pantallas (Opciones, Cargar)
 
 func _abrir(cual: String) -> void:
-	AudioManager.reproducir("picoteo")
+	AudioManager.ui("menu_open", -6.0)
 	for b in botones:
 		b.focus_mode = Control.FOCUS_NONE
 		_resaltar(b, false)
+	_btn_logros.focus_mode = Control.FOCUS_NONE
 	_desvanecer(0.0)
 	match cual:
 		"opciones":
 			_opciones.abrir()
 		"personalizar":
 			_personalizar.abrir()
+		"logros":
+			_logros.abrir()
 		_:
 			_cargar.abrir()
 
@@ -251,6 +273,52 @@ func _al_cerrar_pantalla(boton: Button) -> void:
 		boton.grab_focus()
 	else:
 		_enfocar_primero()
+
+
+func _al_cerrar_logros() -> void:
+	_actualizar_continuar()
+	_actualizar_logros()
+	_desvanecer(1.0)
+	_btn_logros.grab_focus()
+
+
+## El botón cuadrado con el trofeo (arriba a la izquierda) y, debajo del icono, cuántos lleva.
+func _armar_boton_logros() -> void:
+	_btn_logros = Button.new()
+	_btn_logros.name = "Logros"
+	_btn_logros.custom_minimum_size = Vector2(76, 76)
+	_btn_logros.tooltip_text = "Logros"
+	EstiloUI.estilizar_boton(_btn_logros)
+	raiz.add_child(_btn_logros)
+	_btn_logros.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT, Control.PRESET_MODE_MINSIZE, 26)
+	var icono := IconoTrofeo.new()
+	icono.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icono.offset_left = 12.0
+	icono.offset_right = -12.0
+	icono.offset_top = 6.0
+	icono.offset_bottom = -20.0
+	_btn_logros.add_child(icono)
+	_txt_logros = EstiloUI.texto(_btn_logros, &"Valor", 13)
+	_txt_logros.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	_txt_logros.offset_top = -22.0
+	_txt_logros.offset_bottom = -2.0
+	_txt_logros.offset_left = 0.0
+	_txt_logros.offset_right = 0.0
+	_txt_logros.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_txt_logros.add_theme_color_override("font_color", Color.WHITE)
+	_btn_logros.mouse_entered.connect(func() -> void:
+		if _activo and _btn_logros.focus_mode != Control.FOCUS_NONE:
+			_btn_logros.grab_focus())
+	_btn_logros.focus_entered.connect(func() -> void:
+		if _activo:
+			AudioManager.ui("highlight", -8.0))
+	_btn_logros.pressed.connect(_abrir.bind("logros"))
+	_actualizar_logros()
+
+
+func _actualizar_logros() -> void:
+	_txt_logros.text = "%d/%d" % [Logros.cantidad(CatalogoLogros.TROFEO) + Logros.cantidad(CatalogoLogros.LOGRO),
+		Logros.total(CatalogoLogros.TROFEO) + Logros.total(CatalogoLogros.LOGRO)]
 
 
 func _desvanecer(a: float) -> void:

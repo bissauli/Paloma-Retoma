@@ -5,6 +5,9 @@ extends Node3D
 ## Todas las variantes comparten malla, huesos y animaciones; sólo cambia la paleta de la textura.
 ## El GLB mira hacia +Z; este nodo lo gira para que la paloma mire hacia -Z, como espera el juego.
 
+## Llegó el gran final del baile de cortejo (ver Coreografia.MOMENTO_CORTEJO): la jugadora enamora palomas.
+signal cortejo_logrado
+
 const VARIANTES := {
 	"Original": preload("res://modelos/paloma/Paloma.glb"),
 	"Gris": preload("res://modelos/paloma/Paloma_Gris.glb"),
@@ -35,6 +38,10 @@ const MEZCLA := 0.15   ## Segundos de transición entre animaciones
 var carga_visual: Node3D
 
 var _congelada := false   ## Ver congelar()
+var _aletazo: AletazoPaloma
+var _baile: StringName = &""    ## Baile en curso (ver bailar); "" = no baila
+var _t_baile := 0.0
+var _reposo: Array[Basis] = []  ## Giro global de cada hueso en reposo (para las poses de baile)
 
 var _glb: Node3D
 var _anim: AnimationPlayer
@@ -177,7 +184,78 @@ func aplicar_distancia(d: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if _baile != &"":
+		var antes := fmod(_t_baile, Coreografia.duracion(_baile))
+		_t_baile += delta
+		_aplicar_baile()
+		# El cortejo tiene su momento: cada vez que el baile pasa por ahí (una vez por vuelta)
+		if _baile == &"cortejo":
+			var ahora := fmod(_t_baile, Coreografia.duracion(_baile))
+			if antes < Coreografia.MOMENTO_CORTEJO and ahora >= Coreografia.MOMENTO_CORTEJO:
+				cortejo_logrado.emit()
+		return
 	_avanzar_animacion(delta)
+
+
+## ¿Está bailando?
+func bailando() -> bool:
+	return _baile != &""
+
+
+## Un aletazo con el ala izquierda o la derecha (se agrega el modificador la primera vez).
+func aletazo(con_izquierda: bool) -> void:
+	if _skel == null:
+		return
+	if _aletazo == null:
+		_aletazo = AletazoPaloma.new()
+		_aletazo.name = "Aletazo"
+		_skel.add_child(_aletazo)
+	_aletazo.golpear(con_izquierda)
+
+
+## El baile en curso (&"" si no baila).
+func baile_actual() -> StringName:
+	return _baile
+
+
+## Empieza un baile de Coreografia (el mismo de los créditos): se apaga la animación del GLB y se giran
+## los huesos y el cuerpo a mano. Sólo para la paloma de la jugadora. Se repite hasta dejar_de_bailar.
+func bailar(baile: StringName) -> void:
+	if not es_jugador or _glb == null:
+		return
+	if _baile == &"":
+		_reposo = PoseBaile.reposo_de(_skel)
+		_anim.active = false
+		_anim_accion.active = false
+		_glb.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF   # Se mueve en _process
+		_skel.reset_bone_poses()
+		set_process(true)
+	_baile = baile
+	_t_baile = 0.0
+	_aplicar_baile()
+
+
+func dejar_de_bailar() -> void:
+	if _baile == &"":
+		return
+	_baile = &""
+	_glb.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_INHERIT
+	_glb.position = Vector3.ZERO
+	_glb.basis = Basis(Vector3.UP, PI)
+	_skel.reset_bone_poses()
+	_anim.active = not _congelada
+	_anim_accion.active = not _congelada
+	set_process(not es_jugador)
+
+
+func _aplicar_baile() -> void:
+	var p := Coreografia.pose(_baile, fmod(_t_baile, Coreografia.duracion(_baile)))
+	# La pose está pensada para un modelo que mira a +Z (hacia la cámara); acá el GLB va girado PI
+	var giro_glb := Basis(Vector3.UP, PI)
+	var centro := Vector3(0.0, 0.25, 0.0)
+	_glb.basis = giro_glb * p.rot
+	_glb.position = centro + giro_glb * p.pos - _glb.basis * centro
+	p.aplicar_a(_skel, _reposo)
 
 
 ## Avanza la animación cada 1, 2, 4 u 8 cuadros según la distancia a la cámara (con el tiempo

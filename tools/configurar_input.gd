@@ -14,6 +14,8 @@ const TECLAS := {
 	"picada": [KEY_SHIFT],
 	"pausa": [KEY_ESCAPE],
 	"interactuar": [KEY_E],
+	"emotes": [KEY_V],
+	"aletazo": [KEY_F],      # (además el botón X del mando: JoypadButton 2)
 }
 const BOTONES := {
 	"picotear": MOUSE_BUTTON_LEFT,
@@ -36,6 +38,7 @@ static func aplicar() -> String:
 	ps.set_setting("layer_names/3d_physics/layer_2", "jugador")
 	ps.set_setting("layer_names/3d_physics/layer_3", "npc")
 	ps.set_setting("layer_names/3d_physics/layer_4", "comida")
+	ps.set_setting("layer_names/3d_physics/layer_5", "objetos")
 
 	for accion: String in TECLAS:
 		var eventos: Array = []
@@ -44,6 +47,11 @@ static func aplicar() -> String:
 			e.physical_keycode = k as Key
 			e.device = -1  # Cualquier dispositivo
 			eventos.append(e)
+		if accion == "aletazo":
+			var x := InputEventJoypadButton.new()
+			x.button_index = JOY_BUTTON_X
+			x.device = -1
+			eventos.append(x)
 		ps.set_setting("input/" + accion, {"deadzone": 0.2, "events": eventos})
 	for accion: String in BOTONES:
 		var b := InputEventMouseButton.new()

@@ -33,6 +33,43 @@ static func caja(color: Color, inclinacion: float, borde := Color.TRANSPARENT) -
 	return s
 
 
+## Estilo de botón de acción: caja redondeada y translúcida del color de "acento", con borde claro,
+## sombra y el foco como un aro blanco. Para botones sueltos o en fila (las barras inclinadas del
+## menú están hechas para ir solas y se pisan entre sí).
+static func estilizar_boton(b: Button, acento := Color(0.247, 0.722, 0.839)) -> void:
+	b.add_theme_color_override("font_color", Color.WHITE)
+	b.add_theme_color_override("font_hover_color", Color.WHITE)
+	b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.4))
+	b.add_theme_stylebox_override("normal", _caja_boton(acento.lerp(Color(0, 0.05, 0.1), 0.15), 0.78, 0.55))
+	b.add_theme_stylebox_override("hover", _caja_boton(acento.lightened(0.22), 0.92, 1.0))
+	b.add_theme_stylebox_override("pressed", _caja_boton(acento.darkened(0.25), 0.95, 1.0))
+	b.add_theme_stylebox_override("hover_pressed", _caja_boton(acento.darkened(0.25), 0.95, 1.0))
+	b.add_theme_stylebox_override("disabled", _caja_boton(Color(0.35, 0.5, 0.56), 0.22, 0.2))
+	var foco := StyleBoxFlat.new()
+	foco.draw_center = false
+	foco.set_border_width_all(3)
+	foco.border_color = Color.WHITE
+	foco.set_corner_radius_all(11)
+	foco.set_expand_margin_all(2)
+	b.add_theme_stylebox_override("focus", foco)
+
+
+static func _caja_boton(color: Color, alfa: float, borde: float) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = Color(color.r, color.g, color.b, alfa)
+	s.set_corner_radius_all(9)
+	s.set_border_width_all(2)
+	s.border_color = Color(1, 1, 1, borde)
+	s.content_margin_left = 18.0
+	s.content_margin_right = 18.0
+	s.content_margin_top = 8.0
+	s.content_margin_bottom = 8.0
+	s.shadow_color = Color(0, 0.03, 0.06, 0.4)
+	s.shadow_size = 6
+	s.shadow_offset = Vector2(0, 3)
+	return s
+
+
 ## Etiqueta con una variación del tema (&"TituloPantalla", &"Seccion", &"Etiqueta"...).
 static func texto(padre: Node, variacion: StringName, tam: int, contenido := "") -> Label:
 	var l := Label.new()

@@ -91,6 +91,8 @@ func _init() -> void:
 	_invertir = CheckBox.new()
 	fila("Invertir eje Y", _invertir)
 	_invertir.toggled.connect(Ajustes.set_invertir_y)
+	for casilla: BaseButton in [_silencio, _pantalla, _invertir]:
+		casilla.toggled.connect(func(on: bool) -> void: AudioManager.ui("click_in" if on else "click_out", -8.0))
 
 
 func abrir() -> void:
