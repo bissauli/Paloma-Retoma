@@ -493,8 +493,60 @@ static func _toro(r: Node3D, radio_int: float, radio_ext: float, pos: Vector3, c
 static func _pieza(r: Node3D, malla: Mesh, pos: Vector3, color: Color) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = malla
-	mi.material_override = Construir.material(color, 0.8)
+	mi.material_override = _material(color)
 	mi.position = pos
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	r.add_child(mi)
 	return mi
+
+
+# ---------------------------------------------------------------- Textura pixel-art (como la de la paloma)
+# La paloma es pixel-art: una textura de 128x128 con filtro "nearest", donde cada pixel tiene su tono.
+# Un accesorio de color liso se ve plano al lado. Cada color lleva su propia textura chiquita de
+# bloques de 2x2 con variaciones de tono (algún pixel más oscuro o más claro, como las plumas), sin
+# suavizar, proyectada en el espacio de la pieza con la misma densidad de pixel que el cuerpo. El
+# oro y la plata brillan como metal y los lentes como vidrio. Una textura y un material por color.
+
+const PIXEL := 0.008    ## Tamaño de un pixel de la textura, en metros (parecido a los del cuerpo)
+const METALES := [Color("e2b53c"), Color("c9ccd4")]
+const VIDRIOS := [Color("1c1c26"), Color("3d5a3a"), Color("7a4a9a"), Color("2fc6d8"), Color("cfe8f0"), Color("39e0ff")]
+
+static var _materiales := {}
+
+
+static func _material(color: Color) -> StandardMaterial3D:
+	var clave := color.to_html()
+	if _materiales.has(clave):
+		return _materiales[clave]
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = _textura(color)
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	m.uv1_triplanar = true   # En el espacio de la pieza: sigue al hueso
+	m.uv1_scale = Vector3.ONE / (PIXEL * 16.0)
+	m.roughness = 0.85
+	if color in METALES:
+		m.metallic = 0.35
+		m.metallic_specular = 0.9
+		m.roughness = 0.3
+	elif color in VIDRIOS:
+		m.metallic_specular = 1.0
+		m.roughness = 0.12
+	_materiales[clave] = m
+	return m
+
+
+static func _textura(color: Color) -> ImageTexture:
+	var img := Image.create(16, 16, false, Image.FORMAT_RGB8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(color.to_html())
+	for by in 8:
+		for bx in 8:
+			var v := rng.randf_range(-0.06, 0.06)
+			var r := rng.randf()
+			if r < 0.12:
+				v -= 0.1   # Un pixel más oscuro
+			elif r < 0.22:
+				v += 0.08  # Uno más claro
+			var c := color.lightened(v) if v > 0.0 else color.darkened(-v)
+			img.fill_rect(Rect2i(bx * 2, by * 2, 2, 2), c)
+	return ImageTexture.create_from_image(img)

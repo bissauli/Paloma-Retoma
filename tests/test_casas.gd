@@ -42,7 +42,13 @@ func _ready() -> void:
 			_check("%s: la ruta %s no toca ningún mueble%s" % [casa.name, "adelante->atrás" if desde_frente else "atrás->adelante",
 				"" if choque == "" else " (" + choque + ")"], choque == "")
 		var atras := casa.to_global(Vector3(0, 1, -casa.fondo / 2.0 - CasaEnterable.CALLEJON + 0.1))
-		_check("%s: el callejón de atrás queda dentro del mapa" % casa.name, atras.z > -40.0)
+		_check("%s: atrás hay lugar para salir (dentro de la ciudad)" % casa.name, atras.z > Ciudad.Z_MIN)
+
+	# Cada escenario tiene su coreografía
+	var estilos := {}
+	for c in casas:
+		estilos[(c as CasaEnterable).estilo] = true
+	_check("los 5 escenarios tienen coreografías distintas (%d)" % estilos.size(), estilos.size() == 5)
 
 	# --- Los 5 escenarios, de punta a punta (adelante -> atrás)
 	for c in casas:
@@ -55,7 +61,20 @@ func _ready() -> void:
 		print("  %s: pasada de %.1f s" % [casa.name, seg])
 		_check("%s: se atraviesa de punta a punta (arranca, cruza y sale por atrás)" % casa.name,
 			arranco and cruzo and _terminada and casa.to_local(paloma.global_position).z < -casa.fondo / 2.0)
-		_check("%s: es rápida (menos de 6 s)" % casa.name, seg < 6.0)
+		_check("%s: dura lo justo (menos de 8 s, con el plano final y la vuelta a la cámara)" % casa.name, seg < 8.0)
+		# Lo que cuelga se hamaca después de que pasa (los ventiladores giran, no se hamacan)
+		var hamaca := 0.0
+		var hay := false
+		for piv in casa.colgantes:
+			if not piv.has_meta(&"gira"):
+				hay = true
+				hamaca = maxf(hamaca, maxf(absf(piv.rotation.x), absf(piv.rotation.z)))
+		if hay:
+			_check("%s: lo que cuelga se hamaca al pasar (%.2f rad)" % [casa.name, hamaca], hamaca > 0.02)
+		if casa.estilo == CasaEnterable.Estilo.CENITAL:
+			_check("%s: se roba un salame" % casa.name, casa.robo)
+		if casa.estilo == CasaEnterable.Estilo.DE_FRENTE:
+			_check("%s: tiene escritorios de donde vuelan papeles" % casa.name, casa.mesas.size() > 0)
 		await _frames(100)
 
 	# --- Adelante -> atrás: entra por la ventana de la plaza y sale al callejón
@@ -73,7 +92,9 @@ func _ready() -> void:
 	_check("recupera el control", paloma.controlable and not paloma.en_escena)
 	_check("vuelve la cámara del juego", not (get_viewport().get_camera_3d() is CamaraCinematica))
 	await _frames(60)
-	_check("en el callejón no queda trabada ni sale del mapa", paloma.global_position.z > -40.0 and not casa_a.esta_adentro(paloma.global_position))
+	var pa := paloma.global_position
+	_check("al salir por atrás sigue volando, fuera de la casa y dentro de la ciudad", not casa_a.esta_adentro(pa)
+		and pa.z > Ciudad.Z_MIN and pa.x > Ciudad.X_MIN and pa.x < Ciudad.X_MAX and paloma.velocity.length() > 1.0)
 	await _frames(60)
 
 	# --- Atrás -> adelante: del callejón a la plaza, en otra casa

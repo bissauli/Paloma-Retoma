@@ -5,15 +5,23 @@ extends Node3D
 ## una cinemática estilo Assassin's Creed 3: cruza el cuarto a toda velocidad en zigzag esquivando
 ## obstáculos (de costado, por arriba y por abajo) y sale disparada por la otra ventana.
 ##
-## La cámara es UNA SOLA toma continua, sin cortes: arranca donde estaba la del juego, se pone detrás
-## de la paloma y la persigue suavizada; en el esquive más difícil (el "destacado") todo pasa a cámara
-## lenta y la cámara la rodea de costado, y al final vuelve sola a la cámara del juego.
-## Se saltea con cualquier tecla, click o toque.
+## La cámara es UNA SOLA toma continua, sin cortes: arranca donde estaba la del juego y vuelve sola a
+## ella al final. En el esquive más difícil (el "destacado") todo pasa a cámara lenta. Cada escenario
+## tiene su coreografía ("estilo"), y adentro las cosas reaccionan al paso de la paloma:
+## - PERSECUCION (librería): detrás de la paloma; en el destacado la rodea de costado (bullet time).
+## - TIRABUZON (panadería): travelling lateral, y en el destacado la paloma da un giro de 360°.
+## - GRUA (Doña Marta): la cámara barre desde los rincones altos del cuarto, como una grúa.
+## - DE_FRENTE (oficina): la cámara va adelante, mirándola venir; de los escritorios vuelan papeles.
+## - CENITAL (fiambrería): desde arriba; al pasar por los salames se roba uno y se lo lleva.
+## Lo que cuelga del techo (lámparas, canastos, sábanas, salames) se hamaca cuando pasa cerca, y los
+## ventiladores giran. Se saltea con cualquier tecla, click o toque.
 ##
 ## Cada escenario (cuarto, ruta y obstáculos) lo arma world/pasaje.gd. Este nodo tiene la misma
 ## posición y rotación que la casa: la fachada mira hacia +Z local.
 
 signal escena_terminada(desde_frente: bool)
+
+enum Estilo { PERSECUCION, TIRABUZON, GRUA, DE_FRENTE, CENITAL }
 
 const ESPESOR := 0.4          ## Grosor de las paredes
 const AVISO := 3.0            ## Metros antes de la ventana en que arranca la cinemática
@@ -37,10 +45,28 @@ var x_fondo := 3.0            ## Centro de la ventana de atrás
 var ruta: Array[Vector3] = [] ## Por adentro, de la ventana de adelante a la de atrás (local)
 var destacado := Vector3.ZERO ## Dónde está el esquive en cámara lenta (local)
 var obstaculos := 0           ## Cuántos obstáculos hay adentro
+var cajas: Array = []         ## Las cajas de los obstáculos: [centro, medias medidas, giro] (locales)
 var luz: OmniLight3D
 var textos: Array[String] = []
 var lado_callejon := 1.0      ## Hacia dónde dobla al salir al callejón (+1 = +X local)
 var activa := false
+var estilo := Estilo.PERSECUCION       ## La coreografía de la cinemática
+var nombre := ""                       ## El nombre del local (la placa de título)
+var colgantes: Array[Node3D] = []      ## Pivotes de lo que cuelga del techo (se hamacan)
+var mesas: Array[Vector3] = []         ## Tapas de las mesas (locales): de ahí vuelan los papeles
+var salames: Array[Vector3] = []       ## Dónde cuelgan los salames (locales)
+var robo := false                      ## ¿Se llevó un salame en la última pasada?
+
+var _pendulos := {}            ## Pivote -> [ángulo x, velocidad x, ángulo z, velocidad z]
+var _efectos_hechos := {}      ## Qué mesas ya soltaron papeles en esta pasada
+var _salame: MeshInstance3D    ## El salame robado (en el pico)
+var _esquina := Vector3.ZERO   ## Rincón actual de la cámara grúa (local)
+var _lado_lat := 1.0           ## De qué lado va el travelling lateral
+var _giro_extra := 0.0         ## El tirabuzón: vuelta entera sumada al alabeo
+var _mezcla := 0.0             ## 0..1: de la persecución a la coreografía del escenario
+var _vista := Vector3.ZERO     ## Hacia dónde mira la cámara (con su inercia de giro)
+var _vista_vel := 0.0         ## Velocidad de giro de la mirada (rad/s)
+var _quieta := Vector3.INF    ## El plano final: dónde se queda la cámara viendo cómo se aleja
 
 var _cooldown := 0.0
 var _saltear := false
@@ -66,8 +92,12 @@ var _dir := Vector3.FORWARD
 var _dir_suave := Vector3.FORWARD
 var _rumbo_ant := 0.0
 var _alabeo := 0.0
+var _cabeceo := 0.0
 var _cam_pos := Vector3.ZERO
+var _cam_vel := Vector3.ZERO      ## Velocidad del resorte de la posición de la cámara
 var _cam_mira := Vector3.ZERO
+var _mira_vel := Vector3.ZERO     ## Velocidad del resorte del punto al que mira
+var _ocl := 1.0                   ## 0..1: cuánto se acerca la cámara si un mueble tapa a la paloma
 var _cam_fov := 70.0
 var _lado_orbita := 1.0
 
@@ -78,16 +108,24 @@ func _ready() -> void:
 
 ## Curva suave que pasa por todos los puntos (la usan la cinemática y Pasaje, para que los
 ## obstáculos se ubiquen sobre la misma ruta que va a recorrer la paloma).
+## Los manejadores de cada punto van en la dirección de la curva y miden un tercio del tramo de
+## cada lado: así un tramo corto al lado de uno largo no hace un nudo ni un tirón.
 static func curva_de(pts: Array[Vector3]) -> Curve3D:
 	var c := Curve3D.new()
-	c.bake_interval = 0.08
-	for i in pts.size():
-		var t := Vector3.ZERO
-		if i > 0 and i < pts.size() - 1:
-			t = (pts[i + 1] - pts[i - 1]) * 0.2
-		elif i == 0 and pts.size() > 1:
-			t = (pts[1] - pts[0]) * 0.3
-		c.add_point(pts[i], -t, t)
+	c.bake_interval = 0.06
+	var n := pts.size()
+	for i in n:
+		var h_in := Vector3.ZERO
+		var h_out := Vector3.ZERO
+		if i > 0 and i < n - 1:
+			var dir := (pts[i + 1] - pts[i - 1]).normalized()
+			h_in = -dir * pts[i].distance_to(pts[i - 1]) * 0.34
+			h_out = dir * pts[i].distance_to(pts[i + 1]) * 0.34
+		elif i == 0 and n > 1:
+			h_out = (pts[1] - pts[0]) * 0.34
+		elif i == n - 1 and n > 1:
+			h_in = (pts[n - 2] - pts[n - 1]) * 0.34
+		c.add_point(pts[i], h_in, h_out)
 	return c
 
 
@@ -103,6 +141,7 @@ func puntos_ruta(desde_frente: bool, inicio: Vector3) -> Array[Vector3]:
 		pts.append_array(interior)
 		pts.append(Vector3(x_fondo, Y_PASO + 0.1, -d / 2.0 - 1.2))
 		pts.append(Vector3(x_fondo + lado_callejon * 5.0, Y_PASO + 1.8, -d / 2.0 - 2.0))
+		pts.append(Vector3(x_fondo + lado_callejon * 11.0, Y_PASO + 3.6, -d / 2.0 - 2.4))   # Se aleja (plano final)
 	else:
 		if inicio.z < -d / 2.0 - 1.6:
 			pts.append(Vector3(x_fondo, Y_PASO, -d / 2.0 - 1.3))
@@ -110,6 +149,7 @@ func puntos_ruta(desde_frente: bool, inicio: Vector3) -> Array[Vector3]:
 		pts.append_array(interior)
 		pts.append(Vector3(x_frente, Y_PASO + 0.2, d / 2.0 + 1.6))
 		pts.append(Vector3(x_frente, Y_PASO + 2.0, d / 2.0 + 7.0))
+		pts.append(Vector3(x_frente, Y_PASO + 3.0, d / 2.0 + 9.5))   # Se aleja (plano final; más lejos, el Cabildo)
 	return pts
 
 
@@ -132,8 +172,11 @@ func _physics_process(delta: float) -> void:
 	var j := GameState.jugador
 	if j == null:
 		return
+	var cerca := global_position.distance_to(j.global_position) < 34.0
 	if luz:
-		luz.visible = global_position.distance_to(j.global_position) < 34.0
+		luz.visible = cerca
+	if cerca or activa:
+		_animar_colgantes(delta)
 	if _corriendo:
 		_avanzar(delta)
 		return
@@ -148,6 +191,80 @@ func _physics_process(delta: float) -> void:
 		_empezar(true)
 	elif absf(p.x - x_fondo) <= mitad and p.z < -fondo / 2.0 + 0.1 and p.z > -fondo / 2.0 - AVISO and v.z > VEL_MIN:
 		_empezar(false)
+
+
+## Lo que cuelga del techo: péndulos amortiguados. Cuando la paloma pasa cerca (por debajo) les da
+## un empujón en la dirección en que vuela; los ventiladores giran siempre.
+func _animar_colgantes(delta: float) -> void:
+	var lp := to_local(_pos) if _corriendo else Vector3(INF, INF, INF)
+	var lv := global_transform.basis.inverse() * (_dir * _velocidad(_s)) if _corriendo else Vector3.ZERO
+	for piv in colgantes:
+		if piv.has_meta(&"gira"):
+			piv.rotation.y += delta * 7.0
+			continue
+		var st: Array = _pendulos.get(piv, [0.0, 0.0, 0.0, 0.0])
+		if _corriendo and Vector2(lp.x - piv.position.x, lp.z - piv.position.z).length() < 1.4 \
+				and not piv.has_meta(&"empujado"):
+			piv.set_meta(&"empujado", true)
+			# Un objeto que cuelga hacia abajo: girar en +Z lo lleva a +X; girar en +X lo lleva a -Z
+			st[3] += clampf(lv.x, -12.0, 12.0) * 0.12
+			st[1] -= clampf(lv.z, -12.0, 12.0) * 0.12
+		var w2 := 9.8 / maxf(float(piv.get_meta(&"largo", 1.5)), 0.5)
+		for k in [0, 2]:
+			st[k + 1] += (-w2 * float(st[k]) - 1.3 * float(st[k + 1])) * delta
+			st[k] = clampf(float(st[k]) + float(st[k + 1]) * delta, -0.7, 0.7)
+		_pendulos[piv] = st
+		piv.rotation = Vector3(st[0], piv.rotation.y, st[2])
+
+
+## Papeles que vuelan de una mesa (la oficina): un estallido de hojas que caen planeando.
+func _papeles(en: Vector3) -> void:
+	var p := CPUParticles3D.new()
+	var hoja := QuadMesh.new()
+	hoja.size = Vector2(0.16, 0.21)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("fbfbf6")
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	hoja.material = mat
+	p.mesh = hoja
+	p.amount = 22
+	p.one_shot = true
+	p.explosiveness = 0.95
+	p.lifetime = 2.6
+	p.direction = Vector3.UP
+	p.spread = 70.0
+	p.initial_velocity_min = 2.0
+	p.initial_velocity_max = 4.5
+	p.gravity = Vector3(0, -1.6, 0)
+	p.damping_min = 1.5
+	p.damping_max = 2.5
+	p.angular_velocity_min = -280.0
+	p.angular_velocity_max = 280.0
+	p.angle_min = -180.0
+	p.angle_max = 180.0
+	p.particle_flag_rotate_y = true
+	p.local_coords = false
+	add_child(p)
+	p.position = en + Vector3.UP * 0.1
+	p.emitting = true
+	get_tree().create_timer(3.2).timeout.connect(p.queue_free)
+
+
+## Se roba un salame (la fiambrería): le aparece en el pico y lo lleva hasta un rato después de salir.
+func _robar_salame() -> void:
+	robo = true
+	var pico := _jugador.modelo.find_child("Pico", true, false) as Node3D
+	_salame = MeshInstance3D.new()
+	_salame.mesh = Kit.malla("salame_suelto")
+	_salame.material_override = Kit.material()
+	(pico if pico else _jugador.modelo).add_child(_salame)
+	_salame.position = Vector3(0, -0.02, 0.05)
+	_salame.rotation = Vector3(PI / 2.0, 0, 0)
+	_salame.scale = Vector3.ONE * 0.6
+	if _barras:
+		_barras.texto("¡Se robó un salame!")
+	AudioManager.reproducir("recoger", -2.0, false)
 
 
 func _puede_disparar(j: PalomaJugador) -> bool:
@@ -178,6 +295,31 @@ func _velocidad(s: float) -> float:
 	return minf(v, lerpf(V_LENTA, V_AFUERA, smoothstep(0.3, 2.6, absf(s - _s_destacado))))
 
 
+## Curvatura horizontal de la ruta en "s" (radianes por metro, con signo: positiva doblando a la
+## izquierda), medida en un tramo de 1,2 m para que sea suave.
+func _curvatura(s: float) -> float:
+	var a := _curva.sample_baked(maxf(s - 0.6, 0.0), true)
+	var b := _curva.sample_baked(s, true)
+	var c := _curva.sample_baked(minf(s + 0.6, _largo), true)
+	var d1 := Vector2(b.x - a.x, b.z - a.z)
+	var d2 := Vector2(c.x - b.x, c.z - b.z)
+	if d1.length() < 0.05 or d2.length() < 0.05:
+		return 0.0
+	# Con el eje Z hacia el sur, un giro positivo de rumbo (atan2(-x, -z)) es doblar a la izquierda
+	return -d1.angle_to(d2) / ((d1.length() + d2.length()) * 0.5)
+
+
+## Resorte con amortiguación crítica (como SmoothDamp): sigue al objetivo sin pasarse ni tironear,
+## aunque el objetivo pegue un salto. Devuelve [posición, velocidad].
+static func _resorte(actual: Vector3, objetivo: Vector3, vel: Vector3, tiempo: float, delta: float) -> Array:
+	var omega := 2.0 / maxf(tiempo, 0.0001)
+	var x := omega * delta
+	var ex := 1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x)
+	var cambio := actual - objetivo
+	var temp := (vel + cambio * omega) * delta
+	return [objetivo + (cambio + temp) * ex, (vel - temp * omega) * ex]
+
+
 ## 0..1: qué tanto estamos en la cámara lenta del destacado.
 func _en_destacado(s: float) -> float:
 	return 1.0 - smoothstep(0.0, 2.8, absf(s - _s_destacado))
@@ -201,6 +343,18 @@ func _empezar(desde_frente: bool) -> void:
 	_dir = (to_global(_curva.sample_baked(1.0, true)) - _pos).normalized()
 	_dir_suave = _dir
 	_lado_orbita = 1.0 if randf() < 0.5 else -1.0
+	_lado_lat = 1.0
+	_esquina = Vector3.ZERO
+	_giro_extra = 0.0
+	_mezcla = 0.0
+	_vista_vel = 0.0
+	_quieta = Vector3.INF
+	_efectos_hechos.clear()
+	robo = false
+	if is_instance_valid(_salame):
+		_salame.queue_free()
+	for piv in colgantes:
+		piv.remove_meta(&"empujado")
 	j.escena_empezar()
 	j.camara.bloqueada = true
 	GameState.invulnerable = maxf(GameState.invulnerable, 60.0)
@@ -221,7 +375,14 @@ func _empezar(desde_frente: bool) -> void:
 	_cam_pos = cam_juego.global_position
 	_cam_mira = _cam_pos - cam_juego.global_transform.basis.z * 4.0
 	_cam_fov = cam_juego.fov
+	_cam_vel = j.velocity   # La cámara arranca con el envión que traía, sin frenar de golpe
+	_mira_vel = j.velocity
+	_ocl = 1.0
+	_cabeceo = 0.0
 	_barras.mostrar()
+	if nombre != "":
+		_barras.titulo(nombre)
+	_vista = -cam_juego.global_transform.basis.z
 	if not textos.is_empty():
 		_barras.texto(textos.pick_random())
 	AudioManager.reproducir("aleteo")
@@ -243,13 +404,35 @@ func _avanzar(delta: float) -> void:
 	_dir = (global_transform.basis * adelante).normalized()
 	var plano := Vector2(_dir.x, _dir.z).length()
 	var rumbo := atan2(-_dir.x, -_dir.z) if plano > 0.05 else _rumbo_ant
-	var giro := wrapf(rumbo - _rumbo_ant, -PI, PI) / maxf(delta, 0.001)
 	_rumbo_ant = rumbo
-	# Alabeo y cabeceo suavizados: en el zigzag se nota la inclinación sin sacudones
-	_alabeo = lerpf(_alabeo, clampf(giro * 0.22, -1.1, 1.1), 1.0 - exp(-10.0 * delta))
-	var cabeceo := clampf(atan2(_dir.y, maxf(plano, 0.2)) * 0.9, -0.9, 0.7)
+	# Alabeo como un ave de verdad: sale de la curvatura de la ruta y de la velocidad (aceleración
+	# lateral v²·k), no de la diferencia de rumbo entre cuadros (que es ruidosa). Suavizado.
+	var k := _curvatura(_s)
+	var objetivo_alabeo := clampf(atan(v * v * k / 9.8) * 0.85, -1.05, 1.05)
+	_alabeo = lerpf(_alabeo, objetivo_alabeo, 1.0 - exp(-7.0 * delta))
+	_cabeceo = lerpf(_cabeceo, clampf(atan2(_dir.y, maxf(plano, 0.2)) * 0.9, -0.9, 0.7), 1.0 - exp(-8.0 * delta))
+	var cabeceo := _cabeceo
 	var modo := 3 if v > 12.5 else (2 if v > 5.0 else 1)   # Picada / planeo / aleteo
-	_jugador.escena_mover(_pos, rumbo, modo, v, cabeceo, _alabeo)
+	# Tirabuzón (panadería): una vuelta entera de costado alrededor del esquive destacado
+	if estilo == Estilo.TIRABUZON:
+		var t := clampf((_s - (_s_destacado - 1.6)) / 3.2, 0.0, 1.0)
+		# En ±180° (se ve igual): así al soltarla no queda una vuelta guardada que se "desenrosque"
+		_giro_extra = wrapf(TAU * smoothstep(0.0, 1.0, t) * _lado_orbita, -PI, PI)
+		if t > 0.0 and t < 1.0:
+			modo = 3
+	_jugador.escena_mover(_pos, rumbo, modo, v, cabeceo, _alabeo + _giro_extra)
+	# Efectos al pasar: papeles que vuelan de las mesas (oficina) y el salame robado (fiambrería)
+	var lp := p
+	if estilo == Estilo.DE_FRENTE:
+		for i in mesas.size():
+			if not _efectos_hechos.has(i) and Vector2(lp.x - mesas[i].x, lp.z - mesas[i].z).length() < 1.5:
+				_efectos_hechos[i] = true
+				_papeles(mesas[i])
+	if estilo == Estilo.CENITAL and not robo:
+		for s in salames:
+			if Vector2(lp.x - s.x, lp.z - s.z).length() < 1.4:
+				_robar_salame()
+				break
 	if _sonado < _sonidos.size() and _s >= _sonidos[_sonado] - 0.4:
 		_sonado += 1
 		AudioManager.reproducir("aleteo", -2.0)
@@ -268,31 +451,148 @@ func _process(delta: float) -> void:
 	if not _corriendo or _saltear or _camara == null or _camara.estado != CamaraCinematica.Estado.QUIETA:
 		return
 	var p := _jugador.get_global_transform_interpolated().origin
-	_dir_suave = _dir_suave.slerp(_dir, 1.0 - exp(-5.0 * delta)).normalized()
+	# La dirección de la cámara mira un poco hacia adelante en la ruta: anticipa cada vuelta del
+	# zigzag en vez de correr detrás de ella
+	var aqui := _curva.sample_baked(_s, true)
+	var adelante := _curva.sample_baked(minf(_s + 2.5, _largo), true) - aqui
+	var dir_obj := (global_transform.basis * adelante).normalized() if adelante.length() > 0.2 else _dir
+	_dir_suave = _dir_suave.slerp(dir_obj, 1.0 - exp(-3.5 * delta)).normalized()
 	var k := _en_destacado(_s)
-	var atras := -_dir_suave * lerpf(2.4, 1.6, k)
-	atras = atras.rotated(Vector3.UP, 1.75 * k * _lado_orbita)
-	var objetivo := p + atras + Vector3.UP * lerpf(0.65, 0.3, k)
-	if esta_adentro(p):
+	var adentro := esta_adentro(p)
+	# Afuera (llegando y saliendo) persigue; adentro, cada escenario con su coreografía. No cambia de
+	# golpe: la mezcla entre las dos se arma en 0,8 s al entrar y se desarma al salir (o, de frente,
+	# antes de llegar a la pared), así la cámara viaja sin pasar a través de la paloma
+	var hacia_estilo := adentro and estilo != Estilo.PERSECUCION
+	if estilo == Estilo.DE_FRENTE and _largo - _s < 5.0:
+		hacia_estilo = false   # Al final de la ruta ya no queda "adelante": vuelve a perseguirla
+	_mezcla = move_toward(_mezcla, 1.0 if hacia_estilo else 0.0, delta / 1.1)
+	var w := smoothstep(0.0, 1.0, _mezcla)
+	var plan := _plano(p, k, Estilo.PERSECUCION)
+	if w > 0.0:
+		var otro := _plano(p, k, estilo, w)
+		if estilo == Estilo.DE_FRENTE:
+			plan = otro   # Ya viene mezclado: es una órbita alrededor de la paloma
+		else:
+			plan = [(plan[0] as Vector3).lerp(otro[0], w), (plan[1] as Vector3).lerp(otro[1], w), lerpf(plan[2], otro[2], w)]
+	var objetivo: Vector3 = plan[0]
+	var mira_obj: Vector3 = plan[1]
+	var tiempo: float = plan[2]
+	if adentro:
 		var lo := to_local(objetivo)
 		lo.x = clampf(lo.x, -ancho / 2.0 + ESPESOR + 0.35, ancho / 2.0 - ESPESOR - 0.35)
 		lo.z = clampf(lo.z, -fondo / 2.0 + ESPESOR + 0.35, fondo / 2.0 - ESPESOR - 0.35)
 		lo.y = clampf(lo.y, 0.5, 5.5)
 		objetivo = to_global(lo)
-	# Si un mueble se mete entre la paloma y la cámara, la cámara se pone delante (y se acerca rápido):
-	# la paloma siempre queda a la vista
-	var rapido := false
+	# Si un mueble se mete entre la paloma y la cámara, la cámara se acerca (rápido al taparse, despacio
+	# al destaparse, como el resorte de la cámara del juego): la paloma siempre queda a la vista
+	var ocl_obj := 1.0
 	var q := PhysicsRayQueryParameters3D.create(p, objetivo, 1, [_jugador.get_rid()])
 	var choque := get_world_3d().direct_space_state.intersect_ray(q)
 	if not choque.is_empty():
-		var hasta := choque["position"] as Vector3
-		objetivo = hasta + (p - hasta).normalized() * 0.3
-		rapido = true
-	_cam_pos = _cam_pos.lerp(objetivo, 1.0 - exp(-(22.0 if rapido else 7.0) * delta))
-	_cam_mira = _cam_mira.lerp(p + _dir_suave * lerpf(1.8, 0.2, k), 1.0 - exp(-12.0 * delta))
+		var largo := p.distance_to(objetivo)
+		# Nunca a menos de 1 m de la paloma: más cerca, cualquier movimiento suyo sería un giro brusco
+		ocl_obj = clampf((p.distance_to(choque["position"] as Vector3) - 0.3) / maxf(largo, 0.01), minf(1.0 / maxf(largo, 0.01), 1.0), 1.0)
+	_ocl = lerpf(_ocl, ocl_obj, 1.0 - exp(-(25.0 if ocl_obj < _ocl else 3.0) * delta))
+	objetivo = p + (objetivo - p) * _ocl
+	# Plano final: ya afuera, la cámara se queda (frenando suave) y la ve alejarse
+	if _s > _s_sale + 1.2:
+		if _quieta == Vector3.INF:
+			_quieta = _cam_pos + _cam_vel * 0.3
+		objetivo = _quieta
+		mira_obj = p
+		tiempo = 0.35
+	# Resortes con amortiguación crítica: la cámara acelera y frena suave, nunca de golpe. La
+	# posición, un poco más blanda (como una cámara en mano con estabilizador)
+	var r := _resorte(_cam_pos, objetivo, _cam_vel, tiempo * 1.4, delta)
+	_cam_pos = r[0]
+	_cam_vel = r[1]
+	var cerca := clampf(inverse_lerp(1.6, 0.7, _cam_pos.distance_to(p)), 0.0, 1.0)
+	var m := _resorte(_cam_mira, mira_obj, _mira_vel, lerpf(0.1, 0.22, cerca), delta)
+	_cam_mira = m[0]
+	_mira_vel = m[1]
 	var rapidez := clampf(inverse_lerp(V_LENTA, V_AFUERA, _velocidad(_s)), 0.0, 1.0)
-	_cam_fov = lerpf(_cam_fov, lerpf(64.0, 92.0, rapidez), 1.0 - exp(-4.0 * delta))
-	_camara.corte(_cam_pos, _cam_mira, _cam_fov)
+	_cam_fov = lerpf(_cam_fov, lerpf(64.0, 88.0, rapidez), 1.0 - exp(-2.5 * delta))
+	_girar_vista(_cam_mira - _cam_pos, deg_to_rad(150.0), delta)
+	_camara.corte(_cam_pos, _cam_pos + _vista * 4.0, _cam_fov)
+
+
+## La mirada de la cámara gira con inercia, como la de un camarógrafo: acelera y frena suave y no
+## pasa de "maximo" rad/s. Así un cambio de dirección nunca es un latigazo.
+func _girar_vista(deseada: Vector3, maximo: float, delta: float) -> void:
+	if deseada.length() < 0.001:
+		return
+	deseada = deseada.normalized()
+	if _vista.length() < 0.5:
+		_vista = deseada
+	var ang := _vista.angle_to(deseada)
+	_vista_vel = move_toward(_vista_vel, minf(ang * 5.0, maximo), maximo * 4.0 * delta)
+	var paso := minf(_vista_vel * delta, ang)
+	if ang > 0.0001:
+		_vista = _vista.slerp(deseada, paso / ang).normalized()
+
+
+## Dónde quiere estar la cámara según la coreografía: [posición, punto al que mira, tiempo del
+## resorte]. "p" es la paloma (global) y "k" cuánto estamos en el destacado (0..1).
+func _plano(p: Vector3, k: float, cual: Estilo, w := 1.0) -> Array:
+	var d := _dir_suave
+	match cual:
+		Estilo.TIRABUZON:
+			# Travelling lateral: de costado, del lado con más lugar (cambia sólo si el otro es mucho mejor)
+			var der := d.cross(Vector3.UP).normalized()
+			var lados := [_lugar(p + der * 3.0), _lugar(p - der * 3.0)]
+			var actual: float = lados[0] if _lado_lat > 0.0 else lados[1]
+			var otro: float = lados[1] if _lado_lat > 0.0 else lados[0]
+			if otro > actual + 0.8:
+				_lado_lat = -_lado_lat
+			return [p + der * _lado_lat * lerpf(3.0, 2.2, k) + Vector3.UP * 0.35 - d * 0.5, p + d * 0.6, 0.18]
+		Estilo.GRUA:
+			# Desde un rincón alto: el que mejor ve hacia donde va la paloma (cambia de rincón con
+			# un barrido lento, como una grúa)
+			var hacia := to_local(p + d * 3.5)
+			var lp := to_local(p)
+			var mejor := _esquina
+			var mejor_d := INF if _esquina == Vector3.ZERO else _esquina.distance_to(hacia) - 1.2
+			for sx in [-1.0, 1.0]:
+				for sz in [-1.0, 1.0]:
+					var e := Vector3(sx * (ancho / 2.0 - ESPESOR - 0.6), 5.0, sz * (fondo / 2.0 - ESPESOR - 0.6))
+					var dist := e.distance_to(hacia)
+					if Vector2(e.x - lp.x, e.z - lp.z).length() > 2.2 and dist < mejor_d:
+						mejor = e
+						mejor_d = dist
+			_esquina = mejor
+			return [to_global(_esquina), p + d * 0.4, 0.42]
+		Estilo.DE_FRENTE:
+			# Adelante, mirándola venir: la cámara va 2,6 m más adelante SOBRE LA RUTA (que siempre está
+			# adentro del cuarto, y al final sale por la ventana antes que ella). Para pasar de atrás a
+			# adelante da la vuelta en órbita alrededor de la paloma: nunca la atraviesa
+			var adelante := to_global(_curva.sample_baked(minf(_s + 2.6, _largo), true))
+			var paso := 2.6
+			while adelante.distance_to(p) < 2.2 and paso < 6.0 and _s + paso < _largo:   # En las vueltas cerradas, más adelante
+				paso += 0.4
+				adelante = to_global(_curva.sample_baked(minf(_s + paso, _largo), true))
+			var v0 := -d * 2.4
+			var v1 := adelante - p
+			var a0 := atan2(v0.x, v0.z)
+			var da := wrapf(atan2(v1.x, v1.z) - a0, -PI, PI)
+			if absf(da) > PI * 0.92:
+				da = PI * 0.92 * _lado_orbita   # Justo opuestos: elige un costado para dar la vuelta
+			var ang := a0 + da * w
+			var largo := lerpf(Vector2(v0.x, v0.z).length(), maxf(Vector2(v1.x, v1.z).length(), 1.2), w)
+			var pos := p + Vector3(sin(ang) * largo, lerpf(0.6, v1.y + 0.25, w), cos(ang) * largo)
+			return [pos, p + d * lerpf(1.6, 0.0, w) + Vector3.UP * 0.05, 0.16]
+		Estilo.CENITAL:
+			# Desde arriba, un poco atrás, sin pasarse del techo
+			var alto := clampf(5.4 - p.y, 1.4, 3.0)
+			return [p + Vector3.UP * alto - d * lerpf(0.8, 0.3, k), p + d * 0.9, 0.16]
+	# PERSECUCION: detrás; en el destacado la rodea de costado y se acerca (bullet time)
+	var atras := (-d * lerpf(2.4, 1.6, k)).rotated(Vector3.UP, 1.75 * k * _lado_orbita)
+	return [p + atras + Vector3.UP * lerpf(0.65, 0.3, k), p + d * lerpf(1.8, 0.2, k), 0.14]
+
+
+## Cuánto lugar hay en un punto (global) dentro del cuarto: distancia a la pared más cercana.
+func _lugar(punto: Vector3) -> float:
+	var l := to_local(punto)
+	return minf(ancho / 2.0 - ESPESOR - absf(l.x), fondo / 2.0 - ESPESOR - absf(l.z))
 
 
 ## Fin: la paloma sigue volando con el envión, la cámara del juego queda detrás de ella mirando
@@ -306,11 +606,21 @@ func _terminar() -> void:
 	j.escena_terminar(fin, rumbo, true, Vector3(dir.x, 0.0, dir.z).normalized() * 11.0 + Vector3.UP * 1.5)
 	j.camara.yaw = rumbo
 	j.camara.pitch = -0.2
+	# La cámara del juego no se movió durante la escena: se la pone ya con su orientación final
+	# (si no, gira de golpe en el primer cuadro y el fundido salta)
+	j.camara.rotation = Vector3(j.camara.pitch, j.camara.yaw, 0.0)
 	j.camara.reubicar()
 	j.camara.bloqueada = false
-	if _camara.estado != CamaraCinematica.Estado.TERMINADA:
-		_camara.volver(0.7)
-		await _camara.llego
+	if _saltear:
+		if _camara.estado != CamaraCinematica.Estado.TERMINADA:
+			await _camara.llego
+	else:
+		# Durante el traspaso la cámara del juego sigue a la paloma más despacio (si no, arranca de
+		# golpe detrás de ella); después vuelve de a poco a su suavizado normal
+		var suave := j.camara.suavizado
+		j.camara.suavizado = 4.0
+		await _fundir(j.camara.camara)
+		create_tween().tween_property(j.camara, "suavizado", suave, 1.2).set_trans(Tween.TRANS_SINE)
 	_camara.queue_free()
 	_camara = null
 	_barras.ocultar()
@@ -324,7 +634,53 @@ func _terminar() -> void:
 	_hud = null
 	activa = false
 	_cooldown = ENFRIAMIENTO
+	if is_instance_valid(_salame):
+		# El salame robado lo lleva un rato más y después se lo come
+		get_tree().create_timer(2.5).timeout.connect(_salame.queue_free)
 	escena_terminada.emit(_desde_frente)
+
+
+## La cámara de cine se funde con la del juego sin frenar ni saltar. La del juego se mueve con la
+## paloma, y un resorte que la persigue siempre queda atrás; por eso se mide la DIFERENCIA con ella
+## (que se mueve junto con ella) y esa diferencia se achica con un resorte hasta cero. Arranca con la
+## velocidad que traía la cámara de cine y termina exactamente en la del juego.
+func _fundir(cam_juego: Camera3D) -> void:
+	# Recién reubicada, la cámara del juego arranca casi quieta y acelera de a poco (persigue a la
+	# paloma con su propio suavizado): la diferencia arranca con toda la velocidad de la de cine
+	var vel_juego := Vector3.ZERO
+	var off := _cam_pos - cam_juego.global_position
+	var off_mira := _cam_mira - (cam_juego.global_position - cam_juego.global_transform.basis.z * 4.0)
+	var off_vel := _cam_vel - vel_juego
+	var off_mira_vel := _mira_vel - vel_juego
+	var t := 0.0
+	var antes := cam_juego.global_position
+	while t < 3.0:
+		await get_tree().process_frame
+		if get_tree().paused:
+			continue
+		var dt := get_process_delta_time()
+		t += dt
+		# Arranca blando (sale del plano final sin tirón) y se va endureciendo para alcanzarla
+		var r := _resorte(off, Vector3.ZERO, off_vel, lerpf(0.6, 0.22, smoothstep(0.0, 1.4, t)), dt)
+		off = r[0]
+		off_vel = r[1]
+		var m := _resorte(off_mira, Vector3.ZERO, off_mira_vel, 0.2, dt)
+		off_mira = m[0]
+		off_mira_vel = m[1]
+		# Esto corre antes de que la cámara del juego se mueva en este cuadro: se predice dónde va a
+		# estar (si no, al pasarle el mando, la imagen saltaría un cuadro)
+		var obj := cam_juego.global_position * 2.0 - antes
+		antes = cam_juego.global_position
+		_cam_pos = obj + off
+		_cam_mira = obj - cam_juego.global_transform.basis.z * 4.0 + off_mira
+		_cam_fov = lerpf(_cam_fov, cam_juego.fov, 1.0 - exp(-6.0 * dt))
+		_girar_vista(_cam_mira - _cam_pos, deg_to_rad(170.0), dt)
+		_camara.corte(_cam_pos, _cam_pos + _vista * 4.0, _cam_fov)
+		var dir_juego := -cam_juego.global_transform.basis.z
+		if off.length() < 0.01 and off_mira.length() < 0.02 and _vista.angle_to(dir_juego) < 0.005:
+			break
+	cam_juego.make_current()
+	_camara.current = false
 
 
 ## Cualquier tecla (menos la pausa), click, toque o botón del mando saltea la cinemática.

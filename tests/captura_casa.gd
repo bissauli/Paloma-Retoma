@@ -3,7 +3,7 @@ extends Node
 ## godot --path . res://tests/captura_casa.tscn -- <carpeta_salida>
 ## Por cada pasaje, varios fotogramas de la pasada adelante->atrás.
 
-const TIEMPOS := [0.4, 1.0, 1.6, 2.2, 2.8, 3.4, 4.2]
+const TIEMPOS := [0.4, 1.0, 1.6, 2.2, 2.8, 3.4, 4.2, 5.0]
 
 var salida := "user://"
 var paloma: PalomaJugador
@@ -26,6 +26,16 @@ func _ready() -> void:
 
 
 func _pasada(casa: CasaEnterable, n: int) -> void:
+	# La fachada, desde la plaza
+	paloma.global_position = casa.to_global(Vector3(0, 3.0, casa.fondo / 2.0 + 14.0))
+	paloma.reset_physics_interpolation()
+	paloma.estado = PalomaJugador.Estado.AIRE
+	paloma.velocity = Vector3.ZERO
+	paloma.camara.yaw = 0.0
+	paloma.camara.pitch = -0.02
+	paloma.camara.reubicar()
+	await _frames(25)
+	_foto("%d_%s_fachada" % [n, String(casa.name).replace("Entrada_", "")])
 	paloma.global_position = casa.to_global(Vector3(casa.x_frente, CasaEnterable.Y_PASO, casa.fondo / 2.0 + 2.8))
 	paloma.reset_physics_interpolation()
 	paloma.camara.yaw = 0.0

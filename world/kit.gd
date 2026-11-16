@@ -13,6 +13,7 @@ extends RefCounted
 
 const RUTA_CIUDAD := "res://modelos/ciudad/%s/%s.glb"
 const RUTA_PARQUE := "res://modelos/parque/%s/%s.glb"
+const RUTA_MUEBLES := "res://modelos/muebles/%s.glb"   ## Muebles de los pasajes (generar_muebles.py)
 
 const LOSETAS_PARQUE := ["pasto", "camino_recto", "camino_curva", "camino_t", "camino_cruce", "camino_fin",
 	"plaza_cruce", "plaza_redonda", "plaza_circulo", "muro_recto", "muro_esquina", "muro_fin", "portal",
@@ -87,7 +88,14 @@ static func es_de_ciudad(nombre: String) -> bool:
 	return KitDatos.PIEZAS.has(nombre)
 
 
+## ¿Es un mueble de los interiores de los pasajes (tools/blender/generar_muebles.py)?
+static func es_mueble(nombre: String) -> bool:
+	return MueblesDatos.PIEZAS.has(nombre)
+
+
 static func ruta(nombre: String) -> String:
+	if es_mueble(nombre):
+		return RUTA_MUEBLES % nombre
 	if es_de_ciudad(nombre):
 		return RUTA_CIUDAD % [KitDatos.PIEZAS[nombre]["carpeta"], nombre]
 	return RUTA_PARQUE % ["losetas" if nombre in LOSETAS_PARQUE else "piezas", nombre]
@@ -116,6 +124,8 @@ static func malla(nombre: String) -> Mesh:
 
 ## Datos de la pieza: medidas, sombra, distancia de dibujo, colisiones y carteles.
 static func datos(nombre: String) -> Dictionary:
+	if es_mueble(nombre):
+		return SIN_SOMBRA   # Están adentro: el sol no les llega, la sombra sería un dibujo de más
 	if es_de_ciudad(nombre):
 		return KitDatos.PIEZAS[nombre]
 	return PARQUE_COL.get(nombre, {})
