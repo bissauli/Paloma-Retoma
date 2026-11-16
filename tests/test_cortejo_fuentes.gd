@@ -127,13 +127,13 @@ func _fuentes() -> void:
 	_check("fuentes: la paloma se para en el agua de la fuente (y=%.2f)" % paloma.global_position.y,
 		absf(paloma.global_position.y - fuente.altura) < 0.06 and paloma.estado == PalomaJugador.Estado.SUELO)
 	await _fisica(10)
-	_check("fuentes: dentro del agua aparece el cartel", fuente._cartel.visible)
+	_check("fuentes: dentro del agua aparece el cartel", fuente._aviso_puesto)
 
 	GameState.set_stamina(20.0)
 	_apretar("interactuar")
 	await _fisica(5)
 	_check("fuentes: con E se pone a bañarse", paloma.modelo.baile_actual() == Coreografia.BANO and fuente._banando)
-	_check("fuentes: con el baño puesto ya no se ve el cartel", not fuente._cartel.visible)
+	_check("fuentes: con el baño puesto ya no se ve el cartel", not fuente._aviso_puesto)
 	await _fisica(60)
 	_check("fuentes: salpica mientras se baña", fuente._salpicadura.emitting)
 	_check("fuentes: el baño recarga stamina (%.0f)" % GameState.stamina, GameState.stamina > 40.0)

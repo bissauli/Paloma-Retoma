@@ -32,6 +32,10 @@ func _ready() -> void:
 		tactiles.name = "ControlesTactiles"
 		tactiles.pausa = $Pausa
 		add_child(tactiles)
+	if not Ajustes.movil:
+		var foto := ModoFoto.new()
+		foto.name = "ModoFoto"
+		add_child(foto)
 	_buscar_balcon.call_deferred()
 	# El menú sólo aparece cuando esta es la escena que se está jugando: las pruebas automáticas
 	# instancian main.tscn adentro de otra escena y arrancan directo a jugar.

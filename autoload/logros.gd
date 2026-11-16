@@ -19,6 +19,7 @@ var archivo := ""
 var _stats := {}              ## contador -> float
 var _hechos := {}             ## id -> instante (unix) en que se desbloqueó
 var _bailes := {}             ## bailes distintos que bailó
+var _sombreros := {}          ## sombreros distintos (tipo + color) que se puso
 var _aviso: AvisoLogro
 var _jugador: PalomaJugador   ## La paloma a la que ya se le escuchó el despegue
 var _en_picada := false
@@ -128,6 +129,15 @@ func registrar_baile(baile: StringName) -> void:
 		desbloquear("rey_baile")
 
 
+## Un sombrero o gorra puesto: cuenta cada combinación de tipo y color una sola vez.
+func registrar_sombrero(tipo: String, color: Color) -> void:
+	if not activo():
+		return
+	sumar("sombreros_puestos")
+	_sombreros[tipo + color.to_html(false)] = true
+	maximo("sombreros_distintos", _sombreros.size())
+
+
 func _evaluar(clave: String) -> void:
 	for d: Dictionary in CatalogoLogros.con_stat(clave):
 		if not hecho(d["id"]) and valor(clave) >= float(d["meta"]):
@@ -211,6 +221,7 @@ func guardar() -> void:
 	for id: String in _hechos:
 		cfg.set_value("hechos", id, _hechos[id])
 	cfg.set_value("general", "bailes", _bailes.keys())
+	cfg.set_value("general", "sombreros", _sombreros.keys())
 	cfg.save(archivo)
 
 
@@ -218,6 +229,7 @@ func cargar() -> void:
 	_stats.clear()
 	_hechos.clear()
 	_bailes.clear()
+	_sombreros.clear()
 	var cfg := ConfigFile.new()
 	if cfg.load(archivo) != OK:
 		return
@@ -230,6 +242,8 @@ func cargar() -> void:
 				_hechos[id] = int(cfg.get_value("hechos", id, 0))
 	for b in cfg.get_value("general", "bailes", []):
 		_bailes[StringName(b)] = true
+	for s in cfg.get_value("general", "sombreros", []):
+		_sombreros[String(s)] = true
 
 
 ## Borra todo el progreso (para pruebas).
@@ -237,6 +251,7 @@ func borrar_todo() -> void:
 	_stats.clear()
 	_hechos.clear()
 	_bailes.clear()
+	_sombreros.clear()
 	_bandada_previa = 0
 	_sucio = false
 	if FileAccess.file_exists(archivo):

@@ -290,6 +290,8 @@ func _revisar_jugador(a: Auto, j: Node3D, _delta: float) -> void:   # _delta: lo
 		var pj := j as PalomaJugador
 		if pj.estado == PalomaJugador.Estado.SUELO and pj.get_platform_velocity().length() < 0.1:
 			pj.global_position += fw * a.velocidad * _delta
+			if a.velocidad > 1.5:
+				Logros.sumar("tiempo_auto", _delta)
 		return
 	if a_lo_largo > a.largo / 2.0 and a_lo_largo < a.largo / 2.0 + 10.0 and a.velocidad > 3.0:
 		if a.bocina_enfriamiento <= 0.0:

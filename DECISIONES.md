@@ -400,3 +400,7 @@ Textura y lugares para posarse a media altura (Fase 2, `world/nivel_medio.gd`, `
 - Pruebas: `tests/test_aletazo.tscn` (la animación y su curva, la comida despedida y su vuelta a la mesa, los objetos congelados y su vuelta, los sombreros y la sorpresa, las palomas, la tecla F, el enfriamiento y que volando no hay aletazo).
 - Nota técnica: `Skeleton3D` restaura la pose de los huesos después de dibujar, así que desde afuera no se ve el giro del ala leyendo los huesos; el modificador cuenta cuántas veces se aplicó (`aplicaciones`) para las pruebas.
 
+
+## Choque contra paredes (picada)
+- Si la paloma llega volando a `VELOCIDAD_CHOQUE` (15 m/s: sólo la picada, el vuelo normal llega a 10) contra una pared del mundo (no autos ni objetos que se mueven), se estrella (`PalomaJugador.chocar`): nube de polvo en el golpe (`player/efecto_choque.gd`), rebote hacia atrás, se aplasta un instante y cae mareada `DURACION_ATURDIDA` (1,7 s) sin controles, con un halo de estrellitas y tambaleándose (`ModeloPaloma.aturdir`). Referencia: el choque del gato de Little Kitty, Big City.
+- Señal `choco(impacto)` para logros o misiones. Test: `tests/test_choque.gd`. Pendiente: sonido propio del golpe (hoy usa "aplastar") y afinar el umbral jugando.

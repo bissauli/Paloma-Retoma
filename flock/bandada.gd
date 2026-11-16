@@ -227,6 +227,15 @@ func descansar(puestos: Array[Vector3], rumbo: float) -> void:
 		libres.remove_at(mejor)
 
 
+## Cuántas seguidoras ya están sentadas en su puesto.
+func cantidad_sentadas() -> int:
+	var n := 0
+	for p in seguidoras:
+		if p.sentada:
+			n += 1
+	return n
+
+
 ## La jugadora se levanta: todas retoman el vuelo con ella.
 func levantarse() -> void:
 	descansando = false

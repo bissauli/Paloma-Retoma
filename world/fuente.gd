@@ -21,7 +21,7 @@ var _y_agua := 0.0
 var _chorro: CPUParticles3D
 var _salpicadura: CPUParticles3D
 var _rafaga: CPUParticles3D
-var _cartel: Label3D
+var _aviso_puesto := false
 var _banando := false
 var _t_bano := 0.0
 var _t_onda := 0.0
@@ -90,17 +90,6 @@ func _armar() -> void:
 
 	_salpicadura = _particulas(34, 0.7, false)
 	_rafaga = _particulas(40, 0.8, true)
-	_cartel = Label3D.new()
-	_cartel.text = "E · BAÑARSE"
-	_cartel.font_size = 64
-	_cartel.outline_size = 14
-	_cartel.pixel_size = 0.0045
-	_cartel.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_cartel.no_depth_test = true
-	_cartel.modulate = Color("9be8ff")
-	_cartel.top_level = true
-	_cartel.visible = false
-	add_child(_cartel)
 
 
 func _disco(mat: Material, r: float, pos: Vector3) -> void:
@@ -221,9 +210,13 @@ func _physics_process(delta: float) -> void:
 	else:
 		_t_quieta = 0.0
 
-	_cartel.visible = dentro and not en_bano and not Ajustes.movil
-	if _cartel.visible:
-		_cartel.global_position = j.global_position + Vector3(0, 0.95, 0)
+	var pide := dentro and not en_bano
+	if pide != _aviso_puesto:
+		_aviso_puesto = pide
+		if pide:
+			AvisoAccion.mostrar(get_tree(), _id_aviso(), "E", "BAÑARSE", 2, func() -> void: j.banarse())
+		else:
+			AvisoAccion.ocultar(get_tree(), _id_aviso())
 
 	if dentro and not en_bano:
 		if Input.is_action_just_pressed("interactuar") or (Ajustes.movil and _t_quieta >= RETARDO_AUTO):
@@ -235,6 +228,21 @@ func _physics_process(delta: float) -> void:
 		_terminar_bano()
 	if _banando:
 		_pasar_bano(j, delta)
+
+
+## ¿Se está pidiendo el aviso "E · BAÑARSE" de esta fuente? (lo miran las pruebas)
+func aviso_visible() -> bool:
+	return _aviso_puesto and AvisoAccion.visible_de(_id_aviso())
+
+
+func _id_aviso() -> String:
+	return "fuente_%d" % get_instance_id()
+
+
+func _exit_tree() -> void:
+	if _aviso_puesto:
+		_aviso_puesto = false
+		AvisoAccion.ocultar(get_tree(), _id_aviso())
 
 
 func _empezar_bano(j: PalomaJugador) -> void:

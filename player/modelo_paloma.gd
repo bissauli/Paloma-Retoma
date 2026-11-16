@@ -42,6 +42,9 @@ var _congelada := false   ## Ver congelar()
 var _aletazo: AletazoPaloma
 var _baile: StringName = &""    ## Baile en curso (ver bailar); "" = no baila
 var _t_baile := 0.0
+var _tween_aturdida: Tween      ## Ver aturdir()
+var _tween_vaiven: Tween
+var _halo: Node3D
 var _reposo: Array[Basis] = []  ## Giro global de cada hueso en reposo (para las poses de baile)
 
 var _glb: Node3D
@@ -265,6 +268,46 @@ func bailar(baile: StringName) -> void:
 	_baile = baile
 	_t_baile = 0.0
 	_aplicar_baile()
+
+
+## Se estrelló contra una pared: se aplasta contra ella un instante y queda mareada "dur" segundos,
+## tambaleándose de un lado a otro con un halo de estrellitas sobre la cabeza. Sólo la jugadora.
+func aturdir(dur: float) -> void:
+	if not es_jugador or _glb == null:
+		return
+	dejar_de_bailar()
+	calmar()
+	_glb.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF   # Se mueve con un tween
+	_halo = EfectoChoque.halo()
+	_halo.position = Vector3(0.0, 0.62, 0.0)
+	add_child(_halo)
+	scale = Vector3(1.4, 0.65, 1.4)      # Aplastada contra la pared...
+	_tween_aturdida = create_tween().set_parallel()
+	_tween_aturdida.tween_property(self, "scale", Vector3.ONE, 0.55).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	_tween_aturdida.tween_property(_halo, "rotation:y", TAU * dur * 0.9, dur)
+	# ...y después se tambalea cada vez menos
+	var vaiven := create_tween()
+	var amplitud := 0.5
+	var pasos := maxi(int(dur / 0.3), 2)
+	for i in pasos:
+		var lado := 1.0 if i % 2 == 0 else -1.0
+		vaiven.tween_property(_glb, "rotation:z", lado * amplitud * (1.0 - float(i) / pasos), 0.3).set_trans(Tween.TRANS_SINE)
+	vaiven.tween_callback(calmar)
+	_tween_vaiven = vaiven
+
+
+## Termina el mareo: vuelve a la pose normal y se va el halo.
+func calmar() -> void:
+	if _tween_aturdida and _tween_aturdida.is_valid():
+		_tween_aturdida.kill()
+	if _tween_vaiven and _tween_vaiven.is_valid():
+		_tween_vaiven.kill()
+	if is_instance_valid(_halo):
+		_halo.queue_free()
+	_halo = null
+	if _glb != null and _baile == &"":
+		_glb.rotation.z = 0.0
+		_glb.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_INHERIT
 
 
 func dejar_de_bailar() -> void:

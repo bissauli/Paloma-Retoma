@@ -5,6 +5,7 @@ extends CharacterBody3D
 
 signal despego
 signal aterrizo(fuerte: bool)
+signal choco(impacto: float)    ## Se estrelló contra una pared a toda velocidad (impacto: m/s contra la pared)
 
 enum Estado { SUELO, AIRE }
 
@@ -56,11 +57,17 @@ var _alabeo := 0.0
 var _velocidad_previa := Vector3.ZERO
 var _aleteo_auto := 0.0     ## Segundos de aleteo animado sin input (el salto del menú)
 var _aplastada := 0.0       ## Segundos que le quedan chata en el piso (la pisó un auto, ver aplastar)
+var _aturdida := 0.0        ## Segundos que le quedan mareada (se estrelló contra una pared, ver chocar)
 var _tween_aplastar: Tween
 var descansando := false    ## Descansando (Q): las palomas de la bandada se sientan al lado
 var _tween_descanso: Tween
+var _t_aviso_sombrero := 0.0
+var _t_descanso := 0.0
+var _descanso_contado := false
 
 const DURACION_APLASTADA := 1.5
+const VELOCIDAD_CHOQUE := 15.0     ## Velocidad contra la pared (m/s) desde la que el golpe la aturde: sólo la picada
+const DURACION_ATURDIDA := 1.7     ## Segundos que queda mareada después de estrellarse (ver chocar)
 const CAPA_GENTE := 4       ## Gente y autos (ver world/auto.gd): mientras está chata le pasan por encima
 
 @onready var modelo: ModeloPaloma = $Modelo
@@ -95,7 +102,7 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	var entrada := Vector2.ZERO
-	if controlable and _aplastada <= 0.0:
+	if controlable and _aplastada <= 0.0 and _aturdida <= 0.0:
 		entrada = Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras")
 	var dir: Vector3 = camara.direccion_plana(entrada)
 	_velocidad_previa = velocity
@@ -109,10 +116,14 @@ func _physics_process(delta: float) -> void:
 	else:
 		_fisica_aire(delta, dir)
 
+	_aturdida = maxf(_aturdida - delta, 0.0)
+	var v_antes := velocity      # Con la que llega a la pared (move_and_slide la frena)
 	move_and_slide()
+	_revisar_choque(v_antes)
 	_revisar_contacto(delta)
 	_revisar_baile()
 	_revisar_descanso()
+	_actualizar_avisos(delta)
 	_orientar(delta)
 	_acciones(delta)
 	_animar(delta)
@@ -183,6 +194,13 @@ func _revisar_baile() -> void:
 ## balcones, bordes de fuentes... ver Descanso). Se levanta al moverse, volar, dar un aletazo o con Q.
 func _revisar_descanso() -> void:
 	if descansando:
+		# Tras unos segundos, si hay 3 o más palomas sentadas a su lado, cuenta como descanso en grupo
+		_t_descanso += get_physics_process_delta_time()
+		if not _descanso_contado and _t_descanso >= 3.0:
+			var b := get_tree().get_first_node_in_group("bandada") as Bandada
+			if b and b.cantidad_sentadas() >= 3:
+				_descanso_contado = true
+				Logros.sumar("descansos_grupo")
 		var corta := estado == Estado.AIRE or not controlable or not GameState.en_partida \
 				or GameState.partida_terminada or _aplastada > 0.0
 		if not corta:
@@ -203,6 +221,8 @@ func descansar() -> void:
 	if modelo.bailando():
 		modelo.dejar_de_bailar()
 	descansando = true
+	_t_descanso = 0.0
+	_descanso_contado = false
 	velocity.x = 0.0
 	velocity.z = 0.0
 	if _tween_descanso:
@@ -246,7 +266,7 @@ func _fisica_suelo(delta: float, dir: Vector3) -> void:
 	# En el piso la stamina se recarga, y cada vez más rápido cuanto más tiempo seguido estés
 	_tiempo_en_suelo += delta
 	GameState.set_stamina(GameState.stamina + Config.recarga_suelo(_tiempo_en_suelo) * delta)
-	if controlable and _aplastada <= 0.0 and Input.is_action_just_pressed("volar"):
+	if controlable and _aplastada <= 0.0 and _aturdida <= 0.0 and Input.is_action_just_pressed("volar"):
 		despegar()
 
 
@@ -287,6 +307,15 @@ func saltar_inicio() -> void:
 func _fisica_aire(delta: float, dir: Vector3) -> void:
 	_tiempo_en_aire += delta
 	_tiempo_en_suelo = 0.0     # Al despegar, la recarga vuelve a empezar de cero
+	if _aturdida > 0.0:
+		# Mareada después del choque: cae como piedra, sin controlar nada
+		en_picada = false
+		aleteando = false
+		var frenado := Vector2(velocity.x, velocity.z).move_toward(Vector2.ZERO, 3.0 * delta)
+		velocity.x = frenado.x
+		velocity.z = frenado.y
+		velocity.y = maxf(velocity.y - 22.0 * delta, -12.0)
+		return
 	var hay_stamina := GameState.stamina > 0.5
 	var picada_antes := en_picada
 	en_picada = controlable and Input.is_action_pressed("picada")
@@ -366,7 +395,7 @@ func _aterrizar() -> void:
 func _orientar(delta: float) -> void:
 	var h := Vector2(velocity.x, velocity.z)
 	var rumbo_previo := _rumbo
-	if h.length() > 0.3:
+	if h.length() > 0.3 and _aturdida <= 0.0:    # Mareada no se da vuelta: sigue mirando la pared
 		var deseado := atan2(-h.x, -h.y)
 		var vel_giro := 12.0 if estado == Estado.SUELO else giro_aire
 		_rumbo = lerp_angle(_rumbo, deseado, minf(vel_giro * delta, 1.0))
@@ -399,7 +428,8 @@ func _acciones(delta: float) -> void:
 	_enfriamiento_arrullo = maxf(_enfriamiento_arrullo - delta, 0.0)
 	_enfriamiento_picoteo = maxf(_enfriamiento_picoteo - delta, 0.0)
 	_enfriamiento_aletazo = maxf(_enfriamiento_aletazo - delta, 0.0)
-	if not controlable or _aplastada > 0.0 or (not Ajustes.movil and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED):
+	if not controlable or _aplastada > 0.0 or _aturdida > 0.0 \
+			or (not Ajustes.movil and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED):
 		return
 	if Input.is_action_just_pressed("picotear") and _enfriamiento_picoteo <= 0.0:
 		_enfriamiento_picoteo = 0.28
@@ -454,8 +484,12 @@ func _golpear_adelante() -> int:
 			tiradas += 1
 	for n in get_tree().get_nodes_in_group("golpeables"):
 		var g := n as Golpeable
-		if g and _al_alcance(g.global_position, dir) and g.golpear(dir):
-			tiradas += 1
+		if g and _al_alcance(g.global_position, dir):
+			var era_maceta := g.tipo == "maceta" and not g.golpeado
+			if g.golpear(dir):
+				tiradas += 1
+				if era_maceta:
+					Logros.sumar("macetas")
 	var sombreros := 0
 	for n in get_tree().get_nodes_in_group("humanos"):
 		var h := n as Humano
@@ -472,6 +506,7 @@ func _golpear_adelante() -> int:
 		for p in bandada.seguidoras.duplicate():
 			if _al_alcance(p.global_position, dir):
 				bandada.expulsar(p, global_position)
+				Logros.sumar("expulsadas")
 				tiradas += 1
 	if tiradas > 0:
 		camara.sacudir(0.15)
@@ -484,17 +519,46 @@ func _golpear_adelante() -> int:
 
 ## Si hay un sombrero o gorra tirado (que se le cayó a alguien) delante del pico, se lo pone.
 func _equipar_sombrero(punto: Vector3) -> bool:
+	var g := _sombrero_cerca(punto)
+	if g == null:
+		return false
+	modelo.poner_sombrero(g.tipo, g.color)
+	Logros.registrar_sombrero(g.tipo, g.color)
+	g.queue_free()
+	AudioManager.ui("purchase", -12.0)
+	return true
+
+
+func _sombrero_cerca(punto: Vector3) -> Golpeable:
 	for n in get_tree().get_nodes_in_group("golpeables"):
 		var g := n as Golpeable
 		if g == null or not g.desechable or not (g.tipo in ["sombrero", "gorra"]):
 			continue
 		if g.global_position.distance_to(punto) > radio_picoteo + 0.2 or absf(g.global_position.y - global_position.y) > 0.8:
 			continue
-		modelo.poner_sombrero(g.tipo, g.color)
-		g.queue_free()
-		AudioManager.ui("purchase", -12.0)
-		return true
-	return false
+		return g
+	return null
+
+
+## Avisos de acción de la jugadora (ver AvisoAccion): levantarse del descanso y ponerse un sombrero.
+func _actualizar_avisos(delta: float) -> void:
+	var activa := controlable and GameState.en_partida and not GameState.partida_terminada and not GameState.menu_activo
+	if activa and descansando:
+		AvisoAccion.mostrar(get_tree(), "descanso", "Q", "LEVANTARSE", 4, levantarse)
+	else:
+		AvisoAccion.ocultar(get_tree(), "descanso")
+	_t_aviso_sombrero -= delta
+	if _t_aviso_sombrero > 0.0:
+		return
+	_t_aviso_sombrero = 0.15
+	var hay := false
+	if activa and not descansando and estado == Estado.SUELO:
+		var adelante := Vector3(-sin(_rumbo), 0, -cos(_rumbo))
+		hay = _sombrero_cerca(global_position + adelante * 0.45) != null
+	if hay:
+		AvisoAccion.mostrar(get_tree(), "sombrero", "CLICK", "PONERSE EL SOMBRERO", 3, _picotear_comida)
+	else:
+		AvisoAccion.ocultar(get_tree(), "sombrero")
 
 
 ## Busca comida (grupo "comida") delante del pico y le avisa que fue picoteada.
@@ -564,6 +628,8 @@ func volver_al_nido() -> void:
 		collision_mask |= CAPA_GENTE
 		_tween_aplastar.kill()
 		modelo.scale = Vector3.ONE
+	_aturdida = 0.0
+	modelo.calmar()
 	global_position = destino
 	velocity = Vector3.ZERO
 	estado = Estado.AIRE
@@ -574,6 +640,44 @@ func volver_al_nido() -> void:
 	reset_physics_interpolation()
 	camara.reubicar()
 	GameState.jugador_volvio_al_nido.emit()
+
+
+## ¿Se estrelló? Si llegó volando a VELOCIDAD_CHOQUE o más contra una pared (el mundo, no un auto ni
+## un objeto que se mueve), choca: ver chocar. "v_antes" es la velocidad con la que llegó.
+func _revisar_choque(v_antes: Vector3) -> void:
+	if estado != Estado.AIRE or _aturdida > 0.0 or _aplastada > 0.0 or not GameState.en_partida \
+			or v_antes.length() < VELOCIDAD_CHOQUE:
+		return
+	for i in get_slide_collision_count():
+		var c := get_slide_collision(i)
+		var n := c.get_normal()
+		if absf(n.y) > 0.5:
+			continue       # Piso o techo: eso es aterrizar o rozar, no estrellarse
+		var cuerpo := c.get_collider() as CollisionObject3D
+		if cuerpo == null or cuerpo is RigidBody3D or (cuerpo.collision_layer & Construir.CAPA_MUNDO) == 0:
+			continue
+		var impacto := -v_antes.dot(n)
+		if impacto >= VELOCIDAD_CHOQUE:
+			chocar(c.get_position(), n, impacto)
+			return
+
+
+## Se estrelló de lleno contra una pared: una nube de polvo en el golpe, rebota hacia atrás y cae
+## mareada (con estrellitas sobre la cabeza) sin poder controlarse hasta que se le pasa.
+func chocar(punto: Vector3, normal: Vector3, impacto: float) -> void:
+	var n := Vector3(normal.x, 0.0, normal.z)
+	n = n.normalized() if n.length() > 0.01 else Vector3.ZERO
+	if descansando:
+		levantarse()
+	_aturdida = DURACION_ATURDIDA
+	en_picada = false
+	aleteando = false
+	velocity = n * clampf(impacto * 0.3, 3.0, 6.0) + Vector3.UP * 1.5
+	camara.sacudir(1.0)
+	AudioManager.reproducir("aplastar", -4.0)
+	EfectoChoque.polvo(get_parent(), punto, normal)
+	modelo.aturdir(DURACION_ATURDIDA)
+	choco.emit(impacto)
 
 
 ## Un humano la espanta: sale volando de golpe en esa dirección (no gasta stamina).

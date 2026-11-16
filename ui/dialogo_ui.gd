@@ -10,7 +10,6 @@ extends CanvasLayer
 const VELOCIDAD := 55.0         ## Letras por segundo
 const ANCHO := 880.0
 
-var _aviso: Button
 var _caja: PanelContainer
 var _nombre: Label
 var _texto: Label
@@ -27,25 +26,11 @@ func _ready() -> void:
 	raiz.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	raiz.theme = EstiloUI.TEMA
 	add_child(raiz)
-	_armar_aviso(raiz)
 	_armar_caja(raiz)
 	Dialogos.cercano_cambio.connect(_al_cambiar_cercano)
 	Dialogos.linea_cambio.connect(_mostrar_linea)
 	Dialogos.terminado.connect(func() -> void: _caja.visible = false)
 	_caja.visible = false
-	_aviso.visible = false
-
-
-func _armar_aviso(raiz: Control) -> void:
-	_aviso = Button.new()
-	_aviso.focus_mode = Control.FOCUS_NONE
-	_aviso.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 120)
-	_aviso.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_aviso.pressed.connect(Dialogos.interactuar)
-	for estado in ["normal", "hover", "pressed", "focus"]:
-		_aviso.add_theme_stylebox_override(estado, EstiloUI.caja(EstiloUI.C_OSCURO, 0.25, EstiloUI.C_CYAN_BORDE))
-	_aviso.add_theme_font_size_override("font_size", 20)
-	raiz.add_child(_aviso)
 
 
 func _armar_caja(raiz: Control) -> void:
@@ -73,15 +58,15 @@ func _armar_caja(raiz: Control) -> void:
 
 
 func _al_cambiar_cercano(i: Interlocutor) -> void:
-	_aviso.visible = i != null
 	if i:
-		var tecla := "" if Ajustes.movil else "E   "
-		_aviso.text = tecla + (tr("HABLAR CON %s") % tr(i.nombre())).to_upper()
+		AvisoAccion.mostrar(get_tree(), "dialogo", "E", tr("HABLAR CON %s") % tr(i.nombre()), 1, Dialogos.interactuar)
+	else:
+		AvisoAccion.ocultar(get_tree(), "dialogo")
 
 
 func _mostrar_linea(quien: String, texto: String, opciones: Array) -> void:
 	_caja.visible = true
-	_aviso.visible = false
+	AvisoAccion.ocultar(get_tree(), "dialogo")
 	_nombre.text = tr(quien).to_upper()
 	_texto.text = tr(texto)
 	_texto.visible_ratio = 0.0
