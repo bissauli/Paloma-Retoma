@@ -76,8 +76,6 @@ static func crear(slot: int, opcion: int) -> Node3D:
 				6: _panuelo(raiz)
 				7: _pinchos(raiz)
 				8: _cascabel(raiz)
-			# Un poco más arriba que la unión con el cuerpo: si no, el collar queda medio enterrado
-			raiz.position.y = 0.02
 		"cola":
 			match opcion:
 				1: _monio(raiz, Vector3(0.0, 0.29, -0.33), CELESTE, 0.9)
@@ -199,31 +197,64 @@ static func _auriculares(r: Node3D) -> void:
 
 # ---------------------------------------------------------------- Espalda
 
+# El lomo es una caja: arriba en y 0.30, de z -0.25 a 0 (adelante está la cabeza, x ±0.1, z 0..0.2), y
+# las alas plegadas llegan a x ±0.2. Lo de la espalda se apoya ahí, con volumen (de costado se ve).
+
 static func _mochila(r: Node3D) -> void:
-	_caja(r, Vector3(0.15, 0.1, 0.1), Vector3(0.0, 0.355, -0.09), AZUL)
-	_caja(r, Vector3(0.1, 0.045, 0.02), Vector3(0.0, 0.34, -0.15), AMARILLO)   # Bolsillo
+	_caja(r, Vector3(0.2, 0.13, 0.15), Vector3(0.0, 0.365, -0.12), AZUL)                 # Cuerpo
+	_caja(r, Vector3(0.21, 0.035, 0.155), Vector3(0.0, 0.44, -0.12), AZUL.darkened(0.25)) # Tapa
+	_caja(r, Vector3(0.05, 0.05, 0.012), Vector3(0.0, 0.42, -0.2), AZUL.darkened(0.25))   # Lengüeta
+	_caja(r, Vector3(0.024, 0.016, 0.014), Vector3(0.0, 0.395, -0.205), ORO)              # Hebilla
+	_caja(r, Vector3(0.15, 0.07, 0.035), Vector3(0.0, 0.34, -0.21), AMARILLO)             # Bolsillo
+	_caja(r, Vector3(0.15, 0.008, 0.037), Vector3(0.0, 0.374, -0.21), NEGRO)              # Cierre
 	for lado in [-1.0, 1.0]:
-		_caja(r, Vector3(0.018, 0.008, 0.2), Vector3(0.06 * lado, 0.304, -0.04), NEGRO)   # Correas
+		_caja(r, Vector3(0.025, 0.012, 0.13), Vector3(0.075 * lado, 0.306, -0.0), NEGRO)  # Correas al hombro
+		_caja(r, Vector3(0.03, 0.1, 0.11), Vector3(0.115 * lado, 0.35, -0.12), AZUL.lightened(0.1))  # Bolsillos laterales
+
+
+## Una capa que cae del cuello por el lomo y cuelga detrás, con los costados sobre las alas.
+static func _capa_base(r: Node3D, tela: Color, forro: Color) -> void:
+	_caja(r, Vector3(0.36, 0.022, 0.27), Vector3(0.0, 0.313, -0.125), tela)              # Sobre el lomo
+	var cola := _caja(r, Vector3(0.36, 0.17, 0.022), Vector3(0.0, 0.235, -0.262), tela)   # Cae atrás
+	cola.rotation.x = -0.18
+	for lado in [-1.0, 1.0]:
+		_caja(r, Vector3(0.022, 0.12, 0.26), Vector3(0.19 * lado, 0.26, -0.12), tela)     # Sobre las alas
+		_caja(r, Vector3(0.012, 0.11, 0.25), Vector3(0.177 * lado, 0.26, -0.12), forro)   # Forro
+	_caja(r, Vector3(0.24, 0.04, 0.03), Vector3(0.0, 0.32, 0.0), tela.darkened(0.12))      # Cuello alto
 
 
 static func _capa(r: Node3D) -> void:
-	_caja(r, Vector3(0.27, 0.014, 0.3), Vector3(0.0, 0.31, -0.04), ROJO)
-	_caja(r, Vector3(0.2, 0.012, 0.06), Vector3(0.0, 0.318, 0.1), ROJO.lightened(0.15))
-	_esfera(r, 0.014, Vector3(0.0, 0.315, 0.13), AMARILLO)                     # Broche
+	_capa_base(r, ROJO, AMARILLO.darkened(0.2))
+	for lado in [-1.0, 1.0]:   # Cordones hasta el broche, por los costados de la cabeza
+		_caja(r, Vector3(0.012, 0.012, 0.2), Vector3(0.105 * lado, 0.31, 0.1), ORO)
+	_esfera(r, 0.022, Vector3(0.0, 0.3, 0.215), ORO)                                       # Broche en el pecho
 
 
 static func _jetpack(r: Node3D) -> void:
+	_caja(r, Vector3(0.1, 0.05, 0.2), Vector3(0.0, 0.33, -0.12), GRIS.darkened(0.3))        # Placa
 	for lado in [-1.0, 1.0]:
-		_cilindro(r, 0.035, 0.035, 0.13, Vector3(0.05 * lado, 0.37, -0.09), GRIS)
-		_cilindro(r, 0.036, 0.036, 0.02, Vector3(0.05 * lado, 0.435, -0.09), ROJO)
-		_cilindro(r, 0.0, 0.03, 0.05, Vector3(0.05 * lado, 0.28, -0.09), NARANJA)  # Llama
+		var x: float = 0.065 * lado
+		var tanque := _cilindro(r, 0.045, 0.045, 0.2, Vector3(x, 0.355, -0.12), GRIS)
+		tanque.rotation.x = PI / 2.0
+		var tapa := _esfera(r, 0.045, Vector3(x, 0.355, -0.02), ROJO)
+		tapa.scale = Vector3(1, 1, 0.5)
+		var tobera := _cilindro(r, 0.03, 0.038, 0.035, Vector3(x, 0.355, -0.235), NEGRO)
+		tobera.rotation.x = PI / 2.0
+		var llama := _cilindro(r, 0.0, 0.032, 0.09, Vector3(x, 0.355, -0.295), NARANJA)   # Llama: afuera naranja...
+		llama.rotation.x = -PI / 2.0
+		var nucleo := _cilindro(r, 0.0, 0.018, 0.06, Vector3(x, 0.355, -0.28), AMARILLO)  # ...y adentro amarilla
+		nucleo.rotation.x = -PI / 2.0
+	for lado in [-1.0, 1.0]:
+		_caja(r, Vector3(0.025, 0.012, 0.13), Vector3(0.1 * lado, 0.306, 0.0), NEGRO)      # Arnés
 
 
 static func _capa_asesino(r: Node3D) -> void:
-	_caja(r, Vector3(0.28, 0.014, 0.36), Vector3(0.0, 0.305, -0.07), TELA)
-	_caja(r, Vector3(0.29, 0.03, 0.03), Vector3(0.0, 0.3, 0.08), ROJO)            # Faja
-	var emblema := _caja(r, Vector3(0.04, 0.006, 0.04), Vector3(0.0, 0.314, -0.05), ROJO)
+	_capa_base(r, TELA, ROJO.darkened(0.2))
+	_caja(r, Vector3(0.362, 0.025, 0.024), Vector3(0.0, 0.17, -0.278), ROJO)                 # Ribete de abajo
+	var emblema := _caja(r, Vector3(0.06, 0.006, 0.06), Vector3(0.0, 0.326, -0.13), ROJO)    # El emblema
 	emblema.rotation.y = PI / 4.0
+	_caja(r, Vector3(0.03, 0.007, 0.03), Vector3(0.0, 0.33, -0.13), TELA)
+	_caja(r, Vector3(0.26, 0.035, 0.022), Vector3(0.0, 0.3, 0.212), ROJO)                    # Faja en el pecho
 
 
 ## Bien porteño: el termo en la espalda y el mate con la bombilla.
@@ -238,12 +269,22 @@ static func _termo_mate(r: Node3D) -> void:
 		_caja(r, Vector3(0.018, 0.008, 0.2), Vector3(0.06 * lado, 0.304, -0.04), MARRON)   # Correas
 
 
+## Alas de ángel: de cada lado, un hueso arriba y cinco plumas en abanico (más largas las de afuera),
+## en dos tonos de blanco, y una aureola dorada flotando sobre la cabeza.
 static func _alas_angel(r: Node3D) -> void:
 	for lado in [-1.0, 1.0]:
-		var ala := _caja(r, Vector3(0.16, 0.012, 0.09), Vector3(0.11 * lado, 0.38, -0.08), BLANCO)
-		ala.rotation.z = 0.6 * lado
-		var punta := _caja(r, Vector3(0.09, 0.012, 0.06), Vector3(0.19 * lado, 0.44, -0.1), BLANCO)
-		punta.rotation.z = 0.9 * lado
+		var base: Vector3 = Vector3(0.07 * lado, 0.33, -0.1)
+		var hueso := _caja(r, Vector3(0.2, 0.04, 0.05), base + Vector3(0.08 * lado, 0.11, 0.0), BLANCO)
+		hueso.rotation.z = 0.95 * lado
+		for k in 5:
+			var largo := 0.13 + 0.035 * k
+			var ang := lerpf(0.25, 1.15, k / 4.0)   # De casi horizontal a casi vertical
+			var dir: Vector3 = Vector3(cos(ang) * lado, sin(ang), 0.0)
+			var pluma := _caja(r, Vector3(largo, 0.016, 0.055), base + dir * (largo / 2.0 + 0.03) + Vector3(0, 0, -0.012 * k),
+				BLANCO if k % 2 == 0 else MARFIL)
+			pluma.rotation.z = ang * lado
+	var aureola := _toro(r, 0.07, 0.085, Vector3(0.0, 0.6, 0.1), ORO)
+	aureola.rotation.x = 0.15
 
 
 # ---------------------------------------------------------------- Ojos
@@ -354,67 +395,114 @@ static func _visor(r: Node3D) -> void:
 
 # ---------------------------------------------------------------- Cuello (en la base de la cabeza)
 
+# La cabeza es una caja (x ±0.1, z 0..0.2) apoyada sobre el cuerpo en y 0.30: los collares son aros
+# CUADRADOS que la abrazan justo encima del cuerpo (uno redondo quedaba medio enterrado), y lo que
+# cuelga va adelante, sobre el pecho (que está en z 0.2).
+const PECHO_Z := 0.215
+
+## Aro cuadrado alrededor de la base de la cabeza: cuatro barras de "alto" x "grueso", a la altura "y".
+static func _aro_cuadrado(r: Node3D, y: float, grueso: float, alto: float, color: Color, holgura := 0.012) -> void:
+	var hx := 0.1 + holgura + grueso / 2.0
+	var z0 := 0.0 - holgura - grueso / 2.0
+	var z1 := 0.2 + holgura + grueso / 2.0
+	_caja(r, Vector3(hx * 2.0 + grueso, alto, grueso), Vector3(0.0, y, z1), color)          # Adelante
+	_caja(r, Vector3(hx * 2.0 + grueso, alto, grueso), Vector3(0.0, y, z0), color)          # Atrás
+	for lado in [-1.0, 1.0]:
+		_caja(r, Vector3(grueso, alto, z1 - z0), Vector3(hx * lado, y, (z0 + z1) / 2.0), color)
+
+
 static func _cadena_oro(r: Node3D) -> void:
-	_toro(r, 0.1, 0.124, CUELLO, ORO)
-	var segunda := _toro(r, 0.102, 0.12, CUELLO + Vector3(0, -0.014, 0.004), ORO.darkened(0.12))
-	segunda.rotation.x = 0.1
-	_cilindro(r, 0.004, 0.004, 0.035, Vector3(0.0, 0.29, 0.214), ORO)
-	var medallon := _cilindro(r, 0.028, 0.028, 0.01, Vector3(0.0, 0.265, 0.218), ORO)
+	_aro_cuadrado(r, 0.31, 0.016, 0.018, ORO)
+	_aro_cuadrado(r, 0.29, 0.014, 0.014, ORO.darkened(0.15), 0.02)
+	for lado in [-1.0, 1.0]:   # Eslabones que bajan al medallón
+		var e := _caja(r, Vector3(0.012, 0.05, 0.01), Vector3(0.022 * lado, 0.27, PECHO_Z + 0.01), ORO)
+		e.rotation.z = 0.5 * lado
+	var medallon := _cilindro(r, 0.034, 0.034, 0.014, Vector3(0.0, 0.235, PECHO_Z + 0.012), ORO)
 	medallon.rotation.x = PI / 2.0
+	var signo := _caja(r, Vector3(0.016, 0.03, 0.004), Vector3(0.0, 0.235, PECHO_Z + 0.021), ORO.darkened(0.3))
+	signo.rotation.z = 0.0
 
 
 static func _perlas(r: Node3D) -> void:
-	for i in 16:
-		var a := i * TAU / 16.0
-		var caida := 0.012 * (1.0 + cos(a)) / 2.0   # Cuelga un poco más adelante
-		_esfera(r, 0.015, CUELLO + Vector3(sin(a) * 0.112, -caida, cos(a) * 0.112), Color("f4f0e6"))
+	# Perlas alrededor de la base de la cabeza (sobre un aro cuadrado) y una vuelta que cae adelante
+	var hx := 0.122
+	for i in 9:
+		var x := lerpf(-hx, hx, i / 8.0)
+		_esfera(r, 0.016, Vector3(x, 0.31, 0.222), Color("f4f0e6"))
+		_esfera(r, 0.016, Vector3(x, 0.31, -0.022), Color("f4f0e6"))
+	for i in 7:
+		var z := lerpf(0.0, 0.2, i / 6.0)
+		for lado in [-1.0, 1.0]:
+			_esfera(r, 0.016, Vector3(hx * lado, 0.31, z), Color("f4f0e6"))
+	for i in 9:   # La vuelta larga
+		var t := i / 8.0
+		_esfera(r, 0.014, Vector3(lerpf(-0.08, 0.08, t), 0.29 - sin(t * PI) * 0.05, PECHO_Z + 0.008), Color("f4f0e6"))
+	_esfera(r, 0.022, Vector3(0.0, 0.232, PECHO_Z + 0.012), Color("ffd6e6"))   # La perla rosa del medio
 
 
 static func _bufanda(r: Node3D) -> void:
-	var colores := [CELESTE, BLANCO, CELESTE]
-	for i in 3:
-		_toro(r, 0.088, 0.125, CUELLO + Vector3(0, (1 - i) * 0.022, 0), colores[i])
-	var punta := _caja(r, Vector3(0.05, 0.13, 0.02), Vector3(0.06, 0.25, 0.205), CELESTE)
-	punta.rotation.z = 0.15
-	var raya := _caja(r, Vector3(0.051, 0.025, 0.021), Vector3(0.06, 0.25, 0.206), BLANCO)
-	raya.rotation.z = 0.15
+	# Tres vueltas (celeste, blanca, celeste) y las dos puntas que caen adelante, con flecos
+	_aro_cuadrado(r, 0.335, 0.03, 0.024, CELESTE)
+	_aro_cuadrado(r, 0.312, 0.032, 0.022, BLANCO)
+	_aro_cuadrado(r, 0.29, 0.034, 0.024, CELESTE)
+	for k in 2:
+		var x := -0.04 + k * 0.075
+		var punta := _caja(r, Vector3(0.055, 0.15, 0.022), Vector3(x, 0.215, PECHO_Z + 0.025 - k * 0.006), CELESTE)
+		punta.rotation.z = 0.12 - k * 0.2
+		var raya := _caja(r, Vector3(0.056, 0.025, 0.023), Vector3(x - 0.006 + k * 0.01, 0.2, PECHO_Z + 0.026 - k * 0.006), BLANCO)
+		raya.rotation.z = punta.rotation.z
+		for f in 3:
+			_caja(r, Vector3(0.008, 0.02, 0.01), Vector3(x - 0.015 + f * 0.015 + 0.012 * (0.12 - k * 0.2) * -8.0, 0.13, PECHO_Z + 0.025), BLANCO)
 
 
 static func _monio_gala(r: Node3D) -> void:
-	_toro(r, 0.1, 0.112, CUELLO, BLANCO)
-	_monio(r, Vector3(0.0, 0.3, 0.215), NEGRO, 1.1)
+	_aro_cuadrado(r, 0.315, 0.012, 0.03, BLANCO)          # Cuello de camisa
+	_monio(r, Vector3(0.0, 0.305, PECHO_Z + 0.015), NEGRO, 1.25)
 
 
 static func _medalla(r: Node3D) -> void:
+	_aro_cuadrado(r, 0.312, 0.012, 0.02, AZUL)
 	for lado in [-1.0, 1.0]:
-		var cinta := _caja(r, Vector3(0.02, 0.09, 0.006), Vector3(0.03 * lado, 0.28, 0.21), AZUL)
-		cinta.rotation.z = -0.35 * lado
-	var m := _cilindro(r, 0.032, 0.032, 0.01, Vector3(0.0, 0.235, 0.215), ORO)
+		var cinta := _caja(r, Vector3(0.028, 0.09, 0.008), Vector3(0.026 * lado, 0.272, PECHO_Z + 0.006), AZUL if lado < 0.0 else CELESTE)
+		cinta.rotation.z = -0.3 * lado
+	var m := _cilindro(r, 0.038, 0.038, 0.014, Vector3(0.0, 0.225, PECHO_Z + 0.012), ORO)
 	m.rotation.x = PI / 2.0
-	var estrella := _caja(r, Vector3(0.02, 0.02, 0.004), Vector3(0.0, 0.235, 0.221), ORO.darkened(0.25))
+	var estrella := _caja(r, Vector3(0.026, 0.026, 0.005), Vector3(0.0, 0.225, PECHO_Z + 0.021), ORO.darkened(0.25))
 	estrella.rotation.z = PI / 4.0
+	_caja(r, Vector3(0.026, 0.026, 0.005), Vector3(0.0, 0.225, PECHO_Z + 0.0205), ORO.darkened(0.25))
 
 
 static func _panuelo(r: Node3D) -> void:
-	_toro(r, 0.1, 0.11, CUELLO, ROJO)
-	var tri := _caja(r, Vector3(0.11, 0.11, 0.01), Vector3(0.0, 0.275, 0.205), ROJO)
+	_aro_cuadrado(r, 0.31, 0.016, 0.03, ROJO)
+	var tri := _caja(r, Vector3(0.13, 0.13, 0.014), Vector3(0.0, 0.272, PECHO_Z + 0.004), ROJO)
 	tri.rotation.z = PI / 4.0
-	for p in [Vector3(-0.02, 0.27, 0.211), Vector3(0.022, 0.255, 0.211), Vector3(0.0, 0.235, 0.211)]:
-		_esfera(r, 0.008, p, BLANCO)
+	_caja(r, Vector3(0.04, 0.03, 0.03), Vector3(0.0, 0.305, PECHO_Z + 0.012), ROJO.darkened(0.2))   # El nudo
+	for p in [Vector3(-0.03, 0.27, 0.0), Vector3(0.03, 0.265, 0.0), Vector3(0.0, 0.235, 0.0), Vector3(-0.012, 0.29, 0.0), Vector3(0.018, 0.21, 0.0)]:
+		_esfera(r, 0.009, p + Vector3(0, 0, PECHO_Z + 0.013), BLANCO)
 
 
 static func _pinchos(r: Node3D) -> void:
-	_toro(r, 0.1, 0.126, CUELLO, NEGRO)
-	for i in 8:
-		var a := i * TAU / 8.0
-		var pincho := _cilindro(r, 0.0, 0.015, 0.05, CUELLO + Vector3(sin(a), 0, cos(a)) * 0.14, PLATA)
-		pincho.rotation = Vector3(PI / 2.0, a, 0.0)   # Apunta hacia afuera
+	_aro_cuadrado(r, 0.31, 0.022, 0.03, NEGRO)
+	# Tachas que apuntan hacia afuera en las cuatro caras
+	for i in 5:
+		var x := lerpf(-0.09, 0.09, i / 4.0)
+		var adelante := _cilindro(r, 0.0, 0.012, 0.035, Vector3(x, 0.31, 0.245), PLATA)
+		adelante.rotation.x = PI / 2.0
+		var atras := _cilindro(r, 0.0, 0.012, 0.035, Vector3(x, 0.31, -0.045), PLATA)
+		atras.rotation.x = -PI / 2.0
+	for i in 4:
+		var z := lerpf(0.02, 0.18, i / 3.0)
+		for lado in [-1.0, 1.0]:
+			var costado := _cilindro(r, 0.0, 0.012, 0.035, Vector3(0.145 * lado, 0.31, z), PLATA)
+			costado.rotation.z = -PI / 2.0 * lado
 
 
 static func _cascabel(r: Node3D) -> void:
-	_toro(r, 0.1, 0.11, CUELLO, ROJO)
-	_esfera(r, 0.025, Vector3(0.0, 0.275, 0.214), ORO)
-	_caja(r, Vector3(0.03, 0.004, 0.004), Vector3(0.0, 0.27, 0.238), NEGRO)
+	_aro_cuadrado(r, 0.31, 0.014, 0.024, ROJO)
+	_caja(r, Vector3(0.014, 0.02, 0.014), Vector3(0.0, 0.29, PECHO_Z + 0.008), ORO.darkened(0.2))   # Argolla
+	_esfera(r, 0.03, Vector3(0.0, 0.262, PECHO_Z + 0.016), ORO)
+	_caja(r, Vector3(0.036, 0.005, 0.005), Vector3(0.0, 0.255, PECHO_Z + 0.044), NEGRO)
+	_esfera(r, 0.006, Vector3(0.0, 0.248, PECHO_Z + 0.044), NEGRO)
 
 
 # ---------------------------------------------------------------- Cola

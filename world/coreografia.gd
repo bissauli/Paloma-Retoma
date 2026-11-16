@@ -18,7 +18,7 @@ const FINAL := &"voltereta"
 const DURACION := {
 	&"breakdance": 6.5, &"moonwalk": 5.0, &"disco": 5.0, &"robot": 5.0, &"twist": 5.0,
 	&"salto": 5.0, &"pirueta": 5.5, &"cabeceo": 5.0, &"salsa": 5.0, &"voltereta": 7.0,
-	&"cortejo": 8.0, &"bano": 4.8, &"gangnam": 7.0,
+	&"cortejo": 8.0, &"bano": 4.8, &"gangnam": 8.0,
 }
 const NOMBRES := {
 	&"breakdance": "Break dance", &"moonwalk": "Moonwalk", &"disco": "Disco", &"robot": "Robot",
@@ -359,50 +359,71 @@ static func _salsa(t: float) -> PoseBaile:
 
 # ---------------------------------------------------------------- Gangnam Style
 
-## El baile del caballito (Gangnam Style), 7 s en bucle (arranca y termina igual):
-##   0 - 3 s     El caballito: saltitos alternando las patas (dos de cada lado), el cuerpo rebotando
-##               un poco agachado y las alas cruzadas adelante, como sosteniendo las riendas.
-##   3 - 5 s     El lazo: sigue el caballito, de costado a costado, y un ala revolea arriba de la
-##               cabeza mientras la otra sigue con las riendas.
-##   5 - 6,2 s   Cadera: alas abajo, la cadera se mueve de un lado al otro y la cabeza cabecea.
-##   6,2 - 7 s   Vuelve al caballito.
+## El baile del caballito (Gangnam Style), 8 s en bucle (arranca y termina igual). Cada tramo se
+## funde con el siguiente en ~0,3 s, así nunca hay un salto:
+##   0 - 2,4 s    Caballito: saltitos de a dos por pata, agachada, el cuerpo cabeceando con el galope
+##                y las alas cruzadas adelante como riendas, bombeando con cada salto.
+##   2,4 - 4,4 s  El lazo: sigue galopando y un ala revolea en círculo arriba de la cabeza (la otra
+##                con las riendas), la cabeza siguiendo el lazo.
+##   4,4 - 5,6 s  Cadera: se para, la cadera va y viene adelante y atrás y un ala señala al frente.
+##   5,6 - 6,6 s  Galope de costado: saltitos laterales yendo de un lado al otro con las riendas.
+##   6,6 - 7,4 s  El gran salto: alas arriba y patas abiertas en el aire.
+##   7,4 - 8 s    Cae agachada y vuelve al caballito del principio.
 static func _gangnam(t: float) -> PoseBaile:
 	var beat := t * TAU * 1.25                         # 2,5 saltitos por segundo
 	var salto := absf(sin(beat))                       # Cada medio ciclo, un saltito
-	# Dos saltitos de cada lado. La pata cambia justo cuando está apoyada (salto = 0), así que puede
-	# cambiar de golpe; el cuerpo, en cambio, va de un costado al otro suave
+	# La pata de adelante cambia cada dos saltitos, justo cuando está apoyada (salto = 0)
 	var lado := 1.0 if fmod(t * 1.25, 2.0) < 1.0 else -1.0
-	var costado := sin(t * PI * 1.25)
-	var w_lazo := smoothstep(2.8, 3.2, t) * (1.0 - smoothstep(4.8, 5.2, t))
-	var w_cadera := smoothstep(4.9, 5.3, t) * (1.0 - smoothstep(6.0, 6.4, t))
+	var costado := sin(t * PI * 1.25)                  # El cuerpo va de un lado al otro, suave
+	var w_lazo := smoothstep(2.2, 2.6, t) * (1.0 - smoothstep(4.2, 4.6, t))
+	var w_cadera := smoothstep(4.3, 4.7, t) * (1.0 - smoothstep(5.4, 5.8, t))
+	var w_lateral := smoothstep(5.5, 5.9, t) * (1.0 - smoothstep(6.4, 6.7, t))
+	var w_salto := _campana(6.5, 7.5, t)
+
+	# --- Caballito (la base de todo)
 	var p := PoseBaile.new()
-	# El caballito: agachado, rebotando, la pata de adelante cambia cada dos saltitos
-	p.pos = Vector3(lerpf(0.05, 0.12, w_lazo) * costado, 0.07 * salto - 0.03, 0.0)
-	p.rot = _y(YAW + 10.0 * costado * (1.0 - w_cadera)) * _x(-10.0 * (1.0 - w_cadera))
-	p.pata_izq = _x(-32.0 * salto if lado > 0.0 else -6.0 * salto)
-	p.pata_der = _x(-32.0 * salto if lado < 0.0 else -6.0 * salto)
-	# Riendas: las dos alas cruzadas adelante, subiendo y bajando con el salto
-	var riendas_izq := _ala_izq(176.0, -22.0 + 14.0 * salto)
-	var riendas_der := _ala_der(176.0, -16.0 + 14.0 * salto)
-	# El lazo: el ala derecha arriba de la cabeza, dando vueltas
-	var lazo := _ala_der(60.0 + 35.0 * sin(t * TAU * 2.0), 80.0 + 8.0 * cos(t * TAU * 2.0))
-	p.ala_izq = riendas_izq
-	p.ala_der = PoseBaile._mezclar_giro(riendas_der, lazo, w_lazo)
-	p.cabeza = _x(12.0 * salto - 4.0) * _y(8.0 * costado)
-	p.cola = _x(18.0 * salto) * _y(-12.0 * costado)
-	# Cadera: alas abajo y la cadera de un lado al otro
+	var x_lateral := 0.22 * sin((t - 5.6) * PI)       # Galope de costado: va y vuelve
+	p.pos = Vector3(lerpf(0.05 * costado, x_lateral, w_lateral), 0.11 * salto - 0.04, 0.0)
+	p.rot = _y(YAW + 12.0 * costado) * _x(-14.0 + 10.0 * sin(beat * 2.0))   # Agachada, cabeceando
+	p.pata_izq = _x(-40.0 * salto if lado > 0.0 else -8.0 * salto)
+	p.pata_der = _x(-40.0 * salto if lado < 0.0 else -8.0 * salto)
+	var bombeo := 22.0 * salto
+	p.ala_izq = _ala_izq(176.0, -28.0 + bombeo)
+	p.ala_der = _ala_der(176.0, -22.0 + bombeo)
+	p.cabeza = _x(16.0 * salto - 6.0) * _y(10.0 * costado)
+	p.cola = _x(24.0 * salto) * _y(-14.0 * costado)
+	# --- El lazo: el ala derecha da vueltas arriba de la cabeza (un círculo entero por beat)
+	var giro := t * TAU * 1.25
+	var lazo := _ala_der(70.0 + 40.0 * sin(giro), 95.0 + 18.0 * cos(giro))
+	p.ala_der = PoseBaile._mezclar_giro(p.ala_der, lazo, w_lazo)
+	p.cabeza = PoseBaile._mezclar_giro(p.cabeza, _x(-14.0) * _y(18.0 * sin(giro)), w_lazo)
+
+	# --- Cadera: parada, la cadera adelante y atrás, un ala señalando al frente
 	var cadera := PoseBaile.new()
 	var c := sin(t * TAU * 1.25)
-	cadera.pos = Vector3(0.08 * c, 0.01, 0.0)
-	cadera.rot = _y(YAW) * _z(16.0 * c)
+	cadera.pos = Vector3(0.0, 0.015 * absf(c), 0.07 * c)
+	cadera.rot = _y(YAW) * _x(-12.0 * c)
 	cadera.ala_izq = _ala_izq(25.0, -15.0)
-	cadera.ala_der = _ala_der(25.0, -15.0)
-	cadera.pata_izq = _x(-12.0 * maxf(c, 0.0))
-	cadera.pata_der = _x(-12.0 * maxf(-c, 0.0))
-	cadera.cabeza = _x(16.0 * absf(c)) * _z(-10.0 * c)
-	cadera.cola = _y(25.0 * c)
-	return p.mezclar(cadera, w_cadera)
+	cadera.ala_der = _ala_der(150.0, 15.0 + 10.0 * c)   # Señala adelante
+	cadera.pata_izq = _x(-14.0 * maxf(c, 0.0))
+	cadera.pata_der = _x(-14.0 * maxf(c, 0.0))
+	cadera.cabeza = _x(20.0 * absf(c) - 6.0)
+	cadera.cola = _x(-20.0 * c)
+	p = p.mezclar(cadera, w_cadera)
 
+	# --- El gran salto: alas arriba, patas abiertas, cola en abanico
+	var vuelo := PoseBaile.new()
+	var k := clampf((t - 6.6) / 0.8, 0.0, 1.0)
+	vuelo.pos = Vector3(0.0, 0.42 * 4.0 * k * (1.0 - k), 0.0)
+	vuelo.rot = _y(YAW) * _x(8.0)
+	vuelo.ala_izq = _ala_izq(80.0, 85.0)
+	vuelo.ala_der = _ala_der(80.0, 85.0)
+	vuelo.pata_izq = _x(-35.0) * _z(-25.0)
+	vuelo.pata_der = _x(-35.0) * _z(25.0)
+	vuelo.cabeza = _x(-18.0)
+	vuelo.cola = _x(35.0)
+	vuelo.escala_cola = Vector3(1.35, 1.0, 1.0)
+	return p.mezclar(vuelo, w_salto)
 
 # ---------------------------------------------------------------- 10. Cortejo
 

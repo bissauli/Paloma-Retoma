@@ -1,9 +1,11 @@
 class_name CasaEnterable
 extends Node3D
-## Pasaje: una casa porteña que la paloma atraviesa volando. Tiene una ventana abierta adelante (a la
-## plaza) y otra atrás (al callejón). Si la paloma se mete volando por cualquiera de las dos, salta
-## una cinemática estilo Assassin's Creed 3: cruza el cuarto a toda velocidad en zigzag esquivando
-## obstáculos (de costado, por arriba y por abajo) y sale disparada por la otra ventana.
+## Una sala de un edificio (un local de la planta baja o un ambiente de un departamento), con una
+## ventana abierta adelante y otra atrás. Se puede entrar libremente. En los departamentos, si la
+## paloma está afuera frente a una ventana aparece un aviso (AvisoPasaje: "E · ATRAVESAR VOLANDO") y,
+## si lo aprieta, salta una cinemática estilo Assassin's Creed 3: cruza el cuarto a toda velocidad en
+## zigzag esquivando obstáculos (de costado, por arriba y por abajo) y sale por la otra ventana. En
+## los locales (con_cinematica = false) no hay aviso ni cinemática.
 ##
 ## La cámara es UNA SOLA toma continua, sin cortes: arranca donde estaba la del juego y vuelve sola a
 ## ella al final. En el esquive más difícil (el "destacado") todo pasa a cámara lenta. Cada escenario
@@ -55,6 +57,7 @@ var estilo := Estilo.PERSECUCION       ## La coreografía de la cinemática
 var nombre := ""                       ## El nombre del local (la placa de título)
 var tema := ""                         ## Qué escenario es (ver Pasaje.ESCENARIOS)
 var piso := 0                          ## En qué piso del edificio está la sala
+var con_cinematica := true             ## Los locales de la planta baja no tienen (se recorren a pie)
 var colgantes: Array[Node3D] = []      ## Pivotes de lo que cuelga del techo (se hamacan)
 var mesas: Array[Vector3] = []         ## Tapas de las mesas (locales): de ahí vuelan los papeles
 var salames: Array[Vector3] = []       ## Dónde cuelgan los salames (locales)
@@ -186,17 +189,41 @@ func _physics_process(delta: float) -> void:
 	if _corriendo:
 		_avanzar(delta)
 		return
-	if activa or _cooldown > 0.0 or not _puede_disparar(j):
+	# La cinemática ya no arranca sola: se puede entrar libremente. Cerca de una ventana (por afuera)
+	# aparece el aviso "E · ATRAVESAR VOLANDO" (AvisoPasaje) y sólo si lo aprieta arranca.
+	if activa or _cooldown > 0.0 or not con_cinematica or not _puede_disparar(j):
+		AvisoPasaje.soltar(self)
 		return
+	var lado := _ventana_cerca(j)
+	if lado == 0:
+		AvisoPasaje.soltar(self)
+	else:
+		AvisoPasaje.ofrecer(self, lado > 0, global_position.distance_to(j.global_position))
+
+
+## ¿La paloma está afuera, frente a una de las ventanas (a menos de AVISO metros y a su altura)?
+## +1 = la de adelante, -1 = la de atrás, 0 = ninguna.
+func _ventana_cerca(j: PalomaJugador) -> int:
 	var p := to_local(j.global_position)
-	if p.y < VENTANA_Y0 - 0.1 or p.y > VENTANA_Y1 - 0.25:
+	if p.y < VENTANA_Y0 - 1.2 or p.y > VENTANA_Y1 + 0.4:
+		return 0
+	var mitad := VENTANA_ANCHO / 2.0 + 0.6
+	if absf(p.x - x_frente) <= mitad and p.z > fondo / 2.0 + 0.05 and p.z < fondo / 2.0 + AVISO:
+		return 1
+	if absf(p.x - x_fondo) <= mitad and p.z < -fondo / 2.0 - 0.05 and p.z > -fondo / 2.0 - AVISO:
+		return -1
+	return 0
+
+
+## Arranca la cinemática (la llama AvisoPasaje cuando la jugadora aprieta el botón).
+func empezar_por_boton(desde_frente: bool) -> void:
+	if activa or _cooldown > 0.0 or not con_cinematica:
 		return
-	var v := global_transform.basis.inverse() * j.velocity
-	var mitad := VENTANA_ANCHO / 2.0 + 0.3
-	if absf(p.x - x_frente) <= mitad and p.z > fondo / 2.0 - 0.1 and p.z < fondo / 2.0 + AVISO and v.z < -VEL_MIN:
-		_empezar(true)
-	elif absf(p.x - x_fondo) <= mitad and p.z < -fondo / 2.0 + 0.1 and p.z > -fondo / 2.0 - AVISO and v.z > VEL_MIN:
-		_empezar(false)
+	var j := GameState.jugador
+	if j == null or not _puede_disparar(j):
+		return
+	AvisoPasaje.soltar(self)
+	_empezar(desde_frente)
 
 
 ## Lo que cuelga del techo: péndulos amortiguados. Cuando la paloma pasa cerca (por debajo) les da

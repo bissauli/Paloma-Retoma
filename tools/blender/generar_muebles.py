@@ -1055,7 +1055,289 @@ def balanza_medica():
     mueble("balanza_medica", p)
 
 
+# ================================================================= DEPARTAMENTOS (ambientes de casa) Y TALLER
+# ---- dormitorio y comedor
+def comoda():
+    w, d, h = 1.4, 0.6, 1.0
+    p = [parte(caja(w, d, h - 0.08, 0, 0, 0.08), "madera", 0.035),
+         parte(caja(w + 0.04, d + 0.04, 0.05, 0, 0, h), "madera_osc", 0.015)]
+    for i in range(3):
+        z = 0.16 + i * 0.27
+        p.append(parte(caja(w - 0.12, 0.02, 0.22, 0, -d / 2 - 0.005, z), "madera_osc", 0.008))
+        for sx in (-0.3, 0.3):
+            p.append(parte(caja(0.12, 0.03, 0.03, sx, -d / 2 - 0.02, z + 0.1), "flor_amarilla", 0.008))
+    p += [parte(caja(0.08, 0.08, 0.08, sx, sy), "madera_osc", 0.01) for sx in (-0.62, 0.62) for sy in (-0.22, 0.22)]
+    p.append(parte(caja(0.5, 0.04, 0.6, 0.2, 0.2, h + 0.05), "madera_osc", 0.01))          # Espejo
+    p.append(parte(caja(0.42, 0.02, 0.52, 0.2, 0.175, h + 0.09), "vidrio", 0))
+    p += maceta_chica(-0.45, 0, h + 0.05, 0.1, "blanco")
+    mueble("comoda", p)
+
+
+def vajillero():
+    w, d, h = 1.0, 0.6, 3.0
+    p = [parte(caja(w, d, 1.0, 0, 0, 0.05), "madera", 0.035),
+         parte(caja(w - 0.04, d * 0.7, h - 1.05, 0, 0.08, 1.05), "madera", 0.03),
+         parte(caja(w - 0.16, 0.02, h - 1.25, 0, -d * 0.27, 1.15), "vidrio", 0.005),
+         parte(caja(w + 0.06, d * 0.75, 0.08, 0, 0.08, h), "madera_osc", 0.02)]
+    for z in (1.5, 2.1, 2.6):
+        for i in range(4):
+            p.append(parte(cil((-0.3 + i * 0.2, 0.1, z), (-0.3 + i * 0.2, 0.1, z + 0.02), 0.08, 0.08, 10), "blanco", 0.004))
+    for sx in (-0.22, 0.22):
+        p.append(parte(caja(0.38, 0.02, 0.8, sx, -d / 2 - 0.005, 0.15), "madera_osc", 0.008))
+    mueble("vajillero", p)
+
+
+# ---- cocina
+def heladera_casa():
+    w, d, h = 0.9, 0.75, 2.6
+    p = [parte(caja(w, d, h, 0, 0, 0), "blanco", 0.06),
+         parte(caja(w - 0.02, 0.02, 0.012, 0, -d / 2, h * 0.68), "piedra_osc", 0),
+         parte(caja(0.04, 0.05, 0.5, w / 2 - 0.1, -d / 2 - 0.03, h * 0.68 + 0.1), "metal", 0.01),
+         parte(caja(0.04, 0.05, 0.7, w / 2 - 0.1, -d / 2 - 0.03, h * 0.3), "metal", 0.01)]
+    for i, c in enumerate(("flor_roja", "flor_amarilla", "goma_azul")):   # Imanes y una foto
+        p.append(parte(caja(0.07, 0.01, 0.07, -0.25 + i * 0.12, -d / 2 - 0.005, h * 0.5 + (i % 2) * 0.1), c, 0.004))
+    p.append(parte(caja(0.18, 0.01, 0.13, -0.15, -d / 2 - 0.005, h * 0.8), "fachada_cielo", 0.003))
+    mueble("heladera_casa", p)
+
+
+def alacena_alta():
+    w, d, h = 1.0, 0.68, 3.6
+    p = [parte(caja(w, d, 2.2, 0, 0, 0.06), "fachada_menta", 0.035),
+         parte(caja(w + 0.04, d + 0.04, 0.05, 0, 0, 2.26), "madera", 0.012),
+         parte(caja(w, d * 0.6, 1.1, 0, 0.1, 2.31), "fachada_menta", 0.03)]
+    for sx in (-0.24, 0.24):
+        p.append(parte(caja(0.44, 0.02, 1.9, sx, -d / 2 - 0.005, 0.2), "fachada_menta", 0.01))
+        p.append(parte(caja(0.04, 0.04, 0.16, sx + (0.17 if sx < 0 else -0.17), -d / 2 - 0.03, 1.1), "metal", 0.005))
+    for i, c in enumerate(("tierra", "flor_roja", "letrero_crema")):   # Frascos arriba
+        p.append(parte(cil((-0.3 + i * 0.3, 0.1, 3.41), (-0.3 + i * 0.3, 0.1, 3.6), 0.07, 0.07, 10), "vidrio", 0.005))
+        p.append(parte(cil((-0.3 + i * 0.3, 0.1, 3.42), (-0.3 + i * 0.3, 0.1, 3.52), 0.06, 0.06, 10), c, 0))
+    mueble("alacena_alta", p)
+
+
+def mesada():
+    w, d, h = 1.4, 0.9, 1.0
+    p = [parte(caja(w, d - 0.1, h - 0.06, 0, 0, 0), "fachada_menta", 0.03),
+         parte(caja(w + 0.04, d, 0.06, 0, 0, h - 0.06), "piedra", 0.012),
+         parte(caja(0.5, 0.36, 0.02, 0.3, 0, h - 0.005), "metal", 0.01),                  # Bacha
+         parte(cil((0.3, 0.25, h), (0.3, 0.25, h + 0.28), 0.02, 0.02, 6), "metal", 0),     # Canilla
+         parte(cil((0.3, 0.25, h + 0.28), (0.3, 0.1, h + 0.25), 0.018, 0.015, 6), "metal", 0)]
+    for sx in (-0.45, -0.1, 0.3):
+        p.append(parte(caja(0.32, 0.02, 0.7, sx, -d / 2 + 0.04, 0.1), "fachada_menta", 0.01))
+    p.append(parte(caja(0.35, 0.25, 0.03, -0.35, -0.05, h), "madera", 0.006))              # Tabla
+    p.append(parte(bola((-0.35, -0.05, h + 0.07), 0.05, sub=1), "flor_roja", 0))           # Tomate
+    p.append(parte(cil((-0.55, 0.2, h), (-0.55, 0.2, h + 0.15), 0.07, 0.06, 10), "goma_azul", 0.01))  # Frasco
+    mueble("mesada", p)
+
+
+def cocina_horno():
+    w, d, h = 0.8, 0.7, 0.95
+    p = [parte(caja(w, d, h, 0, 0, 0), "blanco", 0.03),
+         parte(caja(w - 0.16, 0.02, 0.45, 0, -d / 2 - 0.005, 0.18), "vidrio_osc", 0.01),
+         parte(caja(w - 0.12, 0.04, 0.03, 0, -d / 2 - 0.03, 0.7), "metal", 0.005),
+         parte(caja(w + 0.02, d + 0.02, 0.03, 0, 0, h), "metal", 0.008)]
+    for sx in (-0.18, 0.18):
+        for sy in (-0.15, 0.15):
+            p.append(parte(cil((sx, sy, h + 0.03), (sx, sy, h + 0.05), 0.08, 0.08, 10), "auto_negro", 0))
+    p.append(parte(cil((0.18, 0.15, h + 0.05), (0.18, 0.15, h + 0.2), 0.11, 0.1, 12), "flor_roja", 0.02))   # Olla
+    for i in range(4):
+        p.append(parte(cil((-0.27 + i * 0.18, -d / 2, 0.8), (-0.27 + i * 0.18, -d / 2 - 0.04, 0.8), 0.025, 0.025, 8), "auto_negro", 0))
+    mueble("cocina_horno", p)
+
+
+# ---- baño
+def banera():
+    w, d, h = 1.6, 0.75, 0.6
+    p = [parte(caja(w, d, h, 0, 0, 0), "blanco", 0.06),
+         parte(caja(w - 0.16, d - 0.16, 0.05, 0, 0, h - 0.12), "agua", 0),
+         parte(cil((w / 2 - 0.12, d / 2 - 0.12, h), (w / 2 - 0.12, d / 2 - 0.12, h + 0.25), 0.02, 0.02, 6), "metal", 0),
+         parte(cil((w / 2 - 0.12, d / 2 - 0.12, h + 0.25), (w / 2 - 0.25, d / 2 - 0.12, h + 0.2), 0.018, 0.015, 6), "metal", 0)]
+    for i in range(5):   # Espuma
+        p.append(parte(bola((-0.4 + i * 0.18, (i % 2) * 0.1 - 0.05, h - 0.05), 0.09, sub=1), "blanco", 0))
+    p.append(parte(bola((0.1, 0.1, h + 0.02), 0.06, (1.2, 1, 0.8), sub=2), "flor_amarilla", 0))   # Patito
+    p.append(parte(bola((0.16, 0.1, h + 0.08), 0.04, sub=2), "flor_amarilla", 0))
+    mueble("banera", p)
+
+
+def inodoro():
+    p = [parte(cil((0, 0, 0), (0, 0, 0.38), 0.17, 0.2, 12), "blanco", 0.02),
+         parte(cil((0, 0.02, 0.38), (0, 0.02, 0.42), 0.22, 0.22, 14), "blanco", 0.01),
+         parte(caja(0.42, 0.18, 0.4, 0, 0.24, 0.38), "blanco", 0.03),
+         parte(caja(0.08, 0.04, 0.02, 0.12, 0.24, 0.79), "metal", 0.005)]
+    mueble("inodoro", p)
+
+
+def lavatorio():
+    p = [parte(cil((0, 0, 0), (0, 0, 0.75), 0.08, 0.1, 10), "blanco", 0.01),
+         parte(caja(0.6, 0.45, 0.14, 0, 0, 0.75), "blanco", 0.04),
+         parte(cil((0, 0.15, 0.89), (0, 0.15, 1.05), 0.018, 0.018, 6), "metal", 0),
+         parte(caja(0.55, 0.04, 0.75, 0, 0.21, 1.15), "madera", 0.02),                      # Espejo
+         parte(caja(0.47, 0.02, 0.66, 0, 0.19, 1.2), "vidrio", 0)]
+    p.append(parte(cil((-0.2, 0.1, 0.89), (-0.2, 0.1, 1.0), 0.03, 0.03, 8), "flor_rosa", 0.004))   # Jabón
+    mueble("lavatorio", p)
+
+
+def armario_bano():
+    w, d, h = 1.0, 0.68, 3.6
+    p = [parte(caja(w, d, 1.0, 0, 0, 0.05), "blanco", 0.035)]
+    for z in (1.3, 1.9, 2.5, 3.1):
+        p.append(parte(caja(w, d * 0.8, 0.04, 0, 0.05, z), "madera", 0.008))
+    for sx in (-1, 1):
+        p.append(parte(caja(0.05, d * 0.8, h - 1.05, sx * (w / 2 - 0.025), 0.05, 1.05), "madera", 0.008))
+    rng = random.Random(31)
+    for z in (1.34, 1.94, 2.54, 3.14):   # Toallas dobladas y frascos
+        x = -0.38
+        while x < 0.36:
+            if rng.random() < 0.6:
+                p.append(parte(caja(0.2, 0.32, 0.14, x + 0.1, 0.05, z), rng.choice(["flor_azul", "blanco", "fachada_menta", "flor_rosa"]), 0.04))
+                x += 0.23
+            else:
+                p.append(parte(cil((x + 0.05, 0.05, z), (x + 0.05, 0.05, z + 0.18), 0.04, 0.04, 8), rng.choice(PRODUCTOS), 0.004))
+                x += 0.12
+    p.append(parte(caja(0.4, 0.02, 0.8, 0, -d / 2 - 0.005, 0.15), "blanco", 0.01))
+    mueble("armario_bano", p)
+
+
+# ---- cuarto de chicos
+def cajonera_juguetes():
+    w, d, h = 1.0, 0.68, 3.6
+    p = [parte(caja(0.06, d, 2.6, sx * (w / 2 - 0.03)), "flor_azul", 0.02) for sx in (-1, 1)]
+    p.append(parte(caja(w, d, 0.06, 0, 0, 2.6), "flor_azul", 0.02))
+    rng = random.Random(17)
+    for i, z in enumerate((0.05, 0.7, 1.35, 1.95)):
+        p.append(parte(caja(w - 0.1, d, 0.04, 0, 0, z), "blanco", 0.008))
+        if i < 2:   # Cajones de colores abajo
+            for sx in (-0.23, 0.23):
+                p.append(parte(caja(0.42, d - 0.06, 0.5, sx, 0, z + 0.06), rng.choice(["flor_amarilla", "flor_rosa", "hoja", "naranja"]), 0.03))
+        else:
+            p.append(parte(bola((-0.25, 0, z + 0.16), 0.13, sub=2), "flor_roja", 0))          # Pelota
+            p.append(parte(caja(0.18, 0.18, 0.18, 0.05, 0, z + 0.04), "goma_azul", 0.02))       # Cubos
+            p.append(parte(caja(0.14, 0.14, 0.14, 0.05, 0, z + 0.22), "flor_amarilla", 0.02))
+            p.append(parte(caja(0.15, 0.15, 0.15, 0.27, 0, z + 0.04), "hoja", 0.02))
+    # Un osito arriba de todo
+    p.append(parte(bola((0, 0, 2.86), 0.2, (1, 0.8, 1.05), sub=2), "tronco", 0))
+    p.append(parte(bola((0, -0.02, 3.18), 0.15, sub=2), "tronco", 0))
+    for sx in (-0.11, 0.11):
+        p.append(parte(bola((sx, -0.02, 3.3), 0.06, sub=1), "tronco", 0))
+    p.append(parte(bola((0, -0.14, 3.15), 0.05, sub=1), "arena", 0))
+    mueble("cajonera_juguetes", p)
+
+
+def movil_estrellas():
+    p = [parte(cil((0, 0, 0.4), (0, 0, 0.64), 0.008, 0.008, 4), "hierro", 0),
+         parte(cil((-0.4, 0, 0.4), (0.4, 0, 0.4), 0.012, 0.012, 6), "madera", 0),
+         parte(cil((0, -0.4, 0.36), (0, 0.4, 0.36), 0.012, 0.012, 6), "madera", 0)]
+    for (x, y, c) in ((-0.38, 0, "flor_amarilla"), (0.38, 0, "flor_azul"), (0, -0.38, "flor_rosa"), (0, 0.38, "hoja")):
+        p.append(parte(cil((x, y, 0.15), (x, y, 0.4), 0.004, 0.004, 4), "hierro", 0))
+        p.append(parte(bola((x, y, 0.1), 0.08, (1, 0.35, 1), sub=1), c, 0))
+    p.append(parte(bola((0, 0, 0.22), 0.1, (1.2, 0.5, 0.7), sub=2), "blanco", 0))   # Nube
+    mueble("movil_estrellas", p)
+
+
+def oso_peluche():
+    c = "tronco"
+    p = [parte(bola((0, 0, 0.22), 0.22, (1, 0.85, 1.05), sub=2), c, 0),
+         parte(bola((0, -0.02, 0.56), 0.17, sub=2), c, 0),
+         parte(bola((0, -0.16, 0.53), 0.07, sub=1), "arena", 0),
+         parte(bola((0, -0.22, 0.55), 0.025, sub=1), "auto_negro", 0)]
+    for sx in (-0.12, 0.12):
+        p.append(parte(bola((sx, -0.02, 0.7), 0.06, sub=1), c, 0))
+        p.append(parte(bola((sx * 1.4, -0.08, 0.06), 0.09, sub=1), c, 0))
+        p.append(parte(bola((sx * 1.9, -0.05, 0.3), 0.08, sub=1), c, 0))
+    p.append(parte(caja(0.14, 0.04, 0.06, 0, -0.17, 0.4), "flor_roja", 0.01))   # Moño
+    mueble("oso_peluche", p)
+
+
+def cama_chica():
+    w, d = 1.0, 1.8
+    p = [parte(caja(w, d, 0.3, 0, 0, 0.1), "flor_azul", 0.03),
+         parte(caja(w - 0.08, d - 0.1, 0.2, 0, -0.02, 0.36), "blanco", 0.05),
+         parte(caja(w - 0.05, d * 0.6, 0.22, 0, -d * 0.18, 0.38), "flor_rosa", 0.05),
+         parte(caja(w + 0.06, 0.1, 0.8, 0, d / 2 - 0.05, 0.05), "flor_azul", 0.03),
+         parte(caja(0.55, 0.3, 0.13, 0, d / 2 - 0.28, 0.58), "blanco", 0.05)]
+    for i in range(4):   # Lunares
+        p.append(parte(bola((-0.3 + i * 0.2, -0.3 - (i % 2) * 0.25, 0.6), 0.05, (1, 1, 0.3), sub=1), "flor_amarilla", 0))
+    mueble("cama_chica", p)
+
+
+# ---- taller mecánico
+def tablero_herramientas():
+    w, d, h = 1.0, 0.68, 3.6
+    p = [parte(caja(w, 0.06, 2.2, 0, 0.25, 1.2), "arena", 0.01),                   # Tablero perforado
+         parte(caja(w, d, 1.0, 0, 0, 0), "plastico_rojo", 0.035),                  # Cajonera roja
+         parte(caja(w + 0.04, d + 0.04, 0.04, 0, 0, 1.0), "metal", 0.01)]
+    for i in range(4):
+        p.append(parte(caja(w - 0.1, 0.02, 0.18, 0, -d / 2 - 0.005, 0.1 + i * 0.22), "plastico_rojo", 0.006))
+        p.append(parte(caja(0.3, 0.03, 0.03, 0, -d / 2 - 0.02, 0.2 + i * 0.22), "metal", 0.005))
+    for k, (x, z) in enumerate(((-0.3, 2.6), (0.0, 2.7), (0.3, 2.55), (-0.3, 1.8), (0.05, 1.7), (0.32, 1.9))):
+        if k % 3 == 0:   # Llave
+            p.append(parte(caja(0.04, 0.03, 0.4, x, 0.2, z - 0.2), "metal", 0.005))
+            p.append(parte(cil((x, 0.2, z + 0.02), (x, 0.17, z + 0.02), 0.05, 0.05, 8), "metal", 0))
+        elif k % 3 == 1:   # Martillo
+            p.append(parte(caja(0.04, 0.04, 0.35, x, 0.2, z - 0.2), "madera", 0.005))
+            p.append(parte(caja(0.18, 0.06, 0.07, x, 0.19, z + 0.12), "metal", 0.01))
+        else:              # Destornillador
+            p.append(parte(cil((x, 0.2, z - 0.25), (x, 0.2, z - 0.05), 0.012, 0.012, 6), "metal", 0))
+            p.append(parte(cil((x, 0.2, z - 0.05), (x, 0.2, z + 0.12), 0.03, 0.03, 8), "flor_amarilla", 0.004))
+    p.append(parte(caja(w, 0.1, 0.2, 0, 0.2, 3.4), "flor_amarilla", 0.02))         # Cartel arriba
+    mueble("tablero_herramientas", p)
+
+
+def pila_neumaticos():
+    p = []
+    for i in range(5):
+        p.append(parte(cil((0, 0, i * 0.24), (0, 0, i * 0.24 + 0.22), 0.36, 0.36, 16), "goma", 0.03))
+        p.append(parte(cil((0, 0, i * 0.24 + 0.02), (0, 0, i * 0.24 + 0.2), 0.2, 0.2, 12), "llanta", 0))
+    mueble("pila_neumaticos", p)
+
+
+def lampara_taller():
+    p = [parte(cil((-0.35, 0, 0.5), (-0.35, 0, 0.64), 0.008, 0.008, 4), "hierro", 0),
+         parte(cil((0.35, 0, 0.5), (0.35, 0, 0.64), 0.008, 0.008, 4), "hierro", 0),
+         parte(caja(0.95, 0.3, 0.12, 0, 0, 0.4), "metal", 0.02),
+         parte(caja(0.85, 0.22, 0.03, 0, 0, 0.38), "luz", 0)]
+    mueble("lampara_taller", p)
+
+
+def banco_trabajo():
+    w, d, h = 1.4, 0.9, 0.95
+    p = [parte(caja(w, d, 0.08, 0, 0, h - 0.08), "madera", 0.02),
+         parte(caja(w - 0.1, d - 0.1, 0.04, 0, 0, 0.25), "madera_osc", 0.01)]
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            p.append(parte(caja(0.08, 0.08, h - 0.08, sx * (w / 2 - 0.06), sy * (d / 2 - 0.06)), "metal", 0.01))
+    p.append(parte(caja(0.25, 0.2, 0.18, -0.45, 0.2, h), "goma_azul", 0.02))                   # Morsa
+    p.append(parte(caja(0.5, 0.25, 0.22, 0.35, 0.15, h), "plastico_rojo", 0.03))               # Caja de herramientas
+    p.append(parte(caja(0.52, 0.04, 0.04, 0.35, 0.15, h + 0.25), "metal", 0.005))
+    p.append(parte(cil((-0.1, -0.2, h), (0.2, -0.25, h + 0.01), 0.02, 0.02, 6), "metal", 0))     # Llave suelta
+    p.append(parte(cil((0.5, -0.3, 0.29), (0.5, -0.3, 0.6), 0.1, 0.1, 10), "plastico_amarillo", 0.01))   # Bidón de aceite
+    mueble("banco_trabajo", p)
+
+
+def caja_herramientas():
+    p = [parte(caja(0.6, 0.4, 0.95, 0, 0, 0.08), "plastico_rojo", 0.035)]
+    for i in range(4):
+        p.append(parte(caja(0.54, 0.02, 0.18, 0, -0.205, 0.15 + i * 0.22), "plastico_rojo", 0.006))
+        p.append(parte(caja(0.2, 0.03, 0.025, 0, -0.22, 0.24 + i * 0.22), "metal", 0.004))
+    for sx in (-0.24, 0.24):
+        for sy in (-0.15, 0.15):
+            p.append(parte(cil((sx, sy, 0), (sx, sy, 0.08), 0.04, 0.04, 8), "goma", 0))
+    mueble("caja_herramientas", p)
+
+
+def lavarropas():
+    p = [parte(caja(0.65, 0.65, 0.9, 0, 0, 0), "blanco", 0.04),
+         parte(cil((0, -0.33, 0.42), (0, -0.35, 0.42), 0.24, 0.24, 18), "metal", 0.005),
+         parte(cil((0, -0.34, 0.42), (0, -0.37, 0.42), 0.19, 0.19, 18), "vidrio", 0),
+         parte(caja(0.6, 0.02, 0.12, 0, -0.33, 0.76), "piedra", 0.004),
+         parte(cil((0.2, -0.34, 0.76), (0.2, -0.38, 0.76), 0.03, 0.03, 8), "goma_azul", 0)]
+    mueble("lavarropas", p)
+
+
 # ================================================================= construir y exportar
+for f in (comoda, vajillero, heladera_casa, alacena_alta, mesada, cocina_horno, banera, inodoro, lavatorio,
+          armario_bano, cajonera_juguetes, movil_estrellas, oso_peluche, cama_chica, tablero_herramientas,
+          pila_neumaticos, lampara_taller, banco_trabajo, caja_herramientas, lavarropas):
+    f()
 for f in (gondola, cartel_oferta, caja_super, heladera_bebidas, canasto_super, estante_cajones, racimo_bananas,
           puesto_frutas, cajon_frutas, cajon_verduras, ropero, lampara_techo, mesa_comedor, cama, mesita_luz,
           mueble_tv, vitrina_tortas, lampara_colgante, mesa_cafe, mesa_mantel, jardinera_alta, tacho,

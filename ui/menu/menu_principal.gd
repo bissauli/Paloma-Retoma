@@ -16,6 +16,8 @@ const ESTIRAR := 26.0          ## Píxeles que crece la barra hacia la izquierda
 var _opciones: OpcionesMenu
 var _cargar: CargarMenu
 var _personalizar: PersonalizarMenu
+var _accesorios: AccesoriosMenu    ## TEMPORAL: equipar accesorios rápido
+var _btn_accesorios: Button
 var _logros: LogrosMenu
 var _btn_logros: Button        ## El trofeo de arriba a la izquierda
 var _txt_logros: Label         ## ...con cuántos lleva
@@ -32,6 +34,17 @@ var _tween: Tween
 
 func _ready() -> void:
 	visible = false
+	# TEMPORAL: botón "ACCESORIOS" debajo de "PERSONALIZAR PALOMA" (una copia de esa fila), que abre la
+	# pantalla para equipar los accesorios rápido (AccesoriosMenu)
+	var fila_acc := _fila(%Personalizar).duplicate() as Control
+	fila_acc.name = "FilaAccesorios"
+	caja_botones.add_child(fila_acc)
+	caja_botones.move_child(fila_acc, _fila(%Personalizar).get_index() + 1)
+	_btn_accesorios = fila_acc.get_child(0).get_child(0) as Button
+	_btn_accesorios.name = "Accesorios"
+	_btn_accesorios.unique_name_in_owner = false
+	_btn_accesorios.text = "ACCESORIOS"
+	botones.insert(botones.find(%Personalizar) + 1, _btn_accesorios)
 	for b in botones:
 		_preparar_boton(b)
 	%Continuar.pressed.connect(_continuar)
@@ -50,6 +63,10 @@ func _ready() -> void:
 	add_child(_cargar)
 	_cargar.cerrada.connect(_al_cerrar_pantalla.bind(%CargarPartida))
 	_cargar.cargar.connect(func(datos: Dictionary) -> void: _arrancar(continuar.emit.bind(datos)))
+	_accesorios = AccesoriosMenu.new()
+	add_child(_accesorios)
+	_accesorios.cerrada.connect(_al_cerrar_pantalla.bind(_btn_accesorios))
+	_btn_accesorios.pressed.connect(_abrir.bind("accesorios"))
 	_personalizar = PersonalizarMenu.new()
 	add_child(_personalizar)
 	_personalizar.cerrada.connect(_al_cerrar_pantalla.bind(%Personalizar))
@@ -122,7 +139,7 @@ func ocultar() -> void:
 
 func _input(event: InputEvent) -> void:
 	# Si se perdió el foco (click en un lugar vacío), las flechas o el mando lo recuperan
-	if not _activo or _opciones.visible or _cargar.visible or _personalizar.visible or _confirmar.visible or _logros.visible:
+	if not _activo or _opciones.visible or _cargar.visible or _personalizar.visible or _accesorios.visible or _confirmar.visible or _logros.visible:
 		return
 	if get_viewport().gui_get_focus_owner() == null and (event.is_action_pressed("ui_down")
 			or event.is_action_pressed("ui_up") or event.is_action_pressed("ui_accept")):
@@ -260,6 +277,8 @@ func _abrir(cual: String) -> void:
 			_opciones.abrir()
 		"personalizar":
 			_personalizar.abrir()
+		"accesorios":
+			_accesorios.abrir()
 		"logros":
 			_logros.abrir()
 		_:

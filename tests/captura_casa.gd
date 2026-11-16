@@ -26,6 +26,8 @@ func _ready() -> void:
 
 
 func _pasada(casa: CasaEnterable, n: int) -> void:
+	if not casa.con_cinematica:
+		return   # Los locales no tienen cinemática
 	# La fachada, desde la plaza
 	# (La sala está en un piso al azar: se la mira desde lejos, un poco más abajo y hacia arriba)
 	paloma.global_position = casa.to_global(Vector3(0, 1.0, casa.fondo / 2.0 + 22.0))
@@ -45,7 +47,9 @@ func _pasada(casa: CasaEnterable, n: int) -> void:
 	paloma.despegar()
 	paloma.velocity = casa.global_transform.basis * Vector3(0, 0, -7)
 	Input.action_press("mover_adelante")
-	while not casa.activa:
+	while not casa.activa:   # La cinemática arranca con el aviso (como apretar E)
+		if AvisoPasaje.visible_ahora():
+			AvisoPasaje.apretar()
 		await get_tree().physics_frame
 	Input.action_release("mover_adelante")
 	var t0 := Time.get_ticks_msec()

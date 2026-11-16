@@ -1,6 +1,10 @@
 extends Node
-## Prueba automática de los pasajes (casas que la paloma atraviesa volando) y su cinemática:
+## Prueba automática de los interiores de los edificios de alrededor de la plaza (world/pasaje.gd) y de
+## la cinemática para atravesar los departamentos (world/casa_enterable.gd):
 ## godot --headless --path . res://tests/test_casas.tscn
+## - Cada edificio: un local en la planta baja (se entra caminando, sin cinemática) y un ambiente de
+##   departamento en un piso del 2 al 7 (se entra libremente; cerca de la ventana aparece el aviso y la
+##   cinemática arranca sólo si se aprieta).
 
 const Y := CasaEnterable.Y_PASO
 
@@ -12,7 +16,7 @@ var _hamaca_max := 0.0
 
 
 func _ready() -> void:
-	# Los locales y los pisos se sortean en cada partida: acá con una semilla fija (o la que se pase)
+	# Los locales, los ambientes y los pisos se sortean en cada partida: acá con una semilla fija
 	if OS.get_environment("PALOMA_SEMILLA") == "":
 		OS.set_environment("PALOMA_SEMILLA", "7")
 	var main: Node = load("res://main.tscn").instantiate()
@@ -20,32 +24,50 @@ func _ready() -> void:
 	paloma = main.get_node("Paloma")
 	await _frames(20)
 
-	var casas := get_tree().get_nodes_in_group("casa_enterable")
-	_check("hay un local por cada edificio de alrededor (%d)" % casas.size(), casas.size() == Edificios.ALREDEDORES.size())
-	if casas.size() < 4:
+	var todas := get_tree().get_nodes_in_group("casa_enterable")
+	var locales: Array[CasaEnterable] = []
+	var deptos: Array[CasaEnterable] = []
+	for c in todas:
+		var casa := c as CasaEnterable
+		if casa.con_cinematica:
+			deptos.append(casa)
+		else:
+			locales.append(casa)
+	var n := Edificios.ALREDEDORES.size()
+	_check("hay un local y un departamento por edificio (%d y %d)" % [locales.size(), deptos.size()],
+		locales.size() == n and deptos.size() == n)
+	if deptos.size() < 4:
 		get_tree().quit(1)
 		return
-	var casa_a := casas[0] as CasaEnterable
-	var casa_b := casas[3] as CasaEnterable
-	var casa_c := casas[1] as CasaEnterable
-	# --- Pisos al azar y locales distintos
-	var temas := {}
+	var casa_a := deptos[0]
+	var casa_b := deptos[3]
+	var casa_c := deptos[1]
+	# --- Locales en la planta baja; ambientes de departamento en un piso del 2 al 7
+	var temas_l := {}
+	var temas_d := {}
 	var pisos := {}
-	for c in casas:
-		var casa := c as CasaEnterable
-		temas[casa.tema] = true
+	for casa in locales:
+		temas_l[casa.tema] = true
+		print("  %s: local (%s) en la planta baja" % [casa.name, casa.tema])
+		_check("%s: el local es de la lista de locales" % casa.name, Pasaje.LOCALES.has(casa.tema))
+		_check("%s: el local está en la planta baja" % casa.name, casa.piso == 0 and absf(casa.global_position.y) < 0.01)
+		_check("%s: al local se entra caminando (la vidriera llega al piso)" % casa.name, _cruza(casa, casa.x_frente, -1.0, 0.35))
+	for casa in deptos:
+		temas_d[casa.tema] = true
 		pisos[casa.piso] = true
-		print("  %s: %s en el piso %d" % [casa.name, casa.tema, casa.piso])
-		_check("%s: la sala está en un piso del %d al %d" % [casa.name, Pasaje.PISO_MIN, Pasaje.PISO_MAX],
+		print("  %s: departamento (%s) en el piso %d" % [casa.name, casa.tema, casa.piso])
+		_check("%s: es un ambiente de casa" % casa.name, Pasaje.AMBIENTES.has(casa.tema))
+		_check("%s: está en un piso del %d al %d" % [casa.name, Pasaje.PISO_MIN, Pasaje.PISO_MAX],
 			casa.piso >= Pasaje.PISO_MIN and casa.piso <= Pasaje.PISO_MAX)
-		_check("%s: la sala está a la altura de su piso" % casa.name,
+		_check("%s: está a la altura de su piso" % casa.name,
 			absf(casa.global_position.y - casa.piso * Pasaje.ALTO_PISO) < 0.01)
-	_check("cada edificio tiene un local distinto (%d)" % temas.size(), temas.size() == casas.size())
+	_check("los locales son todos distintos (%d)" % temas_l.size(), temas_l.size() == n)
+	_check("los ambientes son todos distintos (%d)" % temas_d.size(), temas_d.size() == n)
+	_check("hay al menos 7 ambientes de casa posibles (%d)" % Pasaje.AMBIENTES.size(), Pasaje.AMBIENTES.size() >= 7)
 	_check("los pisos no son todos iguales (%d distintos)" % pisos.size(), pisos.size() > 1)
 
 	# --- Huecos de verdad, ruta libre, obstáculos y lugar para salir
-	for c in casas:
-		var casa := c as CasaEnterable
+	for casa in locales + deptos:
 		var xf := casa.x_frente
 		var xb := casa.x_fondo
 		print("  %s: %d obstáculos" % [casa.name, casa.obstaculos])
@@ -55,21 +77,45 @@ func _ready() -> void:
 		_check("%s: la pared maciza la frena" % casa.name, not _cruza(casa, 0.0, -1.0))
 		for desde_frente in [true, false]:
 			var inicio := Vector3(xf, Y, casa.fondo / 2.0 + 2.6) if desde_frente else Vector3(xb, Y, -casa.fondo / 2.0 - 2.6)
-			var choque := _ruta_choca(casa, casa.ruta_de_prueba(desde_frente, casa.to_global(inicio)))
+			# En los locales (sin cinemática) sólo importa el tramo de adentro: es el pasillo
+			var choque := _ruta_choca(casa, casa.ruta_de_prueba(desde_frente, casa.to_global(inicio)), not casa.con_cinematica)
 			_check("%s: la ruta %s no toca ningún mueble%s" % [casa.name, "adelante->atrás" if desde_frente else "atrás->adelante",
 				"" if choque == "" else " (" + choque + ")"], choque == "")
 		var atras := casa.to_global(Vector3(0, 1, -casa.fondo / 2.0 - CasaEnterable.CALLEJON + 0.1))
 		_check("%s: atrás hay lugar para salir (dentro de la ciudad)" % casa.name, atras.z > Ciudad.Z_MIN and atras.z < Ciudad.Z_MAX)
 
-	# Los escenarios tienen coreografías variadas
-	var estilos := {}
-	for c in casas:
-		estilos[(c as CasaEnterable).estilo] = true
-	_check("hay al menos 3 coreografías distintas (%d)" % estilos.size(), estilos.size() >= 3)
+	# --- En un local no hay aviso ni cinemática aunque se meta volando por la vidriera
+	var local := locales[0]
+	paloma.global_position = local.to_global(Vector3(local.x_frente, Y, local.fondo / 2.0 + 2.0))
+	paloma.reset_physics_interpolation()
+	paloma.estado = PalomaJugador.Estado.SUELO
+	paloma.despegar()
+	paloma.velocity = local.global_transform.basis * Vector3(0, 0, -6)
+	await _frames(40)
+	_check("en un local no aparece el aviso ni arranca la cinemática", not AvisoPasaje.visible_ahora() and not local.activa)
+	await _frames(40)
 
-	# --- Todos los escenarios, de punta a punta (adelante -> atrás)
-	for c in casas:
-		var casa := c as CasaEnterable
+	# --- Sin apretar el botón: entra volando libremente, sin cinemática
+	paloma.global_position = casa_b.to_global(Vector3(casa_b.x_frente, Y, casa_b.fondo / 2.0 + 2.2))
+	paloma.reset_physics_interpolation()
+	paloma.camara.yaw = casa_b.rotation.y
+	paloma.estado = PalomaJugador.Estado.SUELO
+	paloma.despegar()
+	paloma.velocity = casa_b.global_transform.basis * Vector3(0, 0.6, -6)
+	await _frames(3)
+	_check("frente a la ventana de un departamento aparece el aviso para atravesar", AvisoPasaje.visible_ahora())
+	var entro := false
+	for i in 90:
+		await get_tree().physics_frame
+		paloma.velocity = casa_b.global_transform.basis * Vector3(0, 0.6, -6)
+		entro = entro or casa_b.esta_adentro(paloma.global_position)
+	_check("sin apretarlo, entra sola al departamento", entro)
+	_check("sin apretarlo, no hay cinemática", not casa_b.activa and paloma.controlable and not paloma.en_escena)
+	_check("adentro, el aviso se va", not AvisoPasaje.visible_ahora())
+	await _frames(60)
+
+	# --- Apretando el botón: cada departamento, de punta a punta (adelante -> atrás)
+	for casa in deptos:
 		await _lanzar(casa, Vector3(casa.x_frente, Y, casa.fondo / 2.0 + 2.6), Vector3(0, 0, -7), 0.0, "mover_adelante")
 		var arranco := await _esperar_activa(casa)
 		var t0 := Time.get_ticks_msec()
@@ -153,9 +199,10 @@ func _casa_en(base: Vector3) -> CasaEnterable:
 
 
 ## ¿Una esfera del tamaño de la paloma cruza la pared en x = cx (adelante si sentido < 0)?
-func _cruza(casa: CasaEnterable, cx: float, sentido: float) -> bool:
+## "altura": a qué altura (local) va la esfera (a ras del piso, para ver si se entra caminando).
+func _cruza(casa: CasaEnterable, cx: float, sentido: float, altura := Y) -> bool:
 	var z0 := casa.fondo / 2.0 + 2.0 if sentido < 0.0 else -casa.fondo / 2.0 - 2.0
-	return _barrido(casa.to_global(Vector3(cx, Y, z0)), casa.global_transform.basis * Vector3(0, 0, 3.5 * sentido))
+	return _barrido(casa.to_global(Vector3(cx, altura, z0)), casa.global_transform.basis * Vector3(0, 0, 3.5 * sentido))
 
 
 func _barrido(desde: Vector3, mov: Vector3, radio := 0.22) -> bool:
@@ -172,7 +219,7 @@ func _barrido(desde: Vector3, mov: Vector3, radio := 0.22) -> bool:
 
 ## Recorre la curva (local a la casa) con una esfera un poco más gorda que la paloma.
 ## Devuelve "" si no toca nada, o dónde chocó.
-func _ruta_choca(casa: CasaEnterable, curva: Curve3D) -> String:
+func _ruta_choca(casa: CasaEnterable, curva: Curve3D, solo_adentro := false) -> String:
 	var forma := SphereShape3D.new()
 	forma.radius = 0.26
 	var q := PhysicsShapeQueryParameters3D.new()
@@ -181,7 +228,11 @@ func _ruta_choca(casa: CasaEnterable, curva: Curve3D) -> String:
 	var largo := curva.get_baked_length()
 	var s := 0.0
 	while s <= largo:
-		var p := casa.to_global(curva.sample_baked(s, true))
+		var pl := curva.sample_baked(s, true)
+		if solo_adentro and absf(pl.z) > casa.fondo / 2.0 - CasaEnterable.ESPESOR:
+			s += 0.1
+			continue
+		var p := casa.to_global(pl)
 		q.transform = Transform3D(Basis.IDENTITY, p)
 		if not paloma.get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty():
 			return "en %.1f de %.1f m, local %s" % [s, largo, str(casa.to_local(p).snapped(Vector3.ONE * 0.01))]
@@ -189,7 +240,8 @@ func _ruta_choca(casa: CasaEnterable, curva: Curve3D) -> String:
 	return ""
 
 
-## Pone a la paloma volando en "pos_local" (de la casa) con velocidad "vel" (local) y aprieta avanzar.
+## Pone a la paloma volando en "pos_local" (de la casa) con velocidad "vel" (local), frente a la
+## ventana: cuando aparece el aviso, lo aprieta (como la tecla E) para que arranque la cinemática.
 func _lanzar(casa: CasaEnterable, pos_local: Vector3, vel: Vector3, yaw: float, tecla: String) -> void:
 	paloma.global_position = casa.to_global(pos_local)
 	paloma.reset_physics_interpolation()
@@ -201,7 +253,14 @@ func _lanzar(casa: CasaEnterable, pos_local: Vector3, vel: Vector3, yaw: float, 
 	_hamaca_max = 0.0
 	casa.escena_terminada.connect(_al_terminar, CONNECT_ONE_SHOT)
 	Input.action_press(tecla)
-	await get_tree().physics_frame
+	for i in 30:
+		await get_tree().physics_frame
+		if AvisoPasaje.visible_ahora():
+			var e := InputEventAction.new()
+			e.action = &"interactuar"
+			e.pressed = true
+			Input.parse_input_event(e)
+			break
 
 
 func _al_terminar(desde_frente: bool) -> void:
