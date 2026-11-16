@@ -52,6 +52,8 @@ var entorno: Environment
 var sol: DirectionalLight3D
 var cielo_mat: ShaderMaterial
 var cozy_actual := Color.WHITE   ## Último valor de la global cozy_cielo (para las pruebas)
+var niebla_actual := Color("c9d3e6")   ## Color de la niebla del momento (lo usa el horizonte, world/horizonte.gd)
+var noche_actual := 0.0                ## 0 de día, 1 de noche cerrada
 var nube_mat: ShaderMaterial
 
 ## Estado del clima, de 0 a 1, que se acerca al objetivo del clima actual
@@ -84,6 +86,7 @@ var _tiempo := 0.0
 
 
 func _ready() -> void:
+	add_to_group("cielo")
 	_rng.seed = 2207
 	_crear_entorno()
 	_crear_nubes()
@@ -451,6 +454,8 @@ func _aplicar(forzado: bool) -> void:
 	entorno.ambient_light_color = ambiente
 	entorno.ambient_light_energy = amb_energia + _relampago * 0.5
 	entorno.fog_light_color = niebla
+	niebla_actual = niebla
+	noche_actual = noche
 	entorno.fog_depth_begin = lerpf(110.0, 35.0, lluvia)
 	entorno.fog_depth_end = lerpf(520.0, 240.0, lluvia)
 	cozy_actual = cozy.lerp(Color.WHITE, _relampago * 0.35)

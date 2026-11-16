@@ -32,6 +32,8 @@ func _crear_ambiente() -> void:
 	add_child(cielo)
 	sol = cielo.sol
 	entorno = cielo.entorno
+	# Mapa V4.5: la ciudad que sigue detrás de la pared invisible, en capas con paralaje
+	add_child(Horizonte.new())
 
 
 # ---------------------------------------------------------------- Piso y límites

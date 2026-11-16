@@ -330,12 +330,11 @@ static func colisiones(nombre: String, t: Transform3D, cuerpo: StaticBody3D) -> 
 		forma_s.size = s[1]
 		_forma(cuerpo, forma_s, Transform3D(t.basis.orthonormalized(), t * (s[0] as Vector3)))
 	for c: Array in d.get("cajas", []):
-		var b := Basis.IDENTITY
-		if c.size() >= 15:
-			b = Basis(Vector3(c[6], c[7], c[8]), Vector3(c[9], c[10], c[11]), Vector3(c[12], c[13], c[14]))
-		var tc := t * Transform3D(b, Vector3(c[0], c[1], c[2]))
+		# Mapa V4.5: las cajas del pretil de los edificios cubren también la tapa de color (ColisionAuto)
+		var cj := ColisionAuto.caja(d, c)
+		var tc := t * Transform3D(cj[0], cj[1])
 		var forma := BoxShape3D.new()
-		forma.size = Vector3(c[3], c[4], c[5]) * tc.basis.get_scale()
+		forma.size = (cj[2] as Vector3) * tc.basis.get_scale()
 		_forma(cuerpo, forma, Transform3D(tc.basis.orthonormalized(), tc.origin))
 	var esc := t.basis.get_scale()
 	var esc_max := maxf(esc.x, maxf(esc.y, esc.z))
@@ -348,6 +347,14 @@ static func colisiones(nombre: String, t: Transform3D, cuerpo: StaticBody3D) -> 
 		forma.radius = float(c[3]) * maxf(esc.x, esc.z)
 		forma.height = float(c[4]) * esc.y
 		_forma(cuerpo, forma, Transform3D(t.basis.orthonormalized(), t * Vector3(c[0], c[1], c[2])))
+	# Mapa V4.5: cornisas, toldos, bandas y pasamanos que la paloma atravesaba (ver ColisionAuto)
+	for pts: Array in KitColisionesExtra.PIEZAS.get(nombre, []):
+		var puntos := PackedVector3Array()
+		for k in range(0, pts.size(), 3):
+			puntos.append(t * Vector3(pts[k], pts[k + 1], pts[k + 2]))
+		var forma := ConvexPolygonShape3D.new()
+		forma.points = puntos
+		_forma(cuerpo, forma, Transform3D.IDENTITY)
 	for pts: Array in d.get("convexos", []):
 		var puntos := PackedVector3Array()
 		for k in range(0, pts.size(), 3):
