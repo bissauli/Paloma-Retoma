@@ -57,6 +57,8 @@ var _velocidad_previa := Vector3.ZERO
 var _aleteo_auto := 0.0     ## Segundos de aleteo animado sin input (el salto del menú)
 var _aplastada := 0.0       ## Segundos que le quedan chata en el piso (la pisó un auto, ver aplastar)
 var _tween_aplastar: Tween
+var _tween_rebote: Tween       ## El aplastoncito al aterrizar y el estirón al despegar (ver _rebote)
+var _cabeceo := 0.0           ## Inclinación de adelante a atrás (suavizada, así no da tirones)
 
 const DURACION_APLASTADA := 1.5
 const CAPA_GENTE := 4       ## Gente y autos (ver world/auto.gd): mientras está chata le pasan por encima
@@ -218,6 +220,7 @@ func despegar() -> void:
 	velocity.y = impulso_despegue * (0.8 if GameState.carga != "" else 1.0)
 	velocity += adelante * empuje_despegue
 	GameState.set_stamina(GameState.stamina - Config.STAMINA_DESPEGUE)
+	_rebote(true, 0.7)
 	AudioManager.reproducir("aleteo")
 	despego.emit()
 
@@ -317,10 +320,14 @@ func _aterrizar() -> void:
 	if fuerte:
 		camara.sacudir(0.6)
 		AudioManager.reproducir("picoteo", -2.0)
+	_rebote(false, 1.0 if fuerte else clampf(-_velocidad_previa.y / 8.0, 0.35, 0.8))
 	aterrizo.emit(fuerte)
 
 
-## Gira el cuerpo hacia donde se mueve, con alabeo e inclinación en el aire.
+## Gira el cuerpo hacia donde se mueve, con alabeo e inclinación en el aire. En el piso, al caminar
+## rápido se inclina un poquito hacia adelante y en las curvas se ladea apenas (como una paloma
+## apurada). La inclinación se suaviza siempre: al cambiar de golpe la velocidad vertical (despegar,
+## salir de la picada) el cuerpo no pega un tirón.
 func _orientar(delta: float) -> void:
 	var h := Vector2(velocity.x, velocity.z)
 	var rumbo_previo := _rumbo
@@ -328,14 +335,36 @@ func _orientar(delta: float) -> void:
 		var deseado := atan2(-h.x, -h.y)
 		var vel_giro := 12.0 if estado == Estado.SUELO else giro_aire
 		_rumbo = lerp_angle(_rumbo, deseado, minf(vel_giro * delta, 1.0))
-	var cabeceo := 0.0
+	var giro := wrapf(_rumbo - rumbo_previo, -PI, PI) / maxf(delta, 0.001)
+	var cabeceo_obj := 0.0
 	var alabeo_obj := 0.0
 	if estado == Estado.AIRE:
-		var giro := wrapf(_rumbo - rumbo_previo, -PI, PI) / maxf(delta, 0.001)
 		alabeo_obj = clampf(giro * 0.35, -0.8, 0.8)
-		cabeceo = clampf(atan2(velocity.y, maxf(h.length(), 1.0)) * 0.7, -1.0, 0.6)
+		cabeceo_obj = clampf(atan2(velocity.y, maxf(h.length(), 1.0)) * 0.7, -1.0, 0.6)
+	elif _aplastada <= 0.0:
+		var rapidez := clampf(h.length() / maxf(velocidad_caminar, 0.1), 0.0, 1.2)
+		cabeceo_obj = -0.1 * rapidez
+		alabeo_obj = clampf(giro * 0.05, -0.14, 0.14) * rapidez
+	var suave := 10.0 if estado == Estado.AIRE else 8.0
+	_cabeceo = lerpf(_cabeceo, cabeceo_obj, minf(suave * delta, 1.0))
 	_alabeo = lerpf(_alabeo, alabeo_obj, minf(6.0 * delta, 1.0))
-	modelo.rotation = Vector3(cabeceo, _rumbo, _alabeo)
+	modelo.rotation = Vector3(_cabeceo, _rumbo, _alabeo)
+
+
+## Un aplastoncito al aterrizar ("estirar" = false: se achata y vuelve con un rebote) o un estirón al
+## despegar ("estirar" = true). "fuerza" de 0 a 1. No se mete con el aplastamiento del auto.
+func _rebote(estirar: bool, fuerza: float) -> void:
+	if _aplastada > 0.0 or (_tween_aplastar and _tween_aplastar.is_running()):
+		return
+	if _tween_rebote:
+		_tween_rebote.kill()
+	var k := clampf(fuerza, 0.0, 1.0)
+	var forma := Vector3(1.0 - 0.12 * k, 1.0 + 0.18 * k, 1.0 - 0.12 * k) if estirar \
+		else Vector3(1.0 + 0.16 * k, 1.0 - 0.24 * k, 1.0 + 0.16 * k)
+	modelo.scale = Vector3.ONE
+	_tween_rebote = create_tween()
+	_tween_rebote.tween_property(modelo, "scale", forma, 0.06).set_ease(Tween.EASE_OUT)
+	_tween_rebote.tween_property(modelo, "scale", Vector3.ONE, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _animar(delta: float) -> void:
@@ -534,6 +563,7 @@ func escena_mover(pos: Vector3, rumbo_nuevo: float, modo: int, rapidez: float, c
 	_escena_modo = modo
 	_escena_rapidez = rapidez
 	_alabeo = alabeo
+	_cabeceo = cabeceo
 	modelo.rotation = Vector3(cabeceo, _rumbo, alabeo)
 
 
