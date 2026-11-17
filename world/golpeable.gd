@@ -58,6 +58,7 @@ func _ready() -> void:
 	collision_mask = 1 | CAPA_OBJETOS     # El piso y los demás objetos
 	mass = float(TIPOS.get(tipo, TIPOS["taza"])["masa"])
 	can_sleep = true
+	continuous_cd = true      # Chico y rápido: sin esto atraviesa paredes finas
 	if tipo in ["sombrero", "gorra"]:
 		linear_damp = 3.0      # Se frenan enseguida, fáciles de alcanzar
 		angular_damp = 6.0
@@ -99,6 +100,11 @@ func golpear(dir: Vector3, fuerza := 1.0) -> bool:
 		fijar_origen()
 	freeze = false
 	var d := dir.rotated(Vector3.UP, randf_range(-0.3, 0.3))
+	# Si hay una pared justo en esa dirección, sale despedido hacia arriba y no contra ella
+	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 0.1,
+		global_position + Vector3.UP * 0.1 + d * 0.6, 1)
+	if not get_world_3d().direct_space_state.intersect_ray(q).is_empty():
+		d *= 0.15
 	apply_central_impulse((d * randf_range(2.4, 3.6) + Vector3.UP * randf_range(1.4, 2.2)) * mass * fuerza)
 	apply_torque_impulse(Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * mass * 0.35)
 	if not golpeado:

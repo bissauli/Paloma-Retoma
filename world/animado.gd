@@ -17,6 +17,18 @@ extends Node3D
 ## apoya el chico y mira hacia -Z), Vector3 donde pararse para subir (en el mundo)].
 var asientos: Array = []
 
+## Cuántos jinetes (la paloma de la jugadora) están montados en algo que no está en "asientos":
+## la calesita gira mientras haya alguien (ver PalomaJugador.montar).
+var montadas := 0
+var palomas_en := {}            ## Asiento -> paloma montada (ver marcar_paloma)
+## Subibaja con la bandada: la punta (índice de asiento) donde está parada la paloma que salta; esa punta
+## baja. -1 = ninguna (ver Bandada.subir_calesita).
+var lado_pesado := -1
+## La otra hamaca del par (el columpio doble): las palomas de la bandada también se sientan ahí.
+var compania: Animado
+## Radio (desde el centro) del anillo donde bailan las palomas que sobran cuando la jugadora se sube.
+var radio_baile := 5.5
+
 var _quien: Array = []          ## Quién reservó cada asiento (o null)
 var _arriba: Array[bool] = []
 var _t := 0.0
@@ -35,13 +47,34 @@ func _asegurar() -> void:
 		_arriba.append(false)
 
 
-## Un asiento libre (sin reservar) o -1.
+## Un asiento libre (sin reservar y sin paloma montada) o -1.
 func lugar_libre() -> int:
 	_asegurar()
 	for i in asientos.size():
-		if _quien[i] == null or not is_instance_valid(_quien[i]):
+		if (_quien[i] == null or not is_instance_valid(_quien[i])) and not ocupado_por_paloma(i):
 			return i
 	return -1
+
+
+## Una paloma (la de la jugadora o de su bandada) se monta en el asiento "i" (el caballito de la
+## calesita): los humanos no pueden usarlo mientras esté ahí.
+func marcar_paloma(i: int, paloma: Node) -> void:
+	palomas_en[i] = paloma
+
+
+## ¿Hay una paloma montada en el asiento "i"? (se comprueba que siga ahí)
+func ocupado_por_paloma(i: int) -> bool:
+	var p: Node = palomas_en.get(i)
+	if p == null or not is_instance_valid(p):
+		return false
+	var m: Marker3D = p.get("caballito") if p is PalomaNPC else p.get("montada")
+	return m != null and is_instance_valid(m) and int(m.get_meta("indice", -1)) == i
+
+
+## ¿Hay un humano sentado (ya arriba) en el asiento "i"?
+func humano_sentado(i: int) -> bool:
+	_asegurar()
+	return i >= 0 and i < _arriba.size() and _arriba[i] and is_instance_valid(_quien[i])
 
 
 func reservar(i: int, quien: Node) -> void:
@@ -85,11 +118,18 @@ func entrada(i: int) -> Vector3:
 
 
 func _process(delta: float) -> void:
-	var n := ocupados()
+	var n := ocupados() + montadas
+	if tipo == "hamacar":
+		for i: int in palomas_en:
+			if ocupado_por_paloma(i):
+				n += 1   # Una paloma sentada en la hamaca también la hace hamacarse
+	if lado_pesado >= 0 and montadas == 0:
+		lado_pesado = -1   # La jugadora se bajó
 	match tipo:
 		"girar":
 			_giro = move_toward(_giro, velocidad if n > 0 else 0.0, delta * 0.15)
-			rotation.y += delta * _giro
+			# Los caballitos miran hacia su derecha (sentido horario visto desde arriba): gira hacia donde miran
+			rotation.y -= delta * _giro
 		"hamacar":
 			_amp = move_toward(_amp, amplitud if n > 0 else 0.0, delta * (0.1 if n > 0 else 0.06))
 			if _amp > 0.0:
@@ -99,7 +139,10 @@ func _process(delta: float) -> void:
 			rotation.x = sin(_t) * _amp
 		"subibaja":
 			var objetivo := -amplitud
-			if n >= 2:
+			if lado_pesado >= 0:
+				# Una paloma de la bandada saltó a esa punta: el peso la baja y la otra sube
+				objetivo = -signf((asientos[lado_pesado][0] as Transform3D).origin.x) * amplitud
+			elif n >= 2:
 				_t += delta * velocidad
 				objetivo = sin(_t) * amplitud
 			elif n == 1:
@@ -107,4 +150,7 @@ func _process(delta: float) -> void:
 				for i in asientos.size():
 					if _arriba[i]:
 						objetivo = -signf((asientos[i][0] as Transform3D).origin.x) * amplitud
-			rotation.z = move_toward(rotation.z, objetivo, delta * 0.9)
+				for i: int in palomas_en:
+					if ocupado_por_paloma(i):
+						objetivo = -signf((asientos[i][0] as Transform3D).origin.x) * amplitud
+			rotation.z = move_toward(rotation.z, objetivo, delta * 1.1)

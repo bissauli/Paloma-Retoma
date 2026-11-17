@@ -90,6 +90,14 @@ func iniciar(interlocutor: Interlocutor, id_dialogo := "") -> bool:
 	Ajustes.capturar_mouse(false)
 	cercano_cambio.emit(null)
 	interlocutor.conversacion_iniciada.emit(GameState.jugador)
+	# La primera vez que se habla con un personaje importante, antes va su presentación
+	var info: Dictionary = CatalogoDialogos.personaje(interlocutor.personaje).get("presentacion", {})
+	var bandera := "presentado_" + interlocutor.personaje
+	if not info.is_empty() and not Misiones.bandera(bandera):
+		Misiones.poner_bandera(bandera)
+		await PresentacionPersonaje.mostrar(get_tree(), info)
+		if not activo:
+			return true
 	_ir_a(String(_dialogo.get("inicio", "inicio")))
 	return true
 

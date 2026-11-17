@@ -248,6 +248,9 @@ func actualizar_objetivo() -> void:
 	var nuevos: Array = []
 	if partida_terminada:
 		t = "¡La plaza es nuestra!"
+	elif carga == "asado":
+		t = "Llevale el asado a Tío Ruffus, en el Cabildo"
+		nuevos = [_destino(&"npc_tio_ruffus", "Tío Ruffus")]
 	elif carga != "":
 		t = tr("Llevá la %s al nido, en la Pirámide de Mayo") % tr(carga)
 		nuevos = [_destino(&"nido", "Nido")]
@@ -279,7 +282,7 @@ func actualizar_objetivo() -> void:
 		t = "Tomá el balcón de la Casa Rosada con tu bandada"
 		nuevos = [_destino(&"balcon", "Balcón")]
 	# El nido siempre queda marcado (más chico) salvo que sea el destino
-	if not partida_terminada and carga == "":
+	if not partida_terminada and (carga == "" or carga == "asado"):
 		nuevos.append(_destino(&"nido", "Nido", false))
 	nuevos.append_array(Misiones.destinos())   # Las misiones secundarias en curso
 	if nuevos != destinos:

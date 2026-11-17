@@ -115,6 +115,7 @@ func _crear_zonas() -> void:
 	_crear_nido()
 	_crear_balcon_meta()
 	_crear_comida(mesas)
+	_crear_parrilla()
 	_crear_zonas_palomas()
 	_crear_puntos()
 
@@ -225,6 +226,66 @@ func _crear_comida(mesas: Array[Vector3]) -> void:
 	_generador(c, "MigasCatedral", Vector3(0, 0.02, -15), 6.0, 7, 3.0)
 	_generador(c, "MigasSubte", Vector3(33, 0.02, -15), 4.0, 4, 5.0)
 	_generador(c, "MigasCentro", Vector3(0, 0.02, 8), 8.0, 4, 6.0)
+
+
+## La parrilla cerca del Obelisco (a unos 10 m, al noreste): carbón encendido, humito y un buen pedazo de
+## asado. Tío Ruffus lo pide (misión "asado_ruffus"); el asado sólo se levanta con la misión aceptada.
+func _crear_parrilla() -> void:
+	var n := Node3D.new()
+	n.name = "Parrilla"
+	n.add_to_group("parrilla")
+	add_child(n)
+	n.position = Vector3(7.5, 0.0, -7.5)
+	n.rotation.y = -0.35
+	# Patas, cajón de hierro con brasas, grilla y cartel
+	for x in [-0.8, 0.8]:
+		for z in [-0.3, 0.3]:
+			Construir.cilindro(n, Vector3(x, 0.3, z), 0.04, 0.6, Color("2a2a2e"), false, 6)
+	Construir.caja(n, Vector3(0, 0.66, 0), Vector3(1.9, 0.28, 0.8), Color("3a3430"))
+	Construir.caja(n, Vector3(0, 0.81, 0), Vector3(1.74, 0.04, 0.64), Color("ff6a2a"), false)
+	Construir.caja(n, Vector3(0, 0.88, 0), Vector3(1.8, 0.025, 0.66), Color("1c1c20"), false)
+	for i in 9:
+		Construir.caja(n, Vector3(-0.8 + i * 0.2, 0.9, 0), Vector3(0.025, 0.025, 0.66), Color("1c1c20"), false)
+	# La leña de abajo y el cartel (un tablero sobre dos postes, con texto de los dos lados)
+	Construir.caja(n, Vector3(1.15, 0.2, 0), Vector3(0.5, 0.4, 0.6), Color("8a5a36"), false)
+	Construir.caja(n, Vector3(-0.85, 1.1, 0), Vector3(0.05, 0.9, 0.05), Color("2a2a2e"), false)
+	Construir.caja(n, Vector3(0.85, 1.1, 0), Vector3(0.05, 0.9, 0.05), Color("2a2a2e"), false)
+	Construir.caja(n, Vector3(0, 1.45, 0), Vector3(1.8, 0.38, 0.05), Color("3a2a22"), false)
+	Construir.cartel(n, Vector3(0, 1.45, 0.035), "Parrilla El Obelisco", Color("ffe08a"), 34)
+	Construir.cartel(n, Vector3(0, 1.45, -0.035), "Parrilla El Obelisco", Color("ffe08a"), 34).rotation.y = PI
+	# El asado sobre la grilla (reaparece solo si se lo llevan)
+	var asado := Comida.new()
+	asado.tipo = "asado"
+	asado.tiempo_reaparicion = 20.0
+	n.add_child(asado)
+	asado.position = Vector3(0.1, 0.92, 0)
+	# Humo que sube de las brasas
+	var humo := CPUParticles3D.new()
+	humo.amount = 14
+	humo.lifetime = 2.6
+	humo.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	humo.emission_box_extents = Vector3(0.8, 0.02, 0.28)
+	humo.direction = Vector3.UP
+	humo.spread = 14.0
+	humo.gravity = Vector3(0.18, 0.35, 0.0)
+	humo.initial_velocity_min = 0.35
+	humo.initial_velocity_max = 0.7
+	humo.scale_amount_min = 0.7
+	humo.scale_amount_max = 1.6
+	var esfera := SphereMesh.new()
+	esfera.radius = 0.09
+	esfera.height = 0.18
+	esfera.radial_segments = 6
+	esfera.rings = 3
+	humo.mesh = esfera
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.82, 0.82, 0.84, 0.32)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	humo.material_override = mat
+	humo.position = Vector3(0, 0.95, 0)
+	humo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	n.add_child(humo)
 
 
 func _generador(padre: Node, nombre: String, pos: Vector3, radio: float, maximo: int, intervalo: float) -> void:

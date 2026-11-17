@@ -6,7 +6,7 @@ extends Enemigo
 ## Lo crea enemies/gente.gd en cada marcador "zona_chicos" de la ciudad. Se mueve en _process (después
 ## de los juegos, para seguir el asiento sin temblar).
 
-enum Estado { PASEO, YENDO, ARRIBA, ARENERO }
+enum Estado { PASEO, YENDO, ARRIBA, ARENERO, OBSERVANDO }
 
 var zona_centro := Vector3.ZERO
 var zona_tam := Vector2(20, 12)
@@ -21,6 +21,7 @@ var _destino := Vector3.ZERO
 var _juego: Animado
 var _lugar := -1
 var _altura := 0.0
+var _desde_subir := Vector3.ZERO   ## Dónde estaba al empezar a subirse (para el saltito)
 var _cadera := 0.2              ## Altura de la cola del chico sentado sobre su origen
 
 
@@ -64,13 +65,38 @@ func _process(delta: float) -> void:
 		Estado.YENDO:
 			var e := _juego.entrada(_lugar) if _juego else arenero
 			if _ir_a(e, delta, 0.35):
-				_subirse()
+				if _juego and _juego.ocupado_por_paloma(_lugar):
+					_quedarse_mirando()   # Una paloma se le adelantó: no puede subir
+				else:
+					_subirse()
 			elif _t <= 0.0:
 				_soltar_juego()
 				estado = Estado.PASEO
+		Estado.OBSERVANDO:
+			# Con ganas de subir pero el caballito está ocupado por una paloma: mira cómo gira
+			if _juego and is_instance_valid(_juego):
+				var hacia := plano(_juego.global_position - global_position)
+				if hacia.length_squared() > 0.01:
+					_rumbo = lerp_angle(_rumbo, atan2(-hacia.x, -hacia.z), minf(delta * 5.0, 1.0))
+			_acelerar(Vector3.ZERO, 6.0, delta)
+			_avanzar(delta, _altura)
+			modelo.rotation.y = _rumbo
+			modelo.animar(delta, 0.0, fmod(_t, 3.0) < 0.6)   # De a ratos saluda, entusiasmado
+			if _t <= 0.0:
+				_soltar_juego()
+				estado = Estado.PASEO
+				_t = randf_range(1.0, 3.0)
+			return
 		Estado.ARRIBA:
 			_arriba_t += delta
-			global_transform = _juego.asiento_global(_lugar) * Transform3D(Basis.IDENTITY, Vector3(0, -_cadera, 0))
+			var asiento := _juego.asiento_global(_lugar) * Transform3D(Basis.IDENTITY, Vector3(0, -_cadera, 0))
+			if _arriba_t < 0.5:
+				# Trepa al caballito con un saltito (no lo atraviesa)
+				var u := _arriba_t / 0.5
+				var pos := _desde_subir.lerp(asiento.origin, u) + Vector3.UP * sin(u * PI) * 0.7
+				global_transform = Transform3D(asiento.basis, pos)
+			else:
+				global_transform = asiento
 			modelo.rotation.y = 0.0
 			# En el subibaja, si no viene nadie a la otra punta, se cansa de esperar
 			var solo := _juego.tipo == "subibaja" and _juego.ocupados() < 2 and _arriba_t > 9.0
@@ -128,8 +154,16 @@ func _ir_a(punto: Vector3, delta: float, cerca := 0.3) -> bool:
 	return hacia.length() < 0.05 and plano(punto - global_position).length() < 1.2
 
 
+## Llegó a subirse pero el lugar está ocupado por una paloma: se queda parado mirando un rato.
+func _quedarse_mirando() -> void:
+	_vel = Vector3.ZERO
+	estado = Estado.OBSERVANDO
+	_t = randf_range(4.0, 7.0)
+
+
 func _subirse() -> void:
 	_vel = Vector3.ZERO
+	_desde_subir = global_position
 	modelo.cambiar_postura(true)
 	if _juego:
 		_juego.subir(_lugar)

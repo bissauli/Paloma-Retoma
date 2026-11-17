@@ -84,6 +84,9 @@ func soltar(desde: Vector3) -> void:
 	if modo == Modo.SIGUIENDO:
 		GameState.registrar_seguidora(-1)
 	puesto = Vector3.INF
+	caballito = null
+	baila_afuera = false
+	_salto_t = -1.0
 	sentada = false
 	modo = Modo.HUYENDO
 	en_suelo = false
@@ -126,6 +129,8 @@ func _corazon() -> void:
 # ---------------------------------------------------------------- Actualización propia
 
 func _physics_process(delta: float) -> void:
+	if controlada:
+		return    # La maneja otro sistema (el partido de fútbol, ver world/partido_futbol.gd)
 	if modo == Modo.SUELTA:
 		# Las sueltas lejos de la cámara pasean igual, pero se calculan 1 de cada 3 pasos
 		_acum_fisica += delta
@@ -377,22 +382,111 @@ var puesto := Vector3.INF
 var sentada := false
 
 
+## Partido de fútbol (world/partido_futbol.gd): mientras "controlada" es true, ni la bandada ni sus
+## propios pasos de física la mueven; el partido la maneja con ir_controlada y animar_hincha.
+var controlada := false
+
+
+## Camina (o vuela, si está lejos y "volando") hacia "destino" a "rapidez" m/s mirando hacia donde va.
+## Devuelve la distancia horizontal que le falta.
+func ir_controlada(delta: float, destino: Vector3, rapidez: float, volando := false) -> float:
+	var d := destino - global_position
+	var plano := Vector3(d.x, 0.0, d.z)
+	var dist := plano.length()
+	if dist > 0.05:
+		global_position += plano / dist * minf(rapidez * delta, dist)
+		_rumbo = lerp_angle(_rumbo, atan2(-plano.x, -plano.z), minf(10.0 * delta, 1.0))
+	var en_vuelo := volando and dist > 1.5
+	global_position.y = lerpf(global_position.y, destino.y + (1.0 if en_vuelo else 0.0), minf(8.0 * delta, 1.0))
+	altura_suelo = destino.y
+	sentada = true     # Para que la bandada no la empuje contra las demás
+	en_suelo = not en_vuelo
+	modo_anim = 1 if en_vuelo else 0
+	velocidad = plano / maxf(dist, 0.001) * rapidez if dist > 0.15 else Vector3.ZERO
+	modelo.rotation = Vector3(0.0, _rumbo, 0.0)
+	modelo.animar(delta, modo_anim, rapidez if (dist > 0.15 and not en_vuelo) else 0.0)
+	return dist
+
+
+## Gira (suave) hacia un punto del mundo, sin moverse.
+func mirar_punto(delta: float, p: Vector3) -> void:
+	var a := p - global_position
+	if Vector2(a.x, a.z).length_squared() > 0.01:
+		_rumbo = lerp_angle(_rumbo, atan2(-a.x, -a.z), minf(8.0 * delta, 1.0))
+	modelo.rotation = Vector3(0.0, _rumbo, 0.0)
+
+
+## Hincha en la cancha: saltitos, aleteos y arrullos mirando hacia "mirar". "euforia" 1 = normal, 2 = gol.
+func animar_hincha(delta: float, base: Vector3, mirar: Vector3, euforia: float) -> void:
+	sentada = true
+	en_suelo = true
+	altura_suelo = base.y
+	_t_baile += delta * (1.0 if euforia <= 1.0 else 1.6)
+	_t_arrullo -= delta
+	if _t_arrullo <= 0.0:
+		_t_arrullo = randf_range(1.2, 3.5) / euforia
+		if randf() < 0.6:
+			modelo.arrullar()
+	var salto := absf(sin(_t_baile * 4.0)) * 0.22 * euforia
+	global_position = Vector3(base.x, base.y + salto, base.z)
+	var a := mirar - global_position
+	_rumbo = lerp_angle(_rumbo, atan2(-a.x, -a.z), minf(6.0 * delta, 1.0))
+	modelo.rotation = Vector3(sin(_t_baile * 2.0) * 0.1 * euforia, _rumbo, sin(_t_baile * 4.0) * 0.18 * euforia)
+	modo_anim = 1 if salto > 0.06 else 0
+	modelo.animar(delta, modo_anim, 0.0)
+
+
+## Calesita: el caballito (marcador que se mueve) donde va montada, o si "baila_afuera" el lugar
+## fijo de afuera donde baila (puesto). Ver Bandada.subir_calesita.
+var caballito: Marker3D
+var baila_afuera := false
+var _salto_t := -1.0              ## Progreso del salto en arco entre dos puestos (-1 = no está saltando)
+var _salto_desde := Vector3.ZERO
+var _llego_baile := false
+var _t_baile := randf() * 10.0
+var _t_arrullo := 0.0
+
+
 func tiene_puesto() -> bool:
-	return puesto != Vector3.INF
+	return puesto != Vector3.INF or (caballito != null and is_instance_valid(caballito))
 
 
 ## Vuela hasta su puesto y se queda sentada mirando hacia "rumbo".
 func paso_posada(delta: float, rumbo: float) -> void:
+	var sobre_caballito := caballito != null and is_instance_valid(caballito)
+	if sobre_caballito:
+		puesto = caballito.global_position
+		rumbo = caballito.global_rotation.y
+		if _salto_t >= 0.0:
+			# Salta en arco de un lado del subibaja al otro
+			_salto_t += delta / 0.6
+			var u := minf(_salto_t, 1.0)
+			global_position = _salto_desde.lerp(puesto, u) + Vector3.UP * sin(u * PI) * 0.9
+			velocidad = Vector3.ZERO
+			sentada = false
+			modo_anim = 1
+			_mirar(puesto - _salto_desde, delta, 10.0)
+			modelo.animar(delta, 1, 0.0)
+			if _salto_t >= 1.0:
+				_salto_t = -1.0
+			return
 	var d := puesto - global_position
 	var dist := d.length()
-	if dist < 0.06:
+	if baila_afuera:
+		# Una vez que llegó se queda bailando (el saltito la despega del suelo: no se vuelve a medir)
+		var plano := Vector2(d.x, d.z).length()
+		if _llego_baile or plano < 0.15:
+			_llego_baile = true
+			_bailar_en_puesto(delta)
+			return
+	if dist < 0.06 or (sobre_caballito and dist < 0.35):
 		global_position = puesto
 		velocidad = Vector3.ZERO
 		sentada = true
 		en_suelo = true
 		altura_suelo = puesto.y
 		modo_anim = 0
-		_rumbo = lerp_angle(_rumbo, rumbo, minf(8.0 * delta, 1.0))
+		_rumbo = rumbo if sobre_caballito else lerp_angle(_rumbo, rumbo, minf(8.0 * delta, 1.0))
 		modelo.rotation = Vector3(0.0, _rumbo, 0.0)
 		modelo.animar(delta, 0, 0.0)
 		return
@@ -405,8 +499,42 @@ func paso_posada(delta: float, rumbo: float) -> void:
 	modelo.animar(delta, modo_anim, 0.0 if dist < 0.4 else rapidez)
 
 
+## Salta en arco hasta otro puesto (el otro lado del subibaja) y se queda ahí.
+func saltar_a(m: Marker3D) -> void:
+	caballito = m
+	_salto_desde = global_position
+	_salto_t = 0.0
+	sentada = false
+
+
+## Baila en su lugar (alrededor de la calesita): saltitos, giros y arrullos.
+func _bailar_en_puesto(delta: float) -> void:
+	sentada = true
+	en_suelo = true
+	altura_suelo = puesto.y
+	_t_baile += delta
+	_t_arrullo -= delta
+	if _t_arrullo <= 0.0:
+		_t_arrullo = randf_range(1.5, 4.0)
+		if randf() < 0.5:
+			modelo.arrullar()
+	velocidad = Vector3.ZERO
+	var salto := absf(sin(_t_baile * 5.0)) * 0.3
+	global_position = puesto + Vector3(0.0, salto, 0.0)
+	_rumbo += delta * 2.4 * (1.0 if get_instance_id() % 2 == 0 else -1.0)
+	# Se mece de lado y mueve las alas mientras salta
+	modelo.rotation = Vector3(sin(_t_baile * 2.5) * 0.15, _rumbo, sin(_t_baile * 5.0) * 0.22)
+	modo_anim = 1 if salto > 0.05 else 0
+	modelo.animar(delta, modo_anim, 0.0)
+
+
 ## Se levanta del puesto y vuelve a seguir a la bandada.
 func levantar() -> void:
+	caballito = null
+	baila_afuera = false
+	_llego_baile = false
+	_salto_t = -1.0
+	modelo.rotation = Vector3(0.0, _rumbo, 0.0)
 	puesto = Vector3.INF
 	sentada = false
 	_timer_suelo = 0.0

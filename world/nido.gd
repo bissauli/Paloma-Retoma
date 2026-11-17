@@ -58,7 +58,7 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if GameState.carga == "":
+	if GameState.carga == "" or GameState.carga == "asado":   # El asado es de Tío Ruffus, no del nido
 		return
 	var j := GameState.jugador
 	if j == null:

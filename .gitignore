@@ -13,3 +13,6 @@ modelos/*/previas/
 
 # Caché de Python de los generadores de Blender
 __pycache__/
+
+# Exportaciones locales
+build/

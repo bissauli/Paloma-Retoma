@@ -37,6 +37,10 @@ var _frame := 0
 var _timer_llegada := 0.0
 var _aviso_sin_comida := 0.0
 var descansando := false     ## La jugadora está descansando: las seguidoras se sientan a su lado
+var en_calesita: Node3D      ## La calesita (o el subibaja) en que está montada la jugadora (null = ninguno)
+var _saltarina: PalomaNPC    ## Subibaja: la paloma que salta de una punta a la otra
+var _lado_salt := 0
+var _t_salto := 0.0
 var _rumbo_descanso := 0.0
 
 
@@ -227,6 +231,141 @@ func descansar(puestos: Array[Vector3], rumbo: float) -> void:
 		libres.remove_at(mejor)
 
 
+## La jugadora se subió al caballito "suyo" de la calesita: las seguidoras cercanas se suben a los
+## caballitos que quedan libres (las más cercanas a cada uno) y las que sobran bailan alrededor, por
+## fuera de la calesita.
+func subir_calesita(suyo: Marker3D) -> void:
+	var cal := suyo.get_parent() as Node3D
+	if cal == null:
+		return
+	en_calesita = cal
+	var centro := cal.global_position
+	var libres: Array[Marker3D] = []
+	var animado := cal as Animado
+	for n in get_tree().get_nodes_in_group("caballitos"):
+		var m := n as Marker3D
+		if m == null or m == suyo:
+			continue
+		var dueno := m.get_parent() as Animado
+		if m.get_parent() == cal or (animado != null and animado.compania != null and dueno == animado.compania):
+			# Los que ya tienen un chico (o una paloma) sentado no se pueden usar
+			if dueno and (dueno.humano_sentado(int(m.get_meta("indice", -1))) or dueno.ocupado_por_paloma(int(m.get_meta("indice", -1)))):
+				continue
+			libres.append(m)
+	# Sólo las que están cerca de la calesita se suman
+	var candidatas: Array[PalomaNPC] = []
+	for p in seguidoras:
+		if p.global_position.distance_to(centro) <= 35.0:
+			candidatas.append(p)
+	candidatas.sort_custom(func(a: PalomaNPC, b: PalomaNPC) -> bool:
+		return a.global_position.distance_squared_to(centro) < b.global_position.distance_squared_to(centro))
+	var sobran: Array[PalomaNPC] = []
+	# Subibaja: la más cercana se sienta en la punta de enfrente y otra es la que salta de un lado al
+	# otro (su punta baja). Con una sola paloma, ella es la que salta.
+	var es_subibaja := animado != null and animado.tipo == "subibaja"
+	var saltarina: PalomaNPC = null
+	_saltarina = null
+	if es_subibaja:
+		animado.lado_pesado = -1
+		if candidatas.size() == 1:
+			libres.clear()
+	for p in candidatas:
+		if es_subibaja and libres.is_empty() and saltarina == null:
+			saltarina = p
+			continue
+		if libres.is_empty():
+			sobran.append(p)
+			continue
+		var mejor := 0
+		var mejor_d := INF
+		for k in libres.size():
+			var d := p.global_position.distance_squared_to(libres[k].global_position)
+			if d < mejor_d:
+				mejor_d = d
+				mejor = k
+		p.caballito = libres[mejor]
+		var dueno_m := libres[mejor].get_parent() as Animado
+		if dueno_m:
+			dueno_m.marcar_paloma(int(libres[mejor].get_meta("indice", -1)), p)
+		p.baila_afuera = false
+		p.sentada = false
+		libres.remove_at(mejor)
+	if saltarina:
+		_lado_salt = 1 - int(suyo.get_meta("indice", 0))
+		var spot := _lugar_de_salto(cal, _lado_salt)
+		if spot:
+			saltarina.caballito = spot
+			saltarina.baila_afuera = false
+			saltarina.sentada = false
+			_saltarina = saltarina
+			_t_salto = 2.2
+		else:
+			sobran.push_front(saltarina)
+	# Las que sobran: en anillos por fuera (de la calesita o del subibaja), sobre el piso del parque
+	var radio_base: float = animado.radio_baile if animado else 5.5
+	var fila := 0
+	var en_fila := 0
+	var radio := radio_base
+	var cupo := maxi(int(TAU * radio / 0.75), 1)
+	var a0 := randf() * TAU
+	for p in sobran:
+		if en_fila >= cupo:
+			fila += 1
+			en_fila = 0
+			radio = radio_base + fila * 0.95
+			cupo = maxi(int(TAU * radio / 0.75), 1)
+		var ang := a0 + TAU * en_fila / float(cupo) + fila * 0.4
+		var pos := centro + Vector3(cos(ang) * radio, 0.0, sin(ang) * radio)
+		pos.y = p.medir_suelo(pos)
+		p.puesto = pos
+		p.baila_afuera = true
+		p._llego_baile = false
+		p.sentada = false
+		en_fila += 1
+
+
+## El lugar de la paloma que salta en la punta "lado" (0 o 1) del subibaja, o null.
+func _lugar_de_salto(cal: Node3D, lado: int) -> Marker3D:
+	for n in get_tree().get_nodes_in_group("extras_subibaja"):
+		var m := n as Marker3D
+		if m and m.get_parent() == cal and int(m.get_meta("indice", -1)) == 2 + lado:
+			return m
+	return null
+
+
+## Cada tanto la paloma que salta cruza al otro lado del subibaja; cuando cae, esa punta baja.
+func _actualizar_subibaja(delta: float) -> void:
+	if _saltarina == null or not is_instance_valid(_saltarina) or not (en_calesita is Animado):
+		return
+	var an := en_calesita as Animado
+	if _saltarina.caballito == null or not _saltarina.sentada:
+		return
+	an.lado_pesado = int(_saltarina.caballito.get_meta("indice", 2)) - 2
+	_t_salto -= delta
+	if _t_salto > 0.0:
+		return
+	_t_salto = 2.4
+	_lado_salt = 1 - _lado_salt
+	var spot := _lugar_de_salto(an, _lado_salt)
+	if spot:
+		_saltarina.saltar_a(spot)
+
+
+## La jugadora se baja de la calesita: todas vuelven a seguirla.
+func bajar_calesita() -> void:
+	if en_calesita is Animado:
+		var an := en_calesita as Animado
+		an.lado_pesado = -1
+		an.palomas_en.clear()
+		if an.compania:
+			an.compania.palomas_en.clear()
+	_saltarina = null
+	en_calesita = null
+	for p in seguidoras:
+		if p.caballito != null or p.baila_afuera:
+			p.levantar()
+
+
 ## Cuántas seguidoras ya están sentadas en su puesto.
 func cantidad_sentadas() -> int:
 	var n := 0
@@ -266,6 +405,7 @@ func _physics_process(delta: float) -> void:
 	if _jugador == null or not is_instance_valid(_jugador):
 		return
 	if not GameState.partida_terminada:  # En la victoria cada paloma festeja por su cuenta
+		_actualizar_subibaja(delta)
 		_mover_seguidoras(delta)
 		_llegadas(delta)
 	_resolver_choques()
@@ -364,7 +504,7 @@ func _resolver_choques() -> void:
 	# Las correcciones también se chequean contra las paredes: si la bandada se aprieta contra
 	# un edificio, ninguna queda empujada adentro. Las de menos de 1 mm no hacen falta.
 	for i in cant:
-		if corr[i].length_squared() > 0.000001 and not _palomas[i].sentada:
+		if corr[i].length_squared() > 0.000001 and not _palomas[i].sentada and not _palomas[i].controlada:
 			_palomas[i].mover_con_choques(corr[i])
 
 
@@ -455,7 +595,9 @@ func _mover_seguidoras(delta: float) -> void:
 
 	for i in cant:
 		var p := seguidoras[i]
-		if descansando and p.tiene_puesto():
+		if p.controlada:
+			continue    # Juega o alienta en el partido de fútbol
+		if (descansando or en_calesita != null) and p.tiene_puesto():
 			p.paso_posada(delta, _rumbo_descanso)
 			continue
 		var pos_i := pos[i]

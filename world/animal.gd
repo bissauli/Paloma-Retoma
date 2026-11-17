@@ -73,22 +73,45 @@ func _ready() -> void:
 	_timer_mirar = randf()
 	# Arranca quieto en su pose: la primera decisión llega cuando la ciudad ya está armada (su zona de
 	# navegación necesita las colisiones)
-	var pose := {"sentado": "sentado", "echado": "echado", "dormilon": "dormido", "gato": "sentado"}
+	var pose := {"sentado": "sentado", "echado": "echado", "dormilon": "dormido", "gato": "sentado", "presentacion": "sentado"}
 	_parar(pose.get(conducta, "quieto"), randf_range(0.5, 3.0))
 	# Que no arranquen todos sincronizados
 	_anim.seek(randf() * _anim.current_animation_length, true)
 
 
+var _atendiendo: Node3D       ## Con quién está hablando (se queda sentado mirándola)
+
+
+## Empieza una conversación (lo llama el Interlocutor): se sienta y mira a quien le habla.
+func atender(con_quien: Node3D) -> void:
+	_atendiendo = con_quien
+	if _anim:
+		_parar("sentado", 999.0)
+
+
+func dejar_de_atender() -> void:
+	_atendiendo = null
+	if _anim:
+		_parar("sentado", randf_range(3.0, 6.0))
+
+
 func _process(delta: float) -> void:
 	if _anim == null:
 		return
+	if _atendiendo != null:
+		if is_instance_valid(_atendiendo):
+			var hacia := _atendiendo.global_position - global_position
+			if Vector2(hacia.x, hacia.z).length_squared() > 0.01:
+				rotation.y = lerp_angle(rotation.y, atan2(hacia.x, hacia.z), minf(delta * 5.0, 1.0))
+		else:
+			_atendiendo = null
 	_timer_mirar -= delta
 	if _timer_mirar <= 0.0:
 		_timer_mirar = 0.3
 		var cam := get_viewport().get_camera_3d()
 		_lejos = cam != null and cam.global_position.distance_squared_to(global_position) > LEJOS * LEJOS
 		_anim.active = not _lejos
-		if not _lejos:
+		if not _lejos and conducta != "presentacion":
 			_mirar_alrededor()
 	_enfriamiento_ladrido -= delta
 	_enfriamiento_circuito -= delta
@@ -126,6 +149,8 @@ func _decidir() -> void:
 			_elegir([["sentado", 30], ["echado", 22], ["dormido", 20], ["lamerse", 20], ["estirarse", 8]])
 		"gato_paseo":
 			_elegir([["ir", 40], ["sentado", 18], ["lamerse", 16], ["echado", 14], ["quieto", 12]])
+		"presentacion":
+			_parar("sentado", 5.0)   # En la tarjeta de presentación (ver PresentacionPersonaje): sentado y callado
 		_:
 			_parar("quieto", 3.0)
 
@@ -206,7 +231,7 @@ func _al_terminar(_nombre: StringName) -> void:
 ## le acercan (el gato, si la paloma se le pone al lado, se para a mirarla).
 func _mirar_alrededor() -> void:
 	var es_perro := variante.begins_with("perro")
-	if es_perro and conducta != "dormilon":
+	if es_perro and conducta != "dormilon" and _atendiendo == null:
 		var cerca := false
 		for n in get_tree().get_nodes_in_group("palomas_npc"):
 			var p := n as PalomaNPC

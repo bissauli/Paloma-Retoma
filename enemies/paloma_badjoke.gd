@@ -73,6 +73,12 @@ static func poblar(raiz: Node) -> int:
 
 
 func _ready() -> void:
+	# Una copia que sólo se muestra en la tarjeta de presentación (ver PresentacionPersonaje): es sólo el
+	# modelo vestido, sin grupo, sin cartel, sin interlocutor y sin moverse
+	var solo_modelo: bool = get_meta("presentacion", false)
+	if solo_modelo:
+		_armar_solo_modelo()
+		return
 	add_to_group("banda_badjokes")
 	set_meta("rol", rol)
 	set_meta("nombre", nombre)
@@ -100,9 +106,82 @@ func _ready() -> void:
 	_cartel.visibility_range_end = 14.0
 	add_child(_cartel)
 	_espera = randf_range(1.0, 4.0)
+	if rol == "jefe":
+		Interlocutor.marcar(self, "don_remate", 1.5, 3.2)   # Con el jefe se puede hablar (la primera vez, con presentación)
+
+
+## El modelo vestido de su rol, sin nada más (para la presentación del personaje).
+func _armar_solo_modelo() -> void:
+	set_process(false)
+	var datos: Dictionary = ROLES.get(rol, ROLES["guardia"])
+	modelo = ModeloPaloma.new()
+	modelo.name = "Modelo"
+	modelo.variante = datos["variante"]
+	add_child(modelo)
+	modelo.scale = Vector3.ONE * (1.25 if rol == "jefe" else 1.12)
+	_vestir(String(datos["cabeza"]), datos["cuerpo"])
+
+
+## Hinchada del partido de fútbol (world/partido_futbol.gd): va volando a su lugar de la tribuna, alienta
+## mirando la cancha y, cuando termina, vuelve a su puesto.
+var _hincha := Vector3.INF         ## Su lugar en la cancha (INF = no está alentando)
+var _mira_a := Vector3.ZERO
+var _euforia := 1.0
+var _volviendo := false
+var _origen_hincha := Vector3.ZERO
+var _t_salto := randf() * 10.0
+
+
+func hinchar(lugar: Vector3, mirar: Vector3) -> void:
+	if _hincha == Vector3.INF and not _volviendo:
+		_origen_hincha = global_position
+	_hincha = lugar
+	_mira_a = mirar
+	_volviendo = false
+
+
+func volver_a_puesto() -> void:
+	if _hincha != Vector3.INF:
+		_hincha = Vector3.INF
+		_volviendo = true
+
+
+func festejar_gol(si: bool) -> void:
+	_euforia = 2.0 if si else 1.0
+
+
+func _paso_hincha(delta: float) -> void:
+	var destino := _hincha if _hincha != Vector3.INF else _origen_hincha
+	var d := destino - global_position
+	var plano := Vector3(d.x, 0.0, d.z)
+	var dist := plano.length()
+	var vuela := dist > 1.5
+	if dist > 0.08:
+		global_position += plano / dist * minf(7.0 * delta, dist)
+		_girar_hacia(atan2(plano.x, plano.z), delta * 8.0)
+	global_position.y = lerpf(global_position.y, destino.y + (1.2 if vuela else 0.0), minf(8.0 * delta, 1.0))
+	if dist <= 0.08 and _volviendo:
+		_volviendo = false
+		global_position = _origen_hincha
+		rotation.y = _giro_base
+		return
+	if dist <= 0.08 and _hincha != Vector3.INF:
+		# En su lugar: saltitos y arrullos mirando la cancha
+		_t_salto += delta * 4.0 * (1.0 if _euforia <= 1.0 else 1.5)
+		var a := _mira_a - global_position
+		_girar_hacia(atan2(a.x, a.z), delta * 6.0)
+		global_position.y = destino.y + absf(sin(_t_salto)) * 0.2 * _euforia
+		_t_arrullo -= delta
+		if _t_arrullo <= 0.0:
+			_t_arrullo = randf_range(1.5, 3.5)
+			modelo.arrullar()
+	modelo.animar(delta, 1 if vuela else 0, 0.0 if (vuela or dist <= 0.08) else VELOCIDAD * 3.0)
 
 
 func _process(delta: float) -> void:
+	if _hincha != Vector3.INF or _volviendo:
+		_paso_hincha(delta)
+		return
 	var jugadora := _jugadora()
 	var cerca := jugadora != null and jugadora.global_position.distance_to(global_position) < DISTANCIA_MIRAR
 	if cerca:

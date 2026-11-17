@@ -936,23 +936,74 @@ func _juegos() -> void:
 	var cc := c + Vector3(7, y, -4)
 	_poner("calesita_base", cc)
 	var cal := _animado("calesita_giro", cc, 0.0, "girar", 0.45)
-	for k in 3:
-		var a := TAU * k / 3.0
-		var d := Vector3(cos(a), 0, sin(a))
-		cal.asientos.append([Transform3D(Basis(Vector3.UP, -a), d * 2.6 + Vector3(0, 0.45, 0)),
-			cc + Vector3(d.x, 0, d.z) * 4.7])
+	Calesita.armar(cal, cc)   # Columna, techo y caballitos sólidos; los 6 caballitos son los asientos
 	# Hamacas de madera: el marco fijo y cada asiento se hamaca sobre el eje de arriba; el chico mira
 	# hacia la plaza (al sur)
 	_poner("hamaca_madera", c + Vector3(-6, y, -6.5))
+	var columpios: Array[Animado] = []
 	for x: float in [-0.65, 0.65]:
 		var h := _animado("hamaca_asiento", c + Vector3(-6 + x, y + 2.5, -6.5), 0.0, "hamacar", 2.1 + x * 0.1, 0.6)
 		h.asientos.append([Transform3D(Basis(Vector3.UP, PI), Vector3(0, -1.95, 0)), c + Vector3(-6 + x, y, -5.7)])
+		# Lugar de la paloma en el asiento (hijo de la hamaca: se hamaca con ella), mirando al sur
+		var asiento_m := Marker3D.new()
+		asiento_m.name = "AsientoColumpio"
+		asiento_m.set_meta("indice", 0)
+		asiento_m.add_to_group("caballitos")
+		h.add_child(asiento_m)
+		asiento_m.transform = Transform3D(Basis(Vector3.UP, PI), Vector3(0, -1.9, 0))
+		h.radio_baile = 2.6
+		columpios.append(h)
+	columpios[0].compania = columpios[1]
+	columpios[1].compania = columpios[0]
 	_poner("tobogan_torre", c + Vector3(-9, y, 4), deg_to_rad(20))
+	# Marcador del tobogán (en el espacio de la pieza: la rampa baja hacia +X): por ahí se desliza la paloma
+	var tob := Marker3D.new()
+	tob.name = "Tobogan"
+	tob.add_to_group("toboganes")
+	add_child(tob)
+	tob.position = c + Vector3(-9, y, 4)
+	tob.rotation.y = deg_to_rad(20)
 	_poner("subibaja_base", c + Vector3(9, y, 6))
 	var sb := _animado("subibaja_tabla", c + Vector3(9, y + 0.5, 6), 0.0, "subibaja", 1.4, 0.25)
 	for s: float in [1.0, -1.0]:
 		sb.asientos.append([Transform3D(Basis(Vector3.UP, s * PI / 2.0), Vector3(s * 1.45, 0.13, 0)),
 			c + Vector3(9 + s * 1.5, y, 6.8)])
+	# Lugares de las palomas en el subibaja (hijos de la tabla, suben y bajan con ella): los dos asientos
+	# (grupo "caballitos", como los de la calesita) y, más adentro, el lugar de la paloma que salta de
+	# un lado al otro ("extras_subibaja"; el índice 2 + lado es el de la punta "lado").
+	sb.radio_baile = 3.1
+	for k in 4:
+		var lado := 1.0 if k % 2 == 0 else -1.0
+		var pm := Marker3D.new()
+		pm.name = "Asiento%d" % k if k < 2 else "Salto%d" % k
+		pm.set_meta("indice", k)
+		pm.add_to_group("caballitos" if k < 2 else "extras_subibaja")
+		sb.add_child(pm)
+		pm.transform = Transform3D(Basis(Vector3.UP, lado * PI / 2.0), Vector3(lado * (1.45 if k < 2 else 0.95), 0.11, 0.0))
+	# Colisión del subibaja: la tabla (se mueve con ella) y la base fija con el eje
+	var tabla_col := AnimatableBody3D.new()
+	tabla_col.name = "Solidos"
+	tabla_col.sync_to_physics = false
+	tabla_col.collision_layer = 1
+	tabla_col.collision_mask = 0
+	var f_tabla := BoxShape3D.new()
+	f_tabla.size = Vector3(3.4, 0.14, 0.3)
+	var cs_tabla := CollisionShape3D.new()
+	cs_tabla.shape = f_tabla
+	cs_tabla.position = Vector3(0, 0.0, 0)
+	tabla_col.add_child(cs_tabla)
+	sb.add_child(tabla_col)
+	var base_col := StaticBody3D.new()
+	base_col.name = "BaseSubibaja"
+	base_col.collision_layer = 1
+	var f_base := BoxShape3D.new()
+	f_base.size = Vector3(0.3, 0.45, 0.5)
+	var cs_base := CollisionShape3D.new()
+	cs_base.shape = f_base
+	cs_base.position = Vector3(0, 0.225, 0)
+	base_col.add_child(cs_base)
+	add_child(base_col)
+	base_col.position = c + Vector3(9, y, 6)
 	for j: Animado in [cal, sb]:
 		j.add_to_group("juegos_plaza")
 	for h in get_children():
@@ -1155,6 +1206,11 @@ func _barrio() -> void:
 		_losa(l[0], l[1], l[2], l[3], yl, 0.02, Color("efeee8"), false)
 	_poner("arco_futbol", Vector3(cancha.position.x + 0.3, Y_VEREDA + 0.02, cancha.get_center().y), PI / 2.0)
 	_poner("arco_futbol", Vector3(cancha.end.x - 0.3, Y_VEREDA + 0.02, cancha.get_center().y), -PI / 2.0)
+	# El partido de fútbol 5 contra 5 de la banda (pelota en el centro, ver world/partido_futbol.gd). Va como hermano
+	# de la ciudad (no adentro) para que la fusión de mallas no se lleve la pelota
+	var partido := PartidoFutbol.new()
+	partido.name = "PartidoFutbol"
+	get_parent().add_child.call_deferred(partido)
 	# Paredones de chapa con grafitis, autos abandonados, basura
 	_cerco("chapa_cerco", Vector3(112, Y_VEREDA, 55), Vector3(124, Y_VEREDA, 55), [])
 	_cerco("chapa_cerco_b", Vector3(150, Y_VEREDA, 55), Vector3(162, Y_VEREDA, 55), [])

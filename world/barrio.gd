@@ -431,7 +431,9 @@ static func guarida(ci: Ciudad, rng: RandomNumberGenerator) -> void:
 	var bandera := Construir.cartel(anexo, Vector3(-1.45, terraza + 3.55, -7.47), "BJ", Color("ffd84a"), 64)
 	bandera.pixel_size = 0.008
 	# Puntos de aparición, la zona de la base y el punto de la brújula
-	_spawn(n, "jefe", Vector3(ax, terraza + 0.5, -2.0 - 5.35), 0.0, 0)
+	# El sillón dorado tiene el respaldo hacia -Z y la paloma mira hacia -Z con giro 0: para que mire hacia
+	# donde da el asiento (+Z, el patio) va con medio giro
+	_spawn(n, "jefe", Vector3(ax, terraza + 0.5, -2.0 - 5.35), PI, 0)
 	for i in SPAWNS.size():
 		var s: Array = SPAWNS[i]
 		_spawn(n, s[0], s[1], float(s[2]), i + 1)

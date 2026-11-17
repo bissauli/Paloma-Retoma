@@ -13,6 +13,7 @@ const VALORES := {
 	"medialuna": Config.COMIDA_MEDIALUNA,
 	"factura": Config.COMIDA_PAPA,
 	"choripan": Config.COMIDA_CHORIPAN,
+	"asado": 0,    # No se entrega en el nido: es para Tío Ruffus (ver misión "asado_ruffus")
 }
 
 @export_enum("miga", "medialuna", "papa", "factura", "choripan") var tipo := "miga"
@@ -95,6 +96,16 @@ func picoteada(_jugador: Node3D) -> void:
 				_consumir()
 			else:
 				AudioManager.ui("lock", -6.0)   # Todavía no alcanza la bandada
+		"asado":
+			# Sólo se levanta si Tío Ruffus lo pidió (y no se lleva otra cosa en el pico)
+			var estado_mision := Misiones.estado("asado_ruffus")
+			if (estado_mision != Misiones.ACTIVA and estado_mision != Misiones.LISTA) or GameState.carga != "":
+				AudioManager.ui("lock", -6.0)
+				return
+			GameState.set_carga("asado")
+			Misiones.notificar("asado_recogido")
+			AudioManager.reproducir("recoger")
+			_consumir()
 		_:
 			if GameState.carga != "":
 				return
@@ -118,6 +129,13 @@ func golpear(dir: Vector3) -> bool:
 	var dist := randf_range(0.4, 0.8) if tipo == "miga" else randf_range(1.5, 2.2)
 	var inicio := global_position
 	var destino := inicio + d * dist
+	# Una pared en el camino la frena: cae antes de llegar a ella
+	var q := PhysicsRayQueryParameters3D.create(inicio + Vector3.UP * 0.15, destino + Vector3.UP * 0.15 + d * 0.15, 1)
+	var choque := get_world_3d().direct_space_state.intersect_ray(q)
+	if not choque.is_empty():
+		var p_choque: Vector3 = choque["position"]
+		var llega := maxf((Vector2(p_choque.x - inicio.x, p_choque.z - inicio.z)).length() - 0.2, 0.0)
+		destino = inicio + d * minf(llega, dist)
 	destino.y = _altura_del_suelo(destino, inicio.y)
 	var salto := 0.12 if tipo == "miga" else 0.75
 	var tw := create_tween()
@@ -230,6 +248,13 @@ func _armar_piezas(padre: Node3D) -> void:
 		"factura":
 			Construir.esfera(padre, Vector3(0, 0.05, 0), 0.1, Color("c97b3a"), Vector3(1.4, 0.6, 1.0), 6)
 			Construir.esfera(padre, Vector3(0, 0.09, 0), 0.05, Color("f0e6d2"), Vector3(1.6, 0.4, 0.8), 6)
+		"asado":
+			# Un buen pedazo de asado (tira de costilla): carne dorada, parte quemada y el hueso
+			Construir.caja(padre, Vector3(0, 0.08, 0), Vector3(0.5, 0.12, 0.26), Color("9a4a2a"), false)
+			Construir.caja(padre, Vector3(0, 0.15, 0), Vector3(0.46, 0.03, 0.22), Color("5a2a18"), false)
+			Construir.caja(padre, Vector3(0.0, 0.05, 0.13), Vector3(0.5, 0.06, 0.04), Color("f2ead8"), false)
+			for i in 3:
+				Construir.caja(padre, Vector3(-0.14 + i * 0.14, 0.09, 0.0), Vector3(0.02, 0.14, 0.27), Color("f2ead8"), false)
 		"choripan":
 			# Pan con chorizo: grande y tentador
 			Construir.esfera(padre, Vector3(0, 0.12, 0), 0.18, Color("e0b26a"), Vector3(0.9, 0.6, 2.2), 8)

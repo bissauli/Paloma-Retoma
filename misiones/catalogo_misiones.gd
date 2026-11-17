@@ -27,6 +27,16 @@ const MISIONES := {
 		"destino": "dona_rosa",
 		"recompensa": {"comida": 2},
 	},
+	"asado_ruffus": {
+		"titulo": "Un asado para Tío Ruffus",
+		"resumen": "Tío Ruffus está viejito y con hambre: llevale un buen pedazo de asado de la parrilla que está cerca del Obelisco.",
+		"dador": "tio_ruffus",
+		"entrega": "tio_ruffus",
+		"requiere": ["tutorial"],
+		"objetivos": [{"tipo": "evento", "clave": "asado_recogido", "meta": 1, "texto": "Agarrar el asado de la parrilla del Obelisco"}],
+		"destino": "parrilla",
+		"recompensa": {"comida": 6},
+	},
 }
 
 

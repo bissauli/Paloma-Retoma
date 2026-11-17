@@ -61,6 +61,10 @@ var _aturdida := 0.0        ## Segundos que le quedan mareada (se estrelló cont
 var _tween_aplastar: Tween
 var descansando := false    ## Descansando (Q): las palomas de la bandada se sientan al lado
 var _tween_descanso: Tween
+var montada: Marker3D       ## El caballito de la calesita en el que está sentada (null = ninguno)
+var _t_montar := 0.0
+var _picada_bloqueada := false   ## Shift estaba apretado al despegar: la picada espera a que se suelte
+var bloquea_descanso := false     ## El partido de fútbol usa Q para otra cosa (ver world/partido_futbol.gd)
 var _t_aviso_sombrero := 0.0
 var _t_descanso := 0.0
 var _descanso_contado := false
@@ -106,6 +110,23 @@ func _physics_process(delta: float) -> void:
 		entrada = Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras")
 	var dir: Vector3 = camara.direccion_plana(entrada)
 	_velocidad_previa = velocity
+
+	_t_montar = maxf(_t_montar - delta, 0.0)
+	if montada == null and controlable and _t_montar <= 0.0 and Input.is_action_just_pressed("interactuar") \
+			and Dialogos.cercano == null and estado == Estado.SUELO and _aplastada <= 0.0 and not descansando:
+		var cab := _caballito_cercano()
+		if cab:
+			montar(cab)
+	if montada != null:
+		_paso_montada(delta)
+		return
+	if deslizando:
+		_paso_deslizando(delta)
+		return
+	if controlable and _t_montar <= 0.0 and Input.is_action_just_pressed("interactuar") and Dialogos.cercano == null \
+			and estado == Estado.SUELO and _aplastada <= 0.0 and not descansando and _tobogan_cercano() != null:
+		deslizarse(_tobogan_cercano())
+		return
 
 	if _aplastada > 0.0:
 		_aplastada -= delta
@@ -188,6 +209,198 @@ func _revisar_baile() -> void:
 		modelo.dejar_de_bailar()
 
 
+# ---------------------------------------------------------------- Tobogán (E)
+
+## La rampa del tobogán (ver tools/blender/ciudad_v3.py, "tobogan_torre"): en el espacio de la pieza
+## baja hacia +X desde (0,62 ; 1,55) con una pendiente de 1,5 m cada 2,6 m, 0,62 m de ancho.
+const TOB_X0 := 0.62
+const TOB_X1 := 3.3
+const TOB_Y0 := 1.55
+const TOB_PENDIENTE := 1.5 / 2.6
+const TOB_SOBRE := 0.2       ## Altura de las patas sobre el plano de la rampa
+const TOB_TECHO := 3.15      ## Altura de arriba de la torre
+
+var deslizando := false
+var _tobogan: Marker3D
+var _tob_x := 0.0
+var _tob_vel := 0.0
+
+
+## Altura de las patas sobre la rampa en la coordenada x (local) de la pieza.
+func _tob_altura(x: float) -> float:
+	return TOB_Y0 - (x - TOB_X0) * TOB_PENDIENTE + TOB_SOBRE
+
+
+## El tobogán donde está parada (sobre la rampa o arriba de la torre), o null.
+func _tobogan_cercano() -> Marker3D:
+	for n in get_tree().get_nodes_in_group("toboganes"):
+		var t := n as Marker3D
+		if t == null:
+			continue
+		var l := t.global_transform.affine_inverse() * global_position
+		var en_rampa := l.x >= TOB_X0 - 0.1 and l.x <= TOB_X1 and absf(l.z) <= 0.4 and absf(l.y - _tob_altura(l.x)) < 0.6
+		var en_torre := absf(l.x) <= 0.8 and absf(l.z) <= 0.8 and absf(l.y - TOB_TECHO) < 0.5
+		if en_rampa or en_torre:
+			return t
+	return null
+
+
+func deslizarse(t: Marker3D) -> void:
+	var l := t.global_transform.affine_inverse() * global_position
+	_tobogan = t
+	_tob_x = TOB_X0 if l.x < TOB_X0 + 0.1 else l.x
+	_tob_vel = 1.5
+	deslizando = true
+	_t_montar = 0.3
+	velocity = Vector3.ZERO
+	en_picada = false
+	aleteando = false
+	if modelo.bailando():
+		modelo.dejar_de_bailar()
+	AudioManager.reproducir("aleteo", -10.0)
+	Logros.sumar("toboganes")
+
+
+func _paso_deslizando(delta: float) -> void:
+	if not is_instance_valid(_tobogan) or not controlable or GameState.partida_terminada:
+		deslizando = false
+		return
+	var dir := Vector3(_tobogan.global_basis * Vector3.RIGHT)
+	dir.y = 0.0
+	dir = dir.normalized()
+	if _t_montar <= 0.0 and Input.is_action_just_pressed("volar"):
+		_bajar_del_tobogan(dir, true)
+		return
+	_tob_vel = move_toward(_tob_vel, 7.0, 4.5 * delta)
+	_tob_x += _tob_vel * cos(atan(TOB_PENDIENTE)) * delta
+	if _tob_x >= TOB_X1:
+		_bajar_del_tobogan(dir, false)
+		return
+	global_position = _tobogan.global_transform * Vector3(_tob_x, _tob_altura(_tob_x), 0.0)
+	velocity = Vector3.ZERO
+	_rumbo = atan2(-dir.x, -dir.z)
+	modelo.rotation = Vector3(0.0, _rumbo, 0.0)
+	modelo.animar(delta, 0, 0.0)
+	camara.en_aire = false
+	camara.en_picada = false
+	_acciones(delta)
+
+
+## Sale de la rampa con la velocidad que llevaba (o volando si apretó volar).
+func _bajar_del_tobogan(dir: Vector3, volando: bool) -> void:
+	deslizando = false
+	_t_montar = 0.3
+	if volando:
+		estado = Estado.AIRE
+		_tiempo_en_aire = 0.0
+		floor_snap_length = 0.0
+		velocity = dir * _tob_vel * 0.8 + Vector3.UP * impulso_despegue
+		despego.emit()
+	else:
+		velocity = dir * minf(_tob_vel, velocidad_caminar * 1.6) + Vector3.UP * 0.5
+
+
+# ---------------------------------------------------------------- Caballitos de la calesita (E)
+
+## El caballito (marcador del grupo "caballitos") al alcance, o null.
+func _caballito_cercano() -> Marker3D:
+	var mejor: Marker3D = null
+	var mejor_d := 1.6
+	for n in get_tree().get_nodes_in_group("caballitos"):
+		var m := n as Marker3D
+		if m == null:
+			continue
+		var d := m.global_position - global_position
+		if absf(d.y) > 1.2:
+			continue
+		var cal_m := m.get_parent() as Animado
+		if cal_m and (cal_m.humano_sentado(int(m.get_meta("indice", -1))) or cal_m.ocupado_por_paloma(int(m.get_meta("indice", -1)))):
+			continue   # Ya hay alguien sentado ahí
+		var h := Vector2(d.x, d.z).length()
+		if h < mejor_d:
+			mejor_d = h
+			mejor = m
+	return mejor
+
+
+## Se sube al caballito: queda sentada, gira con la calesita y mira hacia donde ella gira.
+func montar(m: Marker3D) -> void:
+	montada = m
+	_t_montar = 0.3
+	velocity = Vector3.ZERO
+	en_picada = false
+	aleteando = false
+	var cal := m.get_parent() as Animado
+	if cal:
+		cal.montadas += 1
+		cal.marcar_paloma(int(m.get_meta("indice", -1)), self)
+	if modelo.bailando():
+		modelo.dejar_de_bailar()
+	if _tween_descanso:
+		_tween_descanso.kill()
+	_tween_descanso = create_tween()
+	_tween_descanso.tween_property(modelo, "scale", Vector3(1.1, 0.85, 1.1), 0.3).set_trans(Tween.TRANS_SINE)
+	global_position = m.global_position
+	reset_physics_interpolation()
+	AudioManager.ui("menu_open", -10.0)
+	Logros.sumar("subibaja" if cal and cal.tipo == "subibaja" else "calesita")
+	var bandada := get_tree().get_first_node_in_group("bandada") as Bandada
+	if bandada:
+		bandada.subir_calesita(m)
+
+
+## Mientras está montada la lleva el caballito. Se baja con E, al moverse o al volar.
+func _paso_montada(delta: float) -> void:
+	if not is_instance_valid(montada) or not controlable or GameState.partida_terminada:
+		bajar_del_caballito()
+		return
+	var entrada := Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras")
+	if _t_montar <= 0.0 and (entrada.length() > 0.1 or Input.is_action_just_pressed("interactuar") \
+			or Input.is_action_just_pressed("volar")):
+		bajar_del_caballito(Input.is_action_just_pressed("volar"))
+		return
+	global_position = montada.global_position
+	velocity = Vector3.ZERO
+	_rumbo = montada.global_rotation.y
+	modelo.rotation = Vector3(0.0, _rumbo, 0.0)
+	modelo.animar(delta, 0, 0.0)
+	GameState.set_stamina(GameState.stamina + Config.recarga_suelo(3.0) * delta)
+	camara.en_aire = false
+	camara.en_picada = false
+	_acciones(delta)
+
+
+## Se baja del caballito hacia afuera de la calesita (o sale volando si apretó volar).
+func bajar_del_caballito(volando := false) -> void:
+	if montada == null:
+		return
+	var cal := montada.get_parent() as Animado
+	if cal:
+		cal.montadas = maxi(cal.montadas - 1, 0)
+	var afuera := Vector3(montada.global_position.x - (cal.global_position.x if cal else 0.0), 0.0,
+		montada.global_position.z - (cal.global_position.z if cal else 0.0))
+	if afuera.length() < 0.4:
+		# Un columpio: el asiento está justo debajo del eje, así que se baja hacia donde mira
+		afuera = -montada.global_basis.z
+		afuera.y = 0.0
+	afuera = afuera.normalized()
+	montada = null
+	_t_montar = 0.3
+	var bandada := get_tree().get_first_node_in_group("bandada") as Bandada
+	if bandada:
+		bandada.bajar_calesita()
+	if _tween_descanso:
+		_tween_descanso.kill()
+	_tween_descanso = create_tween()
+	_tween_descanso.tween_property(modelo, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_SINE)
+	estado = Estado.AIRE
+	_tiempo_en_aire = 0.0
+	floor_snap_length = 0.0
+	velocity = afuera * 2.0 + Vector3.UP * (impulso_despegue if volando else 2.5)
+	if volando:
+		despego.emit()
+
+
 # ---------------------------------------------------------------- Descansar (Q)
 
 ## Q: se queda quieta descansando y las palomas de la bandada se sientan a su lado (en los cables,
@@ -215,7 +428,9 @@ func _revisar_descanso() -> void:
 
 
 func descansar() -> void:
-	if descansando or estado != Estado.SUELO or _aplastada > 0.0 or not GameState.en_partida \
+	if bloquea_descanso:
+		return
+	if descansando or montada != null or estado != Estado.SUELO or _aplastada > 0.0 or not GameState.en_partida \
 			or GameState.partida_terminada or GameState.menu_activo:
 		return
 	if modelo.bailando():
@@ -318,7 +533,14 @@ func _fisica_aire(delta: float, dir: Vector3) -> void:
 		return
 	var hay_stamina := GameState.stamina > 0.5
 	var picada_antes := en_picada
-	en_picada = controlable and Input.is_action_pressed("picada")
+	# Si Shift ya estaba apretado al despegar (o quedó "pegado"), la picada no cuenta hasta que se suelte:
+	# antes la tiraba contra el piso apenas despegaba
+	var shift_apretado := Input.is_action_pressed("picada")
+	if _tiempo_en_aire <= delta * 1.5:
+		_picada_bloqueada = shift_apretado
+	elif not shift_apretado:
+		_picada_bloqueada = false
+	en_picada = controlable and shift_apretado and not _picada_bloqueada
 	aleteando = controlable and Input.is_action_pressed("volar") and hay_stamina and not en_picada
 
 	var h := Vector2(velocity.x, velocity.z)
@@ -504,7 +726,7 @@ func _golpear_adelante() -> int:
 	var bandada := get_tree().get_first_node_in_group("bandada") as Bandada
 	if bandada:
 		for p in bandada.seguidoras.duplicate():
-			if _al_alcance(p.global_position, dir):
+			if not p.controlada and _al_alcance(p.global_position, dir):   # Las del partido no se golpean
 				bandada.expulsar(p, global_position)
 				Logros.sumar("expulsadas")
 				tiradas += 1
@@ -542,15 +764,28 @@ func _sombrero_cerca(punto: Vector3) -> Golpeable:
 
 ## Avisos de acción de la jugadora (ver AvisoAccion): levantarse del descanso y ponerse un sombrero.
 func _actualizar_avisos(delta: float) -> void:
+	# Con 10 chequeos por segundo alcanza: recorrer los grupos (caballitos, toboganes, golpeables) y armar
+	# los avisos en cada paso de física era trabajo de más
+	_t_aviso_sombrero -= delta
+	if _t_aviso_sombrero > 0.0:
+		return
+	_t_aviso_sombrero = 0.1
 	var activa := controlable and GameState.en_partida and not GameState.partida_terminada and not GameState.menu_activo
 	if activa and descansando:
 		AvisoAccion.mostrar(get_tree(), "descanso", "Q", "LEVANTARSE", 4, levantarse)
 	else:
 		AvisoAccion.ocultar(get_tree(), "descanso")
-	_t_aviso_sombrero -= delta
-	if _t_aviso_sombrero > 0.0:
-		return
-	_t_aviso_sombrero = 0.15
+	if activa and not deslizando and montada == null and not descansando and estado == Estado.SUELO \
+			and Dialogos.cercano == null and _tobogan_cercano() != null:
+		AvisoAccion.mostrar(get_tree(), "tobogan", "E", "DESLIZARSE", 2, func() -> void: deslizarse(_tobogan_cercano()))
+	else:
+		AvisoAccion.ocultar(get_tree(), "tobogan")
+	if activa and montada != null:
+		AvisoAccion.mostrar(get_tree(), "caballito", "E", "BAJARSE", 5, bajar_del_caballito)
+	elif activa and not descansando and estado == Estado.SUELO and Dialogos.cercano == null and _caballito_cercano() != null:
+		AvisoAccion.mostrar(get_tree(), "caballito", "E", "MONTARSE", 2, func() -> void: montar(_caballito_cercano()))
+	else:
+		AvisoAccion.ocultar(get_tree(), "caballito")
 	var hay := false
 	if activa and not descansando and estado == Estado.SUELO:
 		var adelante := Vector3(-sin(_rumbo), 0, -cos(_rumbo))

@@ -19,7 +19,48 @@ extends RefCounted
 ##   va      (opcional) el nodo que sigue al apretar E o click; "" o ausente = termina
 ## Condiciones ("si", una o varias = todas) y acciones ("hace"): ver ReglasDialogo.
 
+## "presentacion" (opcional): la tarjeta que se muestra la primera vez que se habla con el personaje
+## (ver PresentacionPersonaje): {nombre, datos: [líneas], modelo: {tipo, rol}, color: de las letras, fondo}.
+## Lo que dice el personaje no va en la tarjeta: viene después, en su diálogo.
+## "modelo" acepta {tipo: "badjoke", rol} (una paloma de la banda) o {tipo: "animal", variante, escala?}.
+## Regla del proyecto: todo personaje importante de la historia lleva presentación (Doña Rosa no).
 const PERSONAJES := {
+	"don_remate": {
+		"nombre": "Don Remate",
+		"especie": "paloma",
+		"presentacion": {
+			"nombre": "Don Remate",
+			"datos": ["Edad: 47 / 47 años de calle", "Rol: Líder de los BadJokes / Chamuyero",
+				"Especialidad: Cobrar migas y contar chistes malos"],
+			"modelo": {"tipo": "badjoke", "rol": "jefe"},
+			"color": Color("ffd84a"),
+			"fondo": Color(0.22, 0.04, 0.3),
+		},
+		"dialogos": [
+			{"si": "!bandera:remate_hablado", "dialogo": "remate_primera"},
+			{"dialogo": "remate_saludo"},
+		],
+	},
+	"tio_ruffus": {
+		"nombre": "Tío Ruffus",
+		"especie": "perro",
+		"presentacion": {
+			"nombre": "Tío Ruffus",
+			"datos": ["Edad: 14 años / 98 en años de perro", "Rol: Abuelo de la plaza / Vigía del Cabildo",
+				"Especialidad: Dormir al sol y oler asado a diez cuadras"],
+			"modelo": {"tipo": "animal", "variante": "perro_blanco"},
+			"color": Color("ffcf8a"),
+			"fondo": Color(0.3, 0.15, 0.04),
+		},
+		"dialogos": [
+			{"si": ["mision:asado_ruffus:lista", "carga:asado"], "dialogo": "ruffus_entrega"},
+			{"si": "mision:asado_ruffus:lista", "dialogo": "ruffus_sin_asado"},
+			{"si": "mision:asado_ruffus:activa", "dialogo": "ruffus_recordatorio"},
+			{"si": "mision:asado_ruffus:completada", "dialogo": "ruffus_despues"},
+			{"si": "!bandera:ruffus_hablado", "dialogo": "ruffus_primera"},
+			{"dialogo": "ruffus_saludo"},
+		],
+	},
 	"dona_rosa": {
 		"nombre": "Doña Rosa",
 		"especie": "humano",
@@ -33,6 +74,117 @@ const PERSONAJES := {
 }
 
 const DIALOGOS := {
+	# La primera vez con Tío Ruffus (después de la presentación): se presenta y sigue como siempre
+	"ruffus_primera": {
+		"inicio": "hola",
+		"nodos": {
+			"hola": {
+				"texto": "¡Guau! Ay, mis huesos... Hola, palomita. Soy Tío Ruffus, el más viejo de la plaza.",
+				"hace": "bandera:ruffus_hablado",
+				"va": "inicio",
+			},
+			"inicio": {
+				"texto": "Yo antes les corría a las palomas, ¿sabías? Ahora apenas me alcanzan las ganas.",
+				"opciones": [
+					{"texto": "¿Necesitás algo, Tío Ruffus?", "va": "pedido",
+						"si": ["tutorial", "mision:asado_ruffus:nueva"]},
+					{"texto": "Chau, Tío Ruffus", "va": ""},
+				],
+			},
+			"pedido": {
+				"texto": "Hace días que me llega olor a asado desde la parrilla del Obelisco, y con estas patitas no llego ni a la esquina. ¿Me traés un buen pedazo? Es pesado: lo tenés que llevar en el pico.",
+				"opciones": [
+					{"texto": "¡Dejalo en mis alas!", "va": "gracias", "hace": "mision_aceptar:asado_ruffus"},
+					{"texto": "Ahora no puedo", "va": ""},
+				],
+			},
+			"gracias": {"texto": "¡Qué buena paloma! La parrilla está cerca del Obelisco, en el medio de la plaza. Yo te espero acá... haciéndome el dormido."},
+		},
+	},
+	# La primera vez (después de la presentación): arranca con el saludo y sigue como siempre
+	"remate_primera": {
+		"inicio": "hola",
+		"nodos": {
+			"hola": {
+				"texto": "¿Así que vos sos la paloma nueva del barrio?",
+				"hace": "bandera:remate_hablado",
+				"va": "inicio",
+			},
+			"inicio": {
+				"texto": "Mirá vos, una paloma de la plaza cruzando la frontera. Acá las migas tienen dueño, ¿sabés? Y el dueño soy yo.",
+				"opciones": [
+					{"texto": "Sólo estoy de paso, Don Remate.", "va": "paso"},
+					{"texto": "¿Y vos quién te creés que sos?", "va": "chiste"},
+					{"texto": "Me voy, me voy...", "va": ""},
+				],
+			},
+			"paso": {
+				"texto": "De paso, dice. Qué linda costumbre. Bueno, mirá: si querés andar tranquila por el barrio, vas a tener que ganarte el respeto. Pasá más tarde, que se me están ocurriendo ideas.",
+			},
+			"chiste": {
+				"texto": "¿Que quién soy? Soy el que se ríe último. ¿Querés escuchar un chiste? ¿Por qué la paloma cruzó la calle? ¡Para no pagar el peaje de las migas! Jajaja... ¿No? Bueno, ya te vas a reír.",
+			},
+		},
+	},
+	"remate_saludo": {
+		"inicio": "inicio",
+		"nodos": {
+			"inicio": {
+				"texto": "Mirá vos, una paloma de la plaza cruzando la frontera. Acá las migas tienen dueño, ¿sabés? Y el dueño soy yo.",
+				"opciones": [
+					{"texto": "Sólo estoy de paso, Don Remate.", "va": "paso"},
+					{"texto": "¿Y vos quién te creés que sos?", "va": "chiste"},
+					{"texto": "Me voy, me voy...", "va": ""},
+				],
+			},
+			"paso": {
+				"texto": "De paso, dice. Qué linda costumbre. Bueno, mirá: si querés andar tranquila por el barrio, vas a tener que ganarte el respeto. Pasá más tarde, que se me están ocurriendo ideas.",
+			},
+			"chiste": {
+				"texto": "¿Que quién soy? Soy el que se ríe último. ¿Querés escuchar un chiste? ¿Por qué la paloma cruzó la calle? ¡Para no pagar el peaje de las migas! Jajaja... ¿No? Bueno, ya te vas a reír.",
+			},
+		},
+	},
+	"ruffus_saludo": {
+		"inicio": "inicio",
+		"nodos": {
+			"inicio": {
+				"texto": "Guau... ay, mis huesos. Hola, palomita. Yo antes les corría a las palomas, ¿sabías? Ahora apenas me alcanzan las ganas.",
+				"opciones": [
+					{"texto": "¿Necesitás algo, Tío Ruffus?", "va": "pedido",
+						"si": ["tutorial", "mision:asado_ruffus:nueva"]},
+					{"texto": "Chau, Tío Ruffus", "va": ""},
+				],
+			},
+			"pedido": {
+				"texto": "Hace días que me llega olor a asado desde la parrilla del Obelisco, y con estas patitas no llego ni a la esquina. ¿Me traés un buen pedazo? Es pesado: lo tenés que llevar en el pico.",
+				"opciones": [
+					{"texto": "¡Dejalo en mis alas!", "va": "gracias", "hace": "mision_aceptar:asado_ruffus"},
+					{"texto": "Ahora no puedo", "va": ""},
+				],
+			},
+			"gracias": {"texto": "¡Qué buena paloma! La parrilla está cerca del Obelisco, en el medio de la plaza. Yo te espero acá... haciéndome el dormido."},
+		},
+	},
+	"ruffus_recordatorio": {
+		"inicio": "inicio",
+		"nodos": {"inicio": {"texto": "Todavía siento el olorcito desde acá... La parrilla está cerca del Obelisco, en el centro de la plaza."}},
+	},
+	"ruffus_sin_asado": {
+		"inicio": "inicio",
+		"nodos": {"inicio": {"texto": "¿Y el asado? Se te debe haber perdido por el camino... Fijate en la parrilla del Obelisco, que siempre queda otro pedazo."}},
+	},
+	"ruffus_entrega": {
+		"inicio": "inicio",
+		"nodos": {"inicio": {
+			"texto": "¡Mi asado! Mmm... qué manjar. Hacía años que no probaba algo así. Tomá, un poco de comida por las molestias.",
+			"hace": ["carga_quitar", "mision_entregar:asado_ruffus"],
+		}},
+	},
+	"ruffus_despues": {
+		"inicio": "inicio",
+		"nodos": {"inicio": {"texto": "Todavía se me hace agua la boca con ese asado. Sos la mejor amiga que un perro viejo puede tener."}},
+	},
 	"rosa_saludo": {
 		"inicio": "inicio",
 		"nodos": {

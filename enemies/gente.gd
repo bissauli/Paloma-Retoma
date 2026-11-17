@@ -56,6 +56,16 @@ func _poblar() -> void:
 	add_child(dona_rosa)
 	Interlocutor.marcar(dona_rosa, "dona_rosa", 2.0)   # Con ella se puede hablar (y da una misión)
 	dona_rosa.global_position = _punto("donarosa", Vector3(-35.95, 0, -8))
+	# Tío Ruffus: un perro viejito echado al sol en el Cabildo, de cara a la plaza. Con él se puede hablar
+	# y pide un asado de la parrilla del Obelisco (misión "asado_ruffus")
+	var ruffus := Animal.new()
+	ruffus.variante = "perro_blanco"
+	ruffus.conducta = "echado"
+	ruffus.position = _punto("tioruffus", Vector3(-33.8, 0, 5.6))
+	ruffus.rotation.y = PI / 2.0
+	ruffus.add_to_group("tio_ruffus")
+	add_child(ruffus)
+	Interlocutor.marcar(ruffus, "tio_ruffus", 1.2)
 	# Turistas en el Cabildo (sus migas también caen delante del banco de Doña Rosa)
 	var p_tur := _punto("turistas", Vector3(-40, 0, -14))
 	for i in 4:

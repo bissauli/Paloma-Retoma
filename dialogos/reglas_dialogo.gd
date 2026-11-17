@@ -7,10 +7,12 @@ extends RefCounted
 ## Condiciones (con "!" adelante se niegan; una lista = todas se cumplen):
 ##   "mision:ID:ESTADO"   ESTADO = nueva | activa | lista | completada
 ##   "bandera:NOMBRE"     una bandera puesta antes (Misiones.poner_bandera)
+##   "carga:TIPO"         la paloma lleva ese tipo de comida en el pico
 ##   "tutorial"           ya terminó el tutorial de las migas
 ##   "comida>=N"  "bandada>=N"  "migas>=N"   (también <=, >, <, ==)
 ## Acciones:
 ##   "mision_aceptar:ID"  "mision_entregar:ID"  "bandera:NOMBRE"
+##   "carga_quitar" (suelta lo que la paloma lleva en el pico)
 ##   "comida+N"  "comida-N"  "evento:CLAVE" (avisa a las misiones, ver Misiones.notificar)
 
 const OPERADORES := [">=", "<=", "==", ">", "<"]
@@ -39,6 +41,8 @@ static func _evaluar(c: String) -> bool:
 		return p.size() == 3 and Misiones.estado(p[1]) == p[2]
 	if c.begins_with("bandera:"):
 		return Misiones.bandera(c.substr(8))
+	if c.begins_with("carga:"):
+		return GameState.carga == c.substr(6)
 	for op: String in OPERADORES:
 		var i := c.find(op)
 		if i > 0:
@@ -80,6 +84,8 @@ static func hacer(accion: Variant) -> void:
 		Misiones.entregar(texto.get_slice(":", 1))
 	elif texto.begins_with("bandera:"):
 		Misiones.poner_bandera(texto.substr(8))
+	elif texto == "carga_quitar":
+		GameState.set_carga("")
 	elif texto.begins_with("evento:"):
 		Misiones.notificar(texto.substr(7))
 	elif texto.begins_with("comida+") or texto.begins_with("comida-"):

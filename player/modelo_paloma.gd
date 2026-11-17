@@ -474,6 +474,9 @@ func mostrar_carga(tipo: String) -> void:
 			_pieza(_caja(Vector3(0.04, 0.04, 0.2)), Color("f2d36b"))
 		"factura":
 			_pieza(_esfera(0.07), Color("c97b3a"), Vector3(1.4, 0.7, 1.0))
+		"asado":
+			_pieza(_caja(Vector3(0.1, 0.06, 0.22)), Color("9a4a2a"))
+			_pieza(_caja(Vector3(0.11, 0.015, 0.05)), Color("f2ead8")).position = Vector3(0, 0, 0.12)
 
 
 func _pieza(malla: Mesh, color: Color, escala := Vector3.ONE) -> MeshInstance3D:

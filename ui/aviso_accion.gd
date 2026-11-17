@@ -100,6 +100,11 @@ func _ready() -> void:
 
 
 func _pedir(id: String, tecla: String, texto: String, prioridad: int, al_tocar: Callable) -> void:
+	# Quien lo pide lo repite mientras dure: si no cambió nada, sólo se actualiza el callback
+	var previo: Dictionary = _pedidos.get(id, {})
+	if not previo.is_empty() and previo["tecla"] == tecla and previo["texto"] == texto and previo["prioridad"] == prioridad:
+		previo["tocar"] = al_tocar
+		return
 	_pedidos[id] = {"tecla": tecla, "texto": texto, "prioridad": prioridad, "tocar": al_tocar}
 	_elegir()
 
