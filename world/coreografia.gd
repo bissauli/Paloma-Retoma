@@ -387,15 +387,20 @@ static func _gangnam(t: float) -> PoseBaile:
 	p.rot = _y(YAW + 12.0 * costado) * _x(-14.0 + 10.0 * sin(beat * 2.0))   # Agachada, cabeceando
 	p.pata_izq = _x(-40.0 * salto if lado > 0.0 else -8.0 * salto)
 	p.pata_der = _x(-40.0 * salto if lado < 0.0 else -8.0 * salto)
-	var bombeo := 22.0 * salto
-	p.ala_izq = _ala_izq(176.0, -28.0 + bombeo)
-	p.ala_der = _ala_der(176.0, -22.0 + bombeo)
+	# Alas CRUZADAS adelante del pecho (las riendas): cada una pasa la línea del medio hacia el otro
+	# lado (más de 180°) y una va inclinada hacia arriba y la otra hacia abajo, así forman una X.
+	# Atraviesan un poco el cuerpo; está bien, lo que importa es que la cruz se lea.
+	# Las alas se arman al final con su apertura y altura ([abrir, subir]): de la cruz a cualquier otra
+	# pose se pasa interpolando esos dos números, no mezclando giros. La cruz está casi del lado
+	# opuesto a las otras poses y la mezcla de giros tomaría el atajo de golpe (un tirón de 80°).
+	var bombeo := 8.0 * salto
+	var izq := Vector2(228.0, 30.0 + bombeo)
+	var der := Vector2(228.0, -30.0 + bombeo)
 	p.cabeza = _x(16.0 * salto - 6.0) * _y(10.0 * costado)
 	p.cola = _x(24.0 * salto) * _y(-14.0 * costado)
 	# --- El lazo: el ala derecha da vueltas arriba de la cabeza (un círculo entero por beat)
 	var giro := t * TAU * 1.25
-	var lazo := _ala_der(70.0 + 40.0 * sin(giro), 95.0 + 18.0 * cos(giro))
-	p.ala_der = PoseBaile._mezclar_giro(p.ala_der, lazo, w_lazo)
+	der = der.lerp(Vector2(70.0 + 40.0 * sin(giro), 95.0 + 18.0 * cos(giro)), w_lazo)
 	p.cabeza = PoseBaile._mezclar_giro(p.cabeza, _x(-14.0) * _y(18.0 * sin(giro)), w_lazo)
 
 	# --- Cadera: parada, la cadera adelante y atrás, un ala señalando al frente
@@ -403,8 +408,8 @@ static func _gangnam(t: float) -> PoseBaile:
 	var c := sin(t * TAU * 1.25)
 	cadera.pos = Vector3(0.0, 0.015 * absf(c), 0.07 * c)
 	cadera.rot = _y(YAW) * _x(-12.0 * c)
-	cadera.ala_izq = _ala_izq(25.0, -15.0)
-	cadera.ala_der = _ala_der(150.0, 15.0 + 10.0 * c)   # Señala adelante
+	izq = izq.lerp(Vector2(100.0, -15.0), w_cadera)
+	der = der.lerp(Vector2(150.0, 15.0 + 10.0 * c), w_cadera)   # Señala adelante
 	cadera.pata_izq = _x(-14.0 * maxf(c, 0.0))
 	cadera.pata_der = _x(-14.0 * maxf(c, 0.0))
 	cadera.cabeza = _x(20.0 * absf(c) - 6.0)
@@ -416,14 +421,17 @@ static func _gangnam(t: float) -> PoseBaile:
 	var k := clampf((t - 6.6) / 0.8, 0.0, 1.0)
 	vuelo.pos = Vector3(0.0, 0.42 * 4.0 * k * (1.0 - k), 0.0)
 	vuelo.rot = _y(YAW) * _x(8.0)
-	vuelo.ala_izq = _ala_izq(80.0, 85.0)
-	vuelo.ala_der = _ala_der(80.0, 85.0)
 	vuelo.pata_izq = _x(-35.0) * _z(-25.0)
 	vuelo.pata_der = _x(-35.0) * _z(25.0)
 	vuelo.cabeza = _x(-18.0)
 	vuelo.cola = _x(35.0)
 	vuelo.escala_cola = Vector3(1.35, 1.0, 1.0)
-	return p.mezclar(vuelo, w_salto)
+	izq = izq.lerp(Vector2(80.0, 85.0), w_salto)
+	der = der.lerp(Vector2(80.0, 85.0), w_salto)
+	p = p.mezclar(vuelo, w_salto)
+	p.ala_izq = _ala_izq(izq.x, izq.y)
+	p.ala_der = _ala_der(der.x, der.y)
+	return p
 
 # ---------------------------------------------------------------- 10. Cortejo
 

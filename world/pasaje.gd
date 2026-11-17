@@ -601,14 +601,16 @@ const OBSTACULOS := {
 	"ferreteria": {"costado": ["tablero_herramientas", "gondola"], "arriba": ["lampara_taller"], "abajo": ["banco_trabajo"]},
 	"peluqueria": {"costado": ["tocador_espejo", "planta_alta"], "arriba": ["lampara_colgante"], "abajo": ["sillon_peluqueria"]},
 	"floreria": {"costado": ["torre_macetas", "planta_alta"], "arriba": ["lampara_colgante"], "abajo": ["balde_flores"]},
-	# Casas: lo de cada ambiente una sola vez; después, cosas que sí se repiten en una casa
-	"living": {"costado": ["biblioteca", "planta_alta"], "arriba": ["lampara_techo"], "abajo": ["mesa_ratona", "sillon_amarillo", "maceta"]},
-	"dormitorio": {"costado": ["ropero", "planta_alta"], "arriba": ["lampara_techo"], "abajo": ["comoda", "mesita_luz", "maceta"]},
-	"cocina": {"costado": ["heladera_casa", "alacena_alta", "planta_alta"], "arriba": ["lampara_colgante"], "abajo": ["mesada", "cocina_horno", "maceta"]},
-	"comedor": {"costado": ["vajillero", "planta_alta"], "arriba": ["lampara_techo"], "abajo": ["mesa_comedor", "comoda", "maceta"]},
-	"bano": {"costado": ["armario_bano", "planta_alta"], "arriba": ["lampara_colgante"], "abajo": ["banera", "lavatorio", "maceta"]},
-	"cuarto_chicos": {"costado": ["cajonera_juguetes", "planta_alta"], "arriba": ["movil_estrellas", "lampara_techo"], "abajo": ["mesa_ratona", "oso_peluche", "maceta"]},
-	"estudio": {"costado": ["biblioteca", "archivero", "planta_alta"], "arriba": ["lampara_verde"], "abajo": ["escritorio_pc", "mesa_ratona", "maceta"]},
+	# Casas: lo de cada ambiente una sola vez; después, cosas que sí se repiten en una casa. Nada de
+	# plantas en el medio de una cocina o un baño: ahí van muebles que de verdad se ven sueltos (la
+	# mesada como isla, el lavarropas, sillas, el tacho)
+	"living": {"costado": ["biblioteca", "lampara_pie", "planta_alta"], "arriba": ["lampara_techo"], "abajo": ["mesa_ratona", "sillon_amarillo", "silla"]},
+	"dormitorio": {"costado": ["ropero", "lampara_pie", "planta_alta"], "arriba": ["lampara_techo"], "abajo": ["comoda", "mesita_luz", "silla"]},
+	"cocina": {"costado": ["heladera_casa", "mesada", "lavarropas"], "arriba": ["lampara_colgante"], "abajo": ["mesada", "cocina_horno", "silla"]},
+	"comedor": {"costado": ["vajillero", "lampara_pie", "planta_alta"], "arriba": ["lampara_techo"], "abajo": ["mesa_comedor", "silla"]},
+	"bano": {"costado": ["armario_bano", "lavarropas"], "arriba": ["lampara_colgante"], "abajo": ["banera", "lavatorio", "tacho"]},
+	"cuarto_chicos": {"costado": ["cajonera_juguetes", "planta_alta"], "arriba": ["movil_estrellas", "lampara_techo"], "abajo": ["mesa_ratona", "oso_peluche", "silla"]},
+	"estudio": {"costado": ["biblioteca", "archivero", "lampara_pie", "planta_alta"], "arriba": ["lampara_verde"], "abajo": ["escritorio_pc", "mesa_ratona", "silla"]},
 }
 
 ## En las casas, cuántas veces puede aparecer cada mueble en un mismo ambiente (lo que no está, sin
@@ -618,7 +620,7 @@ const LIMITE := {"lavarropas": 1, "cocina_horno": 1, "horno": 1, "heladera_casa"
 	"vajillero": 1, "ropero": 1, "armario_bano": 1, "alacena_alta": 1, "mesada": 2, "sillon_amarillo": 1,
 	"sillon_azul": 1, "mesita_luz": 2, "oso_peluche": 1, "cajonera_juguetes": 1, "mesa_ratona": 1, "biblioteca": 2,
 	"archivero": 1, "lampara_pie": 2, "jaula": 1, "mesa_mate": 1, "tacho": 1, "silla": 4, "dispenser": 1,
-	"torre_macetas": 2, "mesa_lectura": 1, "sabana": 3, "planta_alta": 2, "maceta": 3, "lampara_techo": 3,
+	"torre_macetas": 2, "mesa_lectura": 1, "sabana": 3, "planta_alta": 1, "maceta": 3, "lampara_techo": 3,
 	"lampara_colgante": 3, "lampara_verde": 2, "movil_estrellas": 1}
 
 
@@ -775,9 +777,9 @@ const DECO := {
 	# Casas: pocas cosas y coherentes (lo grande de cada ambiente ya está en la ruta, el rincón y lo propio)
 	"living": ["sillon_azul", "lampara_pie", "maceta", "biblioteca", "silla"],
 	"dormitorio": ["mesita_luz", "lampara_pie", "maceta", "silla"],
-	"cocina": ["mesada", "lavarropas", "tacho", "maceta", "silla"],
+	"cocina": ["mesada", "lavarropas", "tacho", "silla"],
 	"comedor": ["silla", "silla", "maceta", "lampara_pie"],
-	"bano": ["maceta", "tacho"],
+	"bano": ["lavarropas", "tacho"],
 	"cuarto_chicos": ["cajonera_juguetes", "silla", "lampara_pie", "maceta"],
 	"estudio": ["silla", "lampara_pie", "maceta", "sillon_azul"],
 }
@@ -797,6 +799,27 @@ const PROPIO := {"panaderia": "horno", "oficina": "dispenser", "fiambreria": "ba
 	"cuarto_chicos": "cama_chica", "estudio": "escritorio_pc", "farmacia": "caja_super", "kiosco": "caja_super",
 	"heladeria": "vitrina_helados", "ferreteria": "banco_trabajo", "peluqueria": "tocador_espejo", "floreria": "caja_super"}
 const DECO_ALTO_MAX := 2.5   ## Lo alto se achica a esto: así no le tapa el cuarto a la cámara
+
+## Lo que va colgado en las paredes y en el piso según el lugar: [cuadros por pared de costado (0-2),
+## estantes con libros, alfombra en el medio]. Lo que no está acá (súper, taller, kiosco...) no lleva
+## nada de eso: un taller con cuadros, estantes de libros y alfombra no tiene sentido.
+const PARED := {
+	"libreria": [1, true, true], "cafe": [2, false, false], "restaurante": [2, false, false],
+	"peluqueria": [1, false, false], "oficina": [1, false, false], "consultorio": [1, false, false],
+	"conventillo": [1, true, true], "living": [2, true, true], "dormitorio": [1, false, true],
+	"comedor": [2, false, true], "cuarto_chicos": [1, true, true], "estudio": [1, true, true],
+}
+## Dónde van plantas en los rincones. En los demás locales van cajas (mercadería) y en la cocina y el
+## baño nada.
+const CON_PLANTAS := ["libreria", "cafe", "restaurante", "peluqueria", "oficina", "consultorio", "floreria",
+	"heladeria", "conventillo", "living", "dormitorio", "comedor", "cuarto_chicos", "estudio"]
+
+
+## Qué va en un rincón de este lugar: una planta, cajas o nada ("").
+static func _rincon_de(tema: String, ce: CasaEnterable) -> String:
+	if tema in CON_PLANTAS:
+		return "maceta"
+	return "" if ce.con_cinematica else "cajas"
 
 
 ## Más decoración: recorre las cuatro paredes y llena cada hueco libre con un mueble del tema, de
@@ -844,14 +867,18 @@ static func _mas_adornos(casa: Node3D, ce: CasaEnterable, tema: String) -> void:
 				t += tam.x * s + (1.2 if casa_de_familia else 0.35)   # En las casas, con aire entre mueble y mueble
 			else:
 				t += 0.5
-	# Cuadros en las paredes de adelante y de atrás, entre los estantes y lejos de las ventanas
+	# Un cuadro en las paredes de adelante y de atrás (sólo donde van cuadros), en el tramo de pared
+	# más ancho que deja la ventana
+	if int(PARED.get(tema, [0])[0]) < 2:
+		return
 	for lado in [-1.0, 1.0]:
 		var x_ventana := ce.x_frente if lado > 0.0 else ce.x_fondo
-		var x := -hx + 2.2
-		while x < hx - 1.0:
-			if absf(x - x_ventana) > 2.8:
-				Kit.colocar(casa, "cuadro", Vector3(x, 3.15, lado * (hz - 0.03)), PI if lado > 0.0 else 0.0, Vector3.ONE * 0.8)
-			x += 2.4
+		var izq := (x_ventana - CasaEnterable.VENTANA_ANCHO / 2.0) - (-hx)
+		var der := hx - (x_ventana + CasaEnterable.VENTANA_ANCHO / 2.0)
+		if maxf(izq, der) < 3.2:
+			continue
+		var x := (-hx + x_ventana - CasaEnterable.VENTANA_ANCHO / 2.0) / 2.0 if izq > der else (hx + x_ventana + CasaEnterable.VENTANA_ANCHO / 2.0) / 2.0
+		Kit.colocar(casa, "cuadro", Vector3(x, 3.15, lado * (hz - 0.03)), PI if lado > 0.0 else 0.0, Vector3.ONE * 0.8)
 
 
 ## Muebles de adorno contra las paredes y en los rincones (sin colisión: la paloma no se queda
@@ -862,8 +889,10 @@ static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: Stri
 	var hx := w / 2.0 - CasaEnterable.ESPESOR
 	var hz := d / 2.0 - CasaEnterable.ESPESOR
 	var ruta := _muestras(ce)
-	# Alfombra en el medio (abajo de todo: nunca tapa la ruta)
-	Kit.colocar(casa, "alfombra", Vector3(0, 0.02, 0), 0.0, Vector3(minf(w * 0.3, 2.2), 1.0, minf(d * 0.35, 2.0)) / Vector3(2.4, 1.0, 1.6) * 1.6)
+	var pared: Array = PARED.get(tema, [0, false, false])
+	# Alfombra en el medio, sólo donde va (abajo de todo: nunca tapa la ruta)
+	if pared[2]:
+		Kit.colocar(casa, "alfombra", Vector3(0, 0.02, 0), 0.0, Vector3(minf(w * 0.3, 2.2), 1.0, minf(d * 0.35, 2.0)) / Vector3(2.4, 1.0, 1.6) * 1.6)
 	# Rincón de atrás a la izquierda: algo del lugar, o el sillón con el gato encima y una lámpara
 	if RINCON.has(tema):
 		var nombre_r: String = RINCON[tema]
@@ -876,26 +905,32 @@ static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: Stri
 		if _adorno(casa, ce, ruta, sillon, ps, PI / 2.0):
 			Kit.colocar(casa, "gato", ps + Vector3(0.05, 0.45, -0.4), PI / 2.0 + 0.4)
 			_adorno(casa, ce, ruta, "lampara_pie", Vector3(-hx + 0.35, 0.02, -hz + 2.6), 0.0)
-	# Rincones de adelante a la derecha y de atrás a la derecha: plantas y cajas
-	_adorno(casa, ce, ruta, "maceta", Vector3(hx - 0.4, 0.02, hz - 0.4), 0.0)
-	_adorno(casa, ce, ruta, "maceta", Vector3(-hx + 0.4, 0.02, hz - 0.4), 1.0)
-	_adorno(casa, ce, ruta, "maceta" if ce.con_cinematica else "cajas", Vector3(hx - 0.5, 0.02, -hz + 0.5), 0.3)
+	# Los otros rincones: plantas donde tiene sentido, cajas de mercadería en los demás locales y nada
+	# en la cocina y el baño. Una sola planta junto a la vidriera; las cajas, al fondo
+	var rincon := _rincon_de(tema, ce)
+	if rincon == "maceta":
+		_adorno(casa, ce, ruta, "maceta", Vector3(hx - 0.4, 0.02, hz - 0.4), 0.0)
+		_adorno(casa, ce, ruta, "maceta", Vector3(hx - 0.5, 0.02, -hz + 0.5), 0.3)
+	elif rincon == "cajas":
+		_adorno(casa, ce, ruta, "cajas", Vector3(hx - 0.5, 0.02, -hz + 0.5), 0.3)
 	# Algo propio de cada lugar, contra la pared derecha
 	var propio: String = PROPIO[tema]
 	var tam_p: Vector3 = MueblesDatos.PIEZAS[propio]["tam"]
 	_adorno(casa, ce, ruta, propio, Vector3(hx - tam_p.z / 2.0 - 0.1, 0.02, 0.0), -PI / 2.0)
-	# Estantes en las paredes de adelante y de atrás (salvo frente a las ventanas) y cuadros a los costados
+	# Estantes con libros en la pared de atrás (sólo donde van, salvo frente a la ventana) y cuadros a
+	# los costados (cuántos, según el lugar)
 	for lado in [-1.0, 1.0]:
-		var z: float = lado * (hz - 0.17)
-		var x_ventana := ce.x_frente if lado > 0.0 else ce.x_fondo
-		var x := -hx + 1.0
-		while x < hx - 0.9:
-			if absf(x - x_ventana) > 2.6:
-				Kit.colocar(casa, "estante_pared", Vector3(x, 4.4, z), PI if lado > 0.0 else 0.0)
-			x += 2.4
+		if pared[1] and lado < 0.0:
+			var x := -hx + 1.0
+			while x < hx - 0.9:
+				if absf(x - ce.x_fondo) > 2.6:
+					Kit.colocar(casa, "estante_pared", Vector3(x, 3.6, -hz + 0.17), 0.0)
+				x += 3.6
 		var xs: float = lado * (hx - 0.03)
-		for k in 2:
-			Kit.colocar(casa, "cuadro", Vector3(xs, 2.9, (k - 0.5) * d * 0.4), -lado * PI / 2.0)
+		var cuadros: int = pared[0]
+		for k in cuadros:
+			var z := 0.0 if cuadros == 1 else (k - 0.5) * d * 0.4
+			Kit.colocar(casa, "cuadro", Vector3(xs, 2.9, z), -lado * PI / 2.0)
 	# Cartel del tema, pintado en la pared izquierda
 	var l := Construir.cartel(casa, Vector3(-hx + 0.03, 4.9, 0), cartel, Color("3a2a1e"), 56)
 	l.rotation.y = PI / 2.0

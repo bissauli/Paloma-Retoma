@@ -260,6 +260,8 @@ static func cafes(padre: Node3D) -> Array[Vector3]:
 		edificio(padre, Vector3(x, 0, 43.0), Vector3(ancho, n["alto"], 10), n["color"], Vector3(0, 0, -1), n["remate"])
 		# Vidriera oscura en planta baja
 		Construir.caja(padre, Vector3(x, 1.6, 37.95), Vector3(ancho - 2.0, 2.6, 0.1), Color("2e3640"), false)
+		# Y lo que se ve adentro, según el nombre (ver world/vidrieras.gd)
+		Vidrieras.poner(padre, Vector3(x, 1.6, 37.89), PI, Vector2(ancho - 2.0, 2.6), n["nombre"], 0.15)
 		# Toldo inclinado (se puede aterrizar encima)
 		var toldo := Construir.caja(padre, Vector3(x, 3.4, 36.6), Vector3(ancho - 1.0, 0.12, 2.8), n["toldo"])
 		toldo.rotation.x = -0.25

@@ -304,7 +304,29 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 		if texto != "":
 			var rango := 40.0 if tipo == "kiosco" else (90.0 if tipo == "hospital" or tipo == "comisaria" else 55.0)
 			_texto(c[0], c[1], texto, c[2], c[3], color, rango)
+			if tipo in VIDRIERAS and not solo_lejos:
+				_vidriera(c, texto, escala.x)
 	return mi
+
+
+## Los carteles que van sobre una vidriera de planta baja (ver generar_ciudad.py, planta_baja).
+const VIDRIERAS := ["local", "cafe", "farmacia", "golosineria", "minimercado", "panaderia", "ropa"]
+
+
+## El interior que se ve por la vidriera de abajo del cartel "c" (ver world/vidrieras.gd). El vidrio
+## ocupa de 0.62 a 2.92 m y está centrado en la fachada; el cartel está 3.6 m arriba y 0.125 m
+## afuera. Los carteles con dibujo al costado están corridos 0.45 m y son 0.9 m más angostos.
+## El plano va 0.105 m afuera: delante de la persiana del kit (que a veces baja hasta tapar casi todo
+## el vidrio) y de sus parantes, que dibuja el shader. Así los locales se ven abiertos.
+func _vidriera(c: Array, texto: String, esc: float) -> void:
+	var p: Vector3 = c[0]
+	var rot: float = c[1]
+	var n := Vector3(sin(rot), 0, cos(rot))
+	var con_icono := String(c[4]) != "local"
+	var u := Vector3.UP.cross(n)
+	var centro := p - n * (0.125 - 0.105) - Vector3(0, 3.6 - 1.77, 0) - u * (0.45 * esc if con_icono else 0.0)
+	var ancho: float = c[2] + (0.8 * esc if con_icono else -0.1 * esc)
+	Vidrieras.poner(self, centro, rot, Vector2(ancho, 2.3), texto)
 
 
 func _nombre_local(pieza: String) -> String:
