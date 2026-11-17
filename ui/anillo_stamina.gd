@@ -139,4 +139,8 @@ func _tapa(angulo: float, salida: float, color: Color, ancho: float) -> void:
 	for i in 9:
 		var f := PI * i / 8.0
 		puntos.append(centro + (radial * cos(f) + tangente * sin(f)) * ancho * 0.5)
+	# Si la paloma está fuera de cuadro (o la ventana no tiene tamaño, como sin pantalla) la posición
+	# puede venir rara y el polígono queda degenerado: Godot no lo puede triangular y avisa con un error
+	if not centro.is_finite() or Geometry2D.triangulate_polygon(puntos).is_empty():
+		return
 	draw_colored_polygon(puntos, color)

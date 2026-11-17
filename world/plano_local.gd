@@ -34,7 +34,7 @@ const PLANO := {
 	"restaurante": ["mesada", 1, "mesa_mantel", "grilla", 1.0, 0.0, "lampara_colgante"],
 	"consultorio": ["escritorio_pc", 1, "sillas_espera", "grilla", 0.95, PI, "lampara_techo"],
 	"oficina": ["escritorio_pc", 1, "escritorio_pc", "grilla", 1.26, 0.0, "lampara_techo"],
-	"mecanico": ["banco_trabajo", 1, "pila_neumaticos", "grilla", 1.2, 0.0, "lampara_taller"],
+	"mecanico": ["banco_trabajo", 1, "", "", 0.0, 0.0, "lampara_taller"],   # En el medio, un auto (ver _auto)
 	"peluqueria": ["caja_super", 1, "", "", 0.0, 0.0, "lampara_colgante"],
 }
 ## Aire alrededor de cada pieza de la grilla (x, z), por rubro (el resto, 1.0 x 1.0).
@@ -77,7 +77,20 @@ static func armar(sala: Node3D, ce: CasaEnterable, tema: String) -> int:
 		var giro: float = p[5]
 		var ancho_x := tam.z if absf(sin(giro)) > 0.5 else tam.x   # Lo que ocupa en X ya girado
 		var hondo_z := tam.x if absf(sin(giro)) > 0.5 else tam.z
-		if p[3] == "filas":
+		if p[3] == "filas" and nombre == "gondola":
+			# Góndolas de dos caras armadas acá (con su mercadería), una por fila, de punta a punta hacia
+			# el fondo; ninguna en el pasillo de la puerta. Sobre cada pasillo, un cartel colgado.
+			var ancho_g := 0.95
+			var n_fila := 0
+			var x := x0 + ancho_g / 2.0
+			while x + ancho_g / 2.0 <= x1:
+				if absf(x - ce.x_frente) > ancho_g / 2.0 + 0.8:
+					var largo_g := minf(z1 - z0, 4.2)
+					if largo_g >= 1.4 and _gondola(sala, ce, tema, Vector3(x, 0.02, (z0 + z1) / 2.0), largo_g, float(p[4]), n_fila):
+						cant += 1
+						n_fila += 1
+				x += ancho_g + PASILLO
+		elif p[3] == "filas":
 			# Filas hacia el fondo, separadas por pasillos; ninguna en el pasillo de la puerta
 			var x := x0 + ancho_x / 2.0
 			while x + ancho_x / 2.0 <= x1:
@@ -113,6 +126,15 @@ static func armar(sala: Node3D, ce: CasaEnterable, tema: String) -> int:
 				if _pieza(sala, ce, "sillon_peluqueria", Vector3(-hx + 1.4, 0.02, z), -PI / 2.0, 1.0):
 					cant += 1
 			z -= 1.6
+	# --- El taller: un auto en el medio, con dos pilas de neumáticos al lado
+	if tema == "mecanico":
+		# (un taller deja el auto cerca del portón: puede llegar hasta casi la vidriera)
+		if _auto(sala, ce, x0, x1, z0 - 0.5, hz - 0.3):
+			cant += 1
+	# --- Un felpudo en la entrada, del color del local
+	var hz_f := ce.fondo / 2.0 - CasaEnterable.ESPESOR
+	Construir.caja(sala, Vector3(ce.x_frente, 0.045, hz_f - 0.55), Vector3(1.6, 0.012, 0.8),
+		Color(MERCADERIA.get(tema, ["8a5a35"])[0]).darkened(0.45), false)
 	# --- Las lámparas, en fila sobre el pasillo de la puerta y sobre el mostrador
 	var lampara: String = p[6]
 	var dl: Dictionary = MueblesDatos.PIEZAS[lampara]
@@ -183,3 +205,118 @@ static func _cordon(sala: Node3D, desde: Vector3) -> void:
 	var largo := Pasaje.PLANTA_BAJA - desde.y
 	if largo > 0.05:
 		Construir.cilindro(sala, desde + Vector3(0, largo / 2.0, 0), 0.02, largo, Color("2a2a2a"), false, 4)
+
+
+## Colores de la mercadería de las góndolas, por rubro (cada tramo de cada estante, uno de estos).
+const MERCADERIA := {
+	"supermercado": ["c8423a", "f2c23a", "3a7fd0", "4fa060", "f4f1e8", "e8823a", "8a5a35"],
+	"kiosco": ["e0403a", "f2c23a", "3a7fd0", "e86aa0", "8ad08a", "f4f1e8"],
+	"farmacia": ["f4f4f4", "3f9a5a", "3a6fc0", "e0403a", "bfe4f4", "f2d6e2"],
+	"ferreteria": ["c0c4c8", "d8a03a", "c8423a", "3a6fc0", "2f3036", "4fa060"],
+}
+## El color de la estructura de la góndola y de sus puntas (con el cartel de ofertas), por rubro.
+const GONDOLA := {"supermercado": ["e9ebe6", "3f9a5a"], "kiosco": ["f1ead8", "c8423a"],
+	"farmacia": ["f4f6f4", "3f9a5a"], "ferreteria": ["8a8f95", "d8a03a"]}
+
+
+## Una góndola de dos caras, de "largo" metros hacia el fondo y "alto" de alto, centrada en "c": zócalo,
+## panel del medio, cuatro estantes por lado con la mercadería (cada tramo de 0,5 m, un producto) y las
+## puntas pintadas. Arriba del pasillo que tiene a la derecha, un cartel colgado con el número.
+## Una sola colisión para toda la góndola. Devuelve false si no entra.
+static func _gondola(sala: Node3D, ce: CasaEnterable, tema: String, c: Vector3, largo: float, alto: float,
+		n: int) -> bool:
+	var ancho := 0.95
+	var e := Vector3(ancho / 2.0, alto / 2.0, largo / 2.0)
+	var centro := c + Vector3(0, e.y, 0)
+	for caja: Array in ce.cajas:
+		var c2: Vector3 = caja[0]
+		var e2: Vector3 = caja[1]
+		if c2.y - e2.y <= 1.9 and _cruzan(centro, e, 0.0, c2, e2, float(caja[2])):
+			return false
+	if not Pasaje._en_cuarto(ce, centro, e, 0.0):
+		return false
+	var colores: Array = MERCADERIA.get(tema, MERCADERIA["supermercado"])
+	var g: Array = GONDOLA.get(tema, GONDOLA["supermercado"])
+	var estructura := Color(g[0])
+	var punta := Color(g[1])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(ce.nombre) + n * 31
+	Construir.caja(sala, c + Vector3(0, 0.07, 0), Vector3(ancho, 0.14, largo), estructura.darkened(0.45), false)
+	Construir.caja(sala, c + Vector3(0, alto / 2.0, 0), Vector3(0.06, alto, largo), estructura, false)
+	for s in [-1.0, 1.0]:
+		Construir.caja(sala, c + Vector3(0, alto / 2.0, s * (largo / 2.0 - 0.02)), Vector3(ancho, alto, 0.04), punta, false)
+		Construir.caja(sala, c + Vector3(0, alto - 0.18, s * (largo / 2.0 + 0.01)), Vector3(ancho * 0.8, 0.22, 0.02),
+			Color.WHITE, false)   # El cartelito de la punta
+	var niveles := 4
+	var paso := (alto - 0.3) / niveles
+	var tramos := maxi(1, int(round(largo / 0.5)))
+	var lt := (largo - 0.08) / tramos
+	for lado in [-1.0, 1.0]:
+		for k in niveles:
+			var y := 0.16 + k * paso
+			Construir.caja(sala, c + Vector3(lado * 0.24, y, 0), Vector3(0.42, 0.03, largo - 0.08), estructura.darkened(0.12), false)
+			for i in tramos:
+				if rng.randf() < 0.06:
+					continue   # Un hueco: se lo llevaron
+				var col := Color(colores[rng.randi_range(0, colores.size() - 1)])
+				var h := paso * rng.randf_range(0.45, 0.75)
+				var z := -largo / 2.0 + 0.04 + lt * (i + 0.5)
+				Construir.caja(sala, c + Vector3(lado * 0.25, y + 0.015 + h / 2.0, z), Vector3(0.32, h, lt - 0.05), col, false)
+	var forma := BoxShape3D.new()
+	forma.size = e * 2.0
+	Construir.colision(sala, centro, forma)
+	ce.cajas.append([centro, e, 0.0])
+	# El cartel del pasillo, colgado del techo sobre el pasillo de la derecha
+	var xp := c.x + ancho / 2.0 + PASILLO / 2.0
+	if xp < ce.ancho / 2.0 - CasaEnterable.ESPESOR - 0.8:
+		var yc := 3.0
+		Construir.caja(sala, Vector3(xp, yc, c.z), Vector3(0.05, 0.45, 1.1), punta, false)
+		for lado in [-1.0, 1.0]:
+			var l := Construir.cartel(sala, Vector3(xp + lado * 0.03, yc, c.z), "PASILLO %d" % (n + 1), Color.WHITE, 30)
+			l.rotation.y = lado * PI / 2.0
+			l.outline_size = 0
+		Construir.cilindro(sala, Vector3(xp, (yc + 0.22 + Pasaje.PLANTA_BAJA) / 2.0, c.z), 0.015,
+			Pasaje.PLANTA_BAJA - yc - 0.22, Color("2a2a2a"), false, 4)
+	return true
+
+
+## Un auto en el medio del taller (del kit de la ciudad, con sus ruedas), a lo largo si entra y si no
+## de costado, lejos del pasillo de la puerta. Con colisión. Devuelve false si no entra.
+static func _auto(sala: Node3D, ce: CasaEnterable, x0: float, x1: float, z0: float, z1: float) -> bool:
+	var modelo := "auto_hatch_rojo"
+	var d: Dictionary = KitDatos.PIEZAS[modelo]
+	var mn: Array = d["min"]
+	var mx: Array = d["max"]
+	var largo0 := float(mx[0]) - float(mn[0])
+	# Si el local es corto, un auto un poco más chico (hasta el 80 %)
+	var s := clampf((z1 - z0) / largo0, 0.8, 1.0)
+	var largo := largo0 * s
+	var ancho := (float(mx[2]) - float(mn[2])) * s
+	# Del lado de la ventana de atrás (lejos de la puerta)
+	for giro in [PI / 2.0, 0.0]:
+		var ex := ancho / 2.0 if giro != 0.0 else largo / 2.0
+		var ez := largo / 2.0 if giro != 0.0 else ancho / 2.0
+		var lo := maxf(x0 + ex, ce.x_frente + CasaEnterable.VENTANA_ANCHO / 2.0 + ex + 0.3)
+		if lo > x1 - ex or z1 - z0 < ez * 2.0:
+			continue
+		var c := Vector3((lo + x1 - ex) / 2.0, 0.02, (z0 + z1) / 2.0)
+		var e := Vector3(largo / 2.0, 0.75 * s, ancho / 2.0)
+		var centro := c + Vector3(0, 0.75 * s, 0)
+		var libre := true
+		for caja: Array in ce.cajas:
+			var c2: Vector3 = caja[0]
+			var e2: Vector3 = caja[1]
+			if c2.y - e2.y <= 1.9 and _cruzan(centro, e, giro, c2, e2, float(caja[2])):
+				libre = false
+		if not libre or not Pasaje._en_cuarto(ce, centro, e, giro):
+			continue
+		var t := Transform3D(Basis(Vector3.UP, giro).scaled(Vector3.ONE * s), c)
+		Kit.colocar(sala, modelo, c, giro, Vector3.ONE * s)
+		for r: Array in d["ruedas"]:
+			Kit.colocar(sala, "rueda_auto", t * Vector3(r[0], r[1], r[2]), giro, Vector3.ONE * s)
+		var forma := BoxShape3D.new()
+		forma.size = e * 2.0
+		Construir.colision(sala, centro, forma, Vector3(0, giro, 0))
+		ce.cajas.append([centro, e, giro])
+		return true
+	return false

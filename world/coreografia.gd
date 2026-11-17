@@ -378,10 +378,12 @@ const VARIANTES_GANGNAM := [
 	{"nombre": "E · De costado", "salto": 0.12, "rodilla": 55.0, "agache": -12.0, "cabeceo": 16.0, "lazo": 18.0,
 		"lazo_alto": 120.0, "lateral": 0.38, "balanceo": 22.0, "bombeo": 9.0, "galope": 0.0},
 	{"nombre": "F · Con onda", "salto": 0.13, "rodilla": 58.0, "agache": -10.0, "cabeceo": 26.0, "lazo": 22.0,
-		"lazo_alto": 128.0, "lateral": 0.25, "balanceo": 14.0, "bombeo": 18.0, "galope": 0.5},
+		"lazo_alto": 128.0, "lateral": 0.25, "balanceo": 14.0, "bombeo": 18.0, "galope": 0.5, "onda": 1.0},
 ]
-## Qué variante baila la paloma (índice de VARIANTES_GANGNAM).
-static var variante_gangnam := 0
+## Qué variante baila la paloma (índice de VARIANTES_GANGNAM). La elegida es la F, "con onda": además de
+## lo de las otras ("onda" = 1) mueve la cadera al ritmo, abre la cola en abanico con cada saltito, saca
+## pecho al aterrizar, aletea la rienda durante el lazo y remata cada frase con una sacudida de plumas.
+static var variante_gangnam := 5
 
 ## El baile del caballito (Gangnam Style), como el emote de Roblox: 8 s en bucle (arranca y termina
 ## igual) y siempre galopando, a 150 pulsos por minuto (un saltito por pulso, justo con la música de
@@ -440,6 +442,25 @@ static func _gangnam(t: float) -> PoseBaile:
 	der = der.lerp(Vector2(80.0 + r * sin(giro), float(v["lazo_alto"]) + r * cos(giro)), w_lazo)
 	izq = izq.lerp(Vector2(214.0, 22.0 + bombeo), w_lazo)   # Sola con las riendas, un poco más al medio
 	p.cabeza = PoseBaile._mezclar_giro(p.cabeza, _x(-12.0) * _y(-12.0 + 10.0 * sin(giro)) * _z(-8.0), w_lazo)
+	# --- La onda (variante F): todo lo que le da más estilo, siempre en fase con los saltitos
+	var onda := float(v.get("onda", 0.0))
+	if onda > 0.0:
+		# Cadera: el cuerpo se inclina de un lado al otro cada dos saltitos (como un meneo)
+		p.rot = p.rot * _z(7.0 * onda * sin(pulso * PI))
+		# Saca pecho al aterrizar: la cabeza sube de golpe y vuelve
+		p.cabeza = p.cabeza * _x(-10.0 * onda * aplaste)
+		# La cola se abre en abanico arriba de cada saltito y se menea más
+		p.escala_cola = Vector3(1.0 + 0.3 * onda * salto, 1.0, 1.0 + 0.12 * onda * salto)
+		p.cola = p.cola * _y(-10.0 * onda * sin(pulso * PI))
+		# Durante el lazo, la rienda (ala izquierda) aletea rapidito
+		izq.y += 7.0 * onda * w_lazo * sin(t * TAU * 5.0)
+		# Remate de cada frase (justo antes de cada lazo y al final): sacudida de plumas, el cuerpo
+		# tiembla y las alas cruzadas se abren un poco. Vuelve a cero antes de que termine el bucle.
+		var sacudida := _campana(2.0, 2.4, t) + _campana(5.2, 5.6, t) + _campana(7.45, 7.9, t)
+		p.rot = p.rot * _y(5.0 * onda * sacudida * sin(t * TAU * 9.0))
+		p.escala_cabeza = Vector3.ONE * (1.0 + 0.08 * onda * sacudida)
+		izq.x -= 14.0 * onda * sacudida
+		der.x -= 14.0 * onda * sacudida * (1.0 - w_lazo)
 	p.ala_izq = _ala_izq(izq.x, izq.y)
 	p.ala_der = _ala_der(der.x, der.y)
 	return p

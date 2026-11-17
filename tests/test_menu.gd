@@ -42,11 +42,13 @@ func _nueva_partida() -> void:
 	_check("la paloma arranca sentada en el banco", j.global_position.y > 0.4 and j.is_on_floor())
 
 	var y0 := j.global_position.y
-	var pos_cam := cam.global_position
+	# La cámara sigue a la paloma (que salta del banco): lo que no tiene que cambiar de golpe es dónde
+	# está la cámara respecto de la paloma
+	var rel_cam := cam.global_position - j.global_position
 	menu.botones[1].pressed.emit()
 	await _frames(12)
 	_check("la paloma salta", j.global_position.y > y0 + 0.2)
-	_check("la cámara arranca desde donde estaba (sin corte)", cam.global_position.distance_to(pos_cam) < 0.5)
+	_check("la cámara arranca desde donde estaba (sin corte)", (cam.global_position - j.global_position).distance_to(rel_cam) < 0.5)
 	# Durante la transición la cámara se mueve de a poco: nunca salta más de 0,6 m por cuadro
 	var previa := cam.global_position
 	var max_salto := 0.0
