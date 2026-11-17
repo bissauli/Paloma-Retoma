@@ -10,8 +10,10 @@ const SHADER := preload("res://shaders/vidriera.gdshader")
 const RANGO := 70.0   ## Más lejos no se distingue el interior: queda el vidrio oscuro del kit
 
 ## Cada rubro: pared, piso, mueble (estantes y mostrador), los cuatro colores de la mercadería, la
-## forma (ver el shader: 0 cajas, 1 redondos, 2 ropa, 3 botellas, 4 libros, 5 lavarropas, 6 cuadros),
-## cuántos estantes y el ancho de cada cosa.
+## forma de las paredes (ver el shader: 0 cajas, 1 redondos, 2 ropa, 3 botellas, 4 libros, 5 lavarropas,
+## 6 cuadros, 7 espejos de peluquería, 8 boiserie de banco, 9 pizarrón, 10 anteojos),
+## cuántos estantes, el ancho de cada cosa y, si hace falta, los muebles del medio (0 mostrador, 2 banco
+## para sentarse, 3 sillones de barbero, 4 cajas de banco, 5 escritorios) y el damero del piso (0 a 1).
 const RUBROS := {
 	"kiosco": ["fbe9b0", "d9d2c6", "c8423a", "e0403a", "f2c23a", "3a7fd0", "e86aa0", 0, 4, 0.18],
 	"comida": ["f3e3c3", "c96f4a", "8a5a35", "6b8f3a", "b8423a", "e8c060", "3a5a8a", 3, 2, 0.16],
@@ -23,8 +25,8 @@ const RUBROS := {
 	"tintoreria": ["e8f2f6", "dfe9ee", "6b7a85", "f4f6f8", "3a5a8a", "c8d4dc", "2f3036", 2, 2, 0.22],
 	"almacen": ["efe2c4", "b9b1a5", "8a5a35", "c8423a", "f2c23a", "3a7fd0", "f4f1e8", 0, 4, 0.2],
 	"bar": ["c98a5a", "7a5a3e", "5b3b2a", "3a6b3a", "8a2f3a", "e0b050", "d8d8c8", 3, 3, 0.13],
-	"optica": ["eef2f6", "d8dde2", "f4f4f4", "2f3036", "b8bcc2", "8a5a40", "3a6fc0", 0, 3, 0.22],
-	"peluqueria": ["d9c4e4", "2f3036", "4a3a55", "bfe4f4", "c8e8f8", "bfe4f4", "d4eefa", 6, 1, 1.5],
+	"optica": ["f4f6f8", "d8dde2", "f4f4f4", "2f3036", "b8423a", "8a5a40", "3a6fc0", 10, 4, 0.32],
+	"peluqueria": ["f4f1f6", "2a2a2e", "1f2024", "b8423a", "3a6fc0", "f2c23a", "4fa060", 7, 3, 0.12, 3, 0.9],
 	"zapateria": ["f1ead8", "b07a4a", "6b4a32", "6b4a32", "2f3036", "f4f1e8", "c8423a", 0, 4, 0.32],
 	"regaleria": ["fde7ef", "e7d6ea", "c8a0c8", "e06a9a", "f2c23a", "6aa8e0", "8ad08a", 0, 3, 0.26],
 	"disqueria": ["2f3036", "54585c", "1f2024", "e0403a", "f2c23a", "3a7fd0", "f4f1e8", 4, 3, 0.07],
@@ -43,10 +45,12 @@ const RUBROS := {
 	"golosineria": ["fde7ef", "f4ecef", "e0507a", "e0403a", "f2c23a", "3a7fd0", "8ad08a", 3, 4, 0.14],
 	"minimercado": ["e8f2e4", "f2f2ee", "8a8f95", "c8423a", "f2c23a", "3a7fd0", "4fa060", 0, 4, 0.2],
 	"cafe": ["f1cf9c", "8d9198", "6b3a2c", "3a6b3a", "8a2f3a", "e0b050", "f4f1e8", 3, 2, 0.14],
-	"oficina": ["e6eaee", "8f969c", "8a5a35", "3a5a8a", "8a8f95", "4f7a3a", "c8423a", 4, 2, 0.09],
-	"banco": ["dddbd3", "c8c4bc", "5b3b2a", "4f7fc0", "8a8f95", "d8b04a", "f4f1e8", 6, 1, 1.5],
-	"galeria": ["f4f4f0", "c8c4bc", "2f3036", "e0403a", "3a7fd0", "f2c23a", "4fa060", 6, 1, 1.5],
-	"viajes": ["d6ecf8", "c8c4bc", "3a6fc0", "3aa0d0", "f2c23a", "4fa060", "e06a3a", 6, 1, 1.5],
+	"oficina": ["e6eaee", "8f969c", "8a5a35", "3a5a8a", "8a8f95", "4f7a3a", "c8423a", 4, 2, 0.09, 5, 0.0],
+	"banco": ["e8e0cc", "c8c4bc", "6b4a32", "1f4f8a", "d8b04a", "3a6fc0", "c8423a", 8, 1, 1.5, 4, 0.0],
+	"galeria": ["f4f4f0", "c8c4bc", "2f3036", "e0403a", "3a7fd0", "f2c23a", "4fa060", 6, 1, 1.5, 2, 0.0],
+	"viajes": ["d6ecf8", "c8c4bc", "3a6fc0", "3aa0d0", "f2c23a", "4fa060", "e06a3a", 6, 1, 1.5, 5, 0.0],
+	"escuela": ["f1ead8", "b07a4a", "8a5a35", "e0403a", "3a7fd0", "f2c23a", "4fa060", 9, 1, 1.5, 5, 0.0],
+	"inmobiliaria": ["eef2f6", "c8c4bc", "5b3b2a", "6fae3a", "3a7fd0", "e8c060", "c8423a", 6, 1, 1.5, 5, 0.0],
 }
 
 ## Qué rubro corresponde a cada palabra del cartel (sin tildes, en minúscula). Gana la primera que aparece.
@@ -62,11 +66,13 @@ const PALABRAS := [
 	["ropa", "ropa"], ["farmacia", "farmacia"], ["panaderia", "panaderia"], ["golosinas", "golosineria"],
 	["minimercado", "minimercado"], ["cafe", "cafe"], ["confiteria", "cafe"], ["bar ", "bar"],
 	["banco", "banco"], ["cambio", "banco"], ["bolsa", "banco"], ["galeria", "galeria"], ["viajes", "viajes"],
-	["seguros", "oficina"], ["inmobiliaria", "oficina"], ["estudio", "oficina"], ["escuela", "oficina"],
+	["seguros", "oficina"], ["inmobiliaria", "inmobiliaria"], ["estudio", "oficina"], ["escuela", "escuela"],
 	["consultora", "oficina"],
 ]
 
 static var _mats := {}
+## Cada cartel que pidió vidriera y qué rubro le tocó ("" si ninguno): [texto, rubro]. Para revisar.
+static var registro: Array = []
 
 
 ## El rubro de un cartel ("" si no se reconoce).
@@ -91,6 +97,8 @@ static func material(r: String) -> ShaderMaterial:
 	m.set_shader_parameter("forma", d[7])
 	m.set_shader_parameter("filas", float(d[8]))
 	m.set_shader_parameter("celda", d[9])
+	m.set_shader_parameter("muebles", d[10] if d.size() > 10 else 0)
+	m.set_shader_parameter("damero", d[11] if d.size() > 11 else 0.0)
 	_mats[r] = m
 	return m
 
@@ -101,6 +109,7 @@ static func material(r: String) -> ShaderMaterial:
 static func poner(padre: Node3D, centro: Vector3, rot_y: float, tam: Vector2, texto: String,
 		bajo := 0.5) -> MeshInstance3D:
 	var r := rubro(texto)
+	registro.append([texto, r])
 	if r == "" or tam.x < 1.0:
 		return null
 	var q := QuadMesh.new()

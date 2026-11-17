@@ -355,6 +355,9 @@ static func _sala(padre: Node3D, casa: Node3D, w_edificio: float, d: float, colo
 	ce.piso = piso
 	ce.con_cinematica = not local
 	ce.ruta = ruta_zigzag(w, d, ce.x_frente, ce.x_fondo, esc["alturas"], esc["amp"])
+	if local:   # El local se recorre a pie: la ruta de prueba es recta (vidriera, el medio, ventana de atrás)
+		ce.ruta = [Vector3(ce.x_frente, CasaEnterable.Y_PASO, d / 2.0 - 0.5), Vector3(ce.x_frente, CasaEnterable.Y_PASO, 0.0),
+			Vector3(ce.x_fondo, CasaEnterable.Y_PASO - 0.1, -d / 2.0 + 0.5)]
 	for t in esc["textos"]:
 		ce.textos.append(str(t))
 
@@ -382,9 +385,11 @@ static func _sala(padre: Node3D, casa: Node3D, w_edificio: float, d: float, colo
 
 	# --- Adentro: texturas, muebles sobre la ruta, adornos y luz
 	_interior(sala, ce, w, d, esc)
-	ce.obstaculos = _obstaculos(sala, ce, tema)
+	ce.obstaculos = PlanoLocal.armar(sala, ce, tema) if local else _obstaculos(sala, ce, tema)
 	ce.luz = _adornos(sala, ce, tema, esc["cartel"])
 	_mas_adornos(sala, ce, tema)
+	if local:   # En el local también cuentan los muebles de las paredes (estantes, heladeras...)
+		ce.obstaculos += (ce.get_meta(&"ocupado", []) as Array).size()
 	padre.add_child(ce)
 	ce.transform = casa.transform * Transform3D(Basis.IDENTITY, Vector3(x_off, y0, 0))
 	if local:
@@ -757,23 +762,23 @@ static func _adorno(casa: Node3D, ce: CasaEnterable, ruta: PackedVector3Array, n
 ## Lo que se pone contra las paredes de cada escenario, en orden. En los locales se repite si sobra
 ## pared (un súper tiene muchas heladeras); en las casas cada cosa respeta LIMITE y hay pocas.
 const DECO := {
-	"libreria": ["biblioteca", "silla", "lampara_pie", "biblioteca", "mesa_ratona", "maceta", "biblioteca", "cajas"],
-	"panaderia": ["estante_panes", "canasto_panes", "silla", "maceta", "estante_panes", "cajas", "mesa_ratona"],
+	"libreria": ["biblioteca"],
+	"panaderia": ["estante_panes"],
 	"conventillo": ["torre_macetas", "silla", "maceta", "lampara_pie"],
-	"oficina": ["archivero", "silla", "maceta", "dispenser", "planta_alta", "lampara_pie", "archivero", "cajas"],
-	"fiambreria": ["barril", "heladera_vitrina", "cajas", "barril", "silla", "maceta", "estante_panes"],
-	"supermercado": ["heladera_bebidas", "gondola", "canasto_super", "heladera_bebidas", "cajon_frutas", "gondola", "cajas"],
-	"verduleria": ["cajon_frutas", "estante_cajones", "cajon_verduras", "canasto_panes", "cajon_frutas", "maceta", "cajas"],
-	"cafe": ["mesa_cafe", "maceta", "mesa_cafe", "tacho", "heladera_bebidas", "mesa_cafe", "lampara_pie"],
-	"restaurante": ["mesa_mantel", "silla", "jardinera_alta", "mesa_mantel", "silla", "maceta", "barril"],
-	"consultorio": ["sillas_espera", "maceta", "balanza_medica", "silla_ruedas", "armario_medico", "sillas_espera", "dispenser"],
-	"mecanico": ["pila_neumaticos", "caja_herramientas", "barril", "tablero_herramientas", "pila_neumaticos", "banco_trabajo", "cajas"],
-	"farmacia": ["armario_medico", "gondola", "balanza_medica", "gondola", "maceta", "armario_medico"],
-	"kiosco": ["heladera_bebidas", "gondola", "canasto_super", "cajas", "heladera_bebidas", "gondola"],
-	"heladeria": ["mesa_cafe", "maceta", "mesa_cafe", "heladera_bebidas", "tacho", "mesa_cafe"],
-	"ferreteria": ["tablero_herramientas", "caja_herramientas", "barril", "cajas", "gondola", "pila_neumaticos"],
-	"peluqueria": ["tocador_espejo", "sillon_peluqueria", "tocador_espejo", "sillas_espera", "maceta", "planta_alta"],
-	"floreria": ["balde_flores", "maceta", "torre_macetas", "balde_flores", "planta_alta", "maceta"],
+	"oficina": ["archivero", "planta_alta", "archivero", "dispenser"],
+	"fiambreria": ["heladera_vitrina"],
+	"supermercado": ["heladera_bebidas"],
+	"verduleria": ["estante_cajones", "cajon_verduras"],
+	"cafe": ["planta_alta", "heladera_bebidas"],
+	"restaurante": ["jardinera_alta"],
+	"consultorio": ["armario_medico", "balanza_medica", "maceta"],
+	"mecanico": ["tablero_herramientas", "pila_neumaticos", "caja_herramientas", "barril"],
+	"farmacia": ["armario_medico"],
+	"kiosco": ["heladera_bebidas", "gondola"],
+	"heladeria": ["heladera_bebidas", "maceta"],
+	"ferreteria": ["tablero_herramientas"],
+	"peluqueria": ["sillas_espera", "maceta"],
+	"floreria": ["torre_macetas", "balde_flores"],
 	# Casas: pocas cosas y coherentes (lo grande de cada ambiente ya está en la ruta, el rincón y lo propio)
 	"living": ["sillon_azul", "lampara_pie", "maceta", "biblioteca", "silla"],
 	"dormitorio": ["mesita_luz", "lampara_pie", "maceta", "silla"],
@@ -785,6 +790,9 @@ const DECO := {
 }
 ## Cuántos muebles contra las paredes, como mucho, en un ambiente de casa (los locales, sin límite).
 const DECO_MAX_CASA := 5
+## En los locales, cuánto aire queda entre mueble y mueble de la pared (lo que no está, 0,35 m).
+const DECO_AIRE := {"cafe": 2.4, "heladeria": 2.4, "restaurante": 2.6, "consultorio": 0.8, "oficina": 1.0,
+	"peluqueria": 1.2, "mecanico": 0.8, "floreria": 0.6}
 ## Lo que va en el rincón de atrás a la izquierda (si no está, el sillón con el gato y la lámpara).
 const RINCON := {"supermercado": "heladera_bebidas", "verduleria": "cajon_verduras", "consultorio": "sillas_espera",
 	"restaurante": "mesa_mantel", "fiambreria": "barril", "panaderia": "canasto_panes", "cafe": "mesa_cafe",
@@ -864,7 +872,7 @@ static func _mas_adornos(casa: Node3D, ce: CasaEnterable, tema: String) -> void:
 			if centro + tam.x * s / 2.0 < largo - 0.6 and lejos_ventana and _adorno(casa, ce, ruta, nombre, p, float(pared[4]), s):
 				k += 1
 				puestos += 1
-				t += tam.x * s + (1.2 if casa_de_familia else 0.35)   # En las casas, con aire entre mueble y mueble
+				t += tam.x * s + (1.2 if casa_de_familia else float(DECO_AIRE.get(tema, 0.35)))   # En las casas, con aire entre mueble y mueble
 			else:
 				t += 0.5
 	# Un cuadro en las paredes de adelante y de atrás (sólo donde van cuadros), en el tramo de pared
@@ -894,7 +902,9 @@ static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: Stri
 	if pared[2]:
 		Kit.colocar(casa, "alfombra", Vector3(0, 0.02, 0), 0.0, Vector3(minf(w * 0.3, 2.2), 1.0, minf(d * 0.35, 2.0)) / Vector3(2.4, 1.0, 1.6) * 1.6)
 	# Rincón de atrás a la izquierda: algo del lugar, o el sillón con el gato encima y una lámpara
-	if RINCON.has(tema):
+	if not ce.con_cinematica:
+		pass   # En los locales, el mostrador y lo del rubro ya los puso PlanoLocal
+	elif RINCON.has(tema):
 		var nombre_r: String = RINCON[tema]
 		var tam_r: Vector3 = MueblesDatos.PIEZAS[nombre_r]["tam"]
 		_adorno(casa, ce, ruta, nombre_r, Vector3(-hx + tam_r.z / 2.0 + 0.08, 0.02, -hz + tam_r.x / 2.0 + 0.3), PI / 2.0,
@@ -914,9 +924,10 @@ static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: Stri
 	elif rincon == "cajas":
 		_adorno(casa, ce, ruta, "cajas", Vector3(hx - 0.5, 0.02, -hz + 0.5), 0.3)
 	# Algo propio de cada lugar, contra la pared derecha
-	var propio: String = PROPIO[tema]
-	var tam_p: Vector3 = MueblesDatos.PIEZAS[propio]["tam"]
-	_adorno(casa, ce, ruta, propio, Vector3(hx - tam_p.z / 2.0 - 0.1, 0.02, 0.0), -PI / 2.0)
+	var propio: String = PROPIO[tema] if ce.con_cinematica else ""
+	if propio != "":
+		var tam_p: Vector3 = MueblesDatos.PIEZAS[propio]["tam"]
+		_adorno(casa, ce, ruta, propio, Vector3(hx - tam_p.z / 2.0 - 0.1, 0.02, 0.0), -PI / 2.0)
 	# Estantes con libros en la pared de atrás (sólo donde van, salvo frente a la ventana) y cuadros a
 	# los costados (cuántos, según el lugar)
 	for lado in [-1.0, 1.0]:
