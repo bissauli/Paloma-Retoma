@@ -1333,7 +1333,78 @@ def lavarropas():
     mueble("lavarropas", p)
 
 
+# ================================================================= LOCALES NUEVOS 2 (peluquería, heladería, florería, farmacia)
+def sillon_peluqueria():
+    p = [parte(cil((0, 0, 0), (0, 0, 0.05), 0.3, 0.32, 14), "metal", 0.01),
+         parte(cil((0, 0, 0.05), (0, 0, 0.45), 0.05, 0.05, 8), "metal", 0),
+         parte(caja(0.55, 0.55, 0.14, 0, 0, 0.45), "auto_negro", 0.05),
+         parte(caja(0.55, 0.12, 0.7, 0, 0.24, 0.55), "auto_negro", 0.05),
+         parte(caja(0.3, 0.1, 0.16, 0, 0.26, 1.25), "auto_negro", 0.04)]          # Apoyacabeza
+    for sx in (-1, 1):
+        p.append(parte(caja(0.08, 0.5, 0.06, sx * 0.3, 0, 0.72), "metal", 0.01))   # Apoyabrazos
+        p.append(parte(caja(0.04, 0.04, 0.2, sx * 0.3, 0.2, 0.55), "metal", 0))
+    p.append(parte(caja(0.4, 0.12, 0.04, 0, -0.38, 0.18), "metal", 0.005))         # Apoyapies
+    mueble("sillon_peluqueria", p)
+
+
+def tocador_espejo():
+    w, d, h = 1.0, 0.68, 3.6
+    p = [parte(caja(w, d * 0.7, 0.9, 0, 0.1, 0), "blanco", 0.03),
+         parte(caja(w + 0.04, d * 0.75, 0.04, 0, 0.1, 0.9), "piedra", 0.01),
+         parte(caja(w * 0.9, 0.06, 1.4, 0, 0.3, 1.0), "madera_osc", 0.02),          # Marco del espejo
+         parte(caja(w * 0.8, 0.02, 1.25, 0, 0.27, 1.07), "vidrio", 0)]
+    for i in range(5):   # Lamparitas arriba del espejo
+        p.append(parte(bola((-0.36 + i * 0.18, 0.26, 2.47), 0.04, sub=1), "luz", 0))
+    for i, c in enumerate(("flor_rosa", "goma_azul", "flor_violeta", "blanco")):   # Frascos y peine
+        p.append(parte(cil((-0.35 + i * 0.12, 0.05, 0.94), (-0.35 + i * 0.12, 0.05, 1.08), 0.03, 0.03, 8), c, 0.004))
+    p.append(parte(caja(0.2, 0.04, 0.015, 0.25, 0.0, 0.94), "auto_negro", 0.004))
+    p.append(parte(caja(0.12, 0.1, 0.18, 0.35, 0.1, 0.94), "naranja", 0.02))      # Secador
+    p.append(parte(caja(w, 0.1, 0.25, 0, 0.3, 2.6), "flor_rosa", 0.02))             # Cartel arriba
+    mueble("tocador_espejo", p)
+
+
+def vitrina_helados():
+    w, d, h = 1.4, 0.9, 1.2
+    p = [parte(caja(w, d, 0.85, 0, 0, 0), "fachada_celeste", 0.03),
+         parte(caja(w + 0.04, d + 0.04, 0.05, 0, 0, 0.85), "metal", 0.012),
+         parte(caja(w - 0.04, d - 0.1, 0.3, 0, 0.03, 0.9), "vidrio", 0.01, plano=True)]
+    gustos = ["flor_rosa", "tronco", "blanco", "flor_amarilla", "hoja_clara", "flor_violeta", "remate_marron", "naranja"]
+    for i in range(8):   # Ocho gustos en sus bachas
+        x = -0.51 + (i % 4) * 0.34
+        y = -0.15 + (i // 4) * 0.3
+        p.append(parte(caja(0.3, 0.26, 0.06, x, y, 0.84), "metal", 0.005))
+        p.append(parte(bola((x, y, 0.92), 0.12, (1.1, 0.95, 0.45), sub=1), gustos[i], 0))
+    p.append(parte(cil((0.55, 0.3, 0.9), (0.55, 0.3, 1.1), 0.05, 0.07, 8), "letrero_crema", 0.004))   # Cucuruchos
+    mueble("vitrina_helados", p)
+
+
+def balde_flores():
+    p = []
+    colores = ["flor_roja", "flor_amarilla", "flor_rosa", "flor_violeta", "flor_blanca", "flor_naranja"]
+    rng = random.Random(23)
+    for i, (x, y) in enumerate(((-0.32, -0.12), (0.0, -0.12), (0.32, -0.12), (-0.16, 0.15), (0.16, 0.15))):
+        p.append(parte(cil((x, y, 0), (x, y, 0.4), 0.13, 0.16, 12), "metal" if i % 2 else "plastico_verde", 0.01))
+        for k in range(6):
+            a = k * math.tau / 6
+            fx, fy = x + math.cos(a) * 0.07, y + math.sin(a) * 0.07
+            alto = rng.uniform(0.75, 1.0)
+            p.append(parte(cil((x, y, 0.35), (fx, fy, alto), 0.008, 0.008, 4), "hoja_osc", 0))
+            p.append(parte(bola((fx, fy, alto + 0.04), 0.06, sub=1), colores[(i + k) % len(colores)], 0))
+    mueble("balde_flores", p)
+
+
+def cartel_cruz():
+    p = [parte(cil((0, 0, 0.5), (0, 0, 0.64), 0.01, 0.01, 4), "hierro", 0),
+         parte(caja(0.6, 0.1, 0.2, 0, 0, 0.2), "hoja", 0.03),
+         parte(caja(0.2, 0.1, 0.6, 0, 0, 0.0), "hoja", 0.03),
+         parte(caja(0.5, 0.11, 0.12, 0, 0, 0.24), "luz_verde", 0.01),
+         parte(caja(0.12, 0.11, 0.5, 0, 0, 0.05), "luz_verde", 0.01)]
+    mueble("cartel_cruz", p)
+
+
 # ================================================================= construir y exportar
+for f in (sillon_peluqueria, tocador_espejo, vitrina_helados, balde_flores, cartel_cruz):
+    f()
 for f in (comoda, vajillero, heladera_casa, alacena_alta, mesada, cocina_horno, banera, inodoro, lavatorio,
           armario_bano, cajonera_juguetes, movil_estrellas, oso_peluche, cama_chica, tablero_herramientas,
           pila_neumaticos, lampara_taller, banco_trabajo, caja_herramientas, lavarropas):

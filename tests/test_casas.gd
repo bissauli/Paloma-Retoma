@@ -34,8 +34,9 @@ func _ready() -> void:
 		else:
 			locales.append(casa)
 	var n := Edificios.ALREDEDORES.size()
-	_check("hay un local y un departamento por edificio (%d y %d)" % [locales.size(), deptos.size()],
-		locales.size() == n and deptos.size() == n)
+	_check("hay al menos un local por edificio y un departamento por edificio (%d y %d)" % [locales.size(), deptos.size()],
+		locales.size() >= n and deptos.size() == n)
+	_check("los edificios anchos tienen dos locales (hay más locales que edificios: %d)" % locales.size(), locales.size() > n)
 	if deptos.size() < 4:
 		get_tree().quit(1)
 		return
@@ -52,16 +53,27 @@ func _ready() -> void:
 		_check("%s: el local es de la lista de locales" % casa.name, Pasaje.LOCALES.has(casa.tema))
 		_check("%s: el local está en la planta baja" % casa.name, casa.piso == 0 and absf(casa.global_position.y) < 0.01)
 		_check("%s: al local se entra caminando (la vidriera llega al piso)" % casa.name, _cruza(casa, casa.x_frente, -1.0, 0.35))
+		var personas := 0
+		for g in get_tree().get_nodes_in_group("cuerpos_humanos"):
+			if (g as Node3D).get_parent() is GenteLocal and ((g as Node3D).get_parent() as GenteLocal).ce == casa:
+				personas += 1
+		_check("%s: tiene empleado y al menos un cliente (%d personas)" % [casa.name, personas], personas >= 2)
 	for casa in deptos:
 		temas_d[casa.tema] = true
 		pisos[casa.piso] = true
 		print("  %s: departamento (%s) en el piso %d" % [casa.name, casa.tema, casa.piso])
 		_check("%s: es un ambiente de casa" % casa.name, Pasaje.AMBIENTES.has(casa.tema))
+		var cuenta: Dictionary = casa.get_meta(&"cuenta", {})
+		var de_mas := []
+		for mueble in cuenta:
+			if Pasaje.LIMITE.has(mueble) and int(cuenta[mueble]) > int(Pasaje.LIMITE[mueble]):
+				de_mas.append("%s x%d" % [mueble, cuenta[mueble]])
+		_check("%s: nada repetido de más (un lavarropas, un horno, una cama...)%s" % [casa.name, "" if de_mas.is_empty() else " " + str(de_mas)], de_mas.is_empty())
 		_check("%s: está en un piso del %d al %d" % [casa.name, Pasaje.PISO_MIN, Pasaje.PISO_MAX],
 			casa.piso >= Pasaje.PISO_MIN and casa.piso <= Pasaje.PISO_MAX)
 		_check("%s: está a la altura de su piso" % casa.name,
 			absf(casa.global_position.y - casa.piso * Pasaje.ALTO_PISO) < 0.01)
-	_check("los locales son todos distintos (%d)" % temas_l.size(), temas_l.size() == n)
+	_check("los locales son todos distintos (%d)" % temas_l.size(), temas_l.size() == locales.size())
 	_check("los ambientes son todos distintos (%d)" % temas_d.size(), temas_d.size() == n)
 	_check("hay al menos 7 ambientes de casa posibles (%d)" % Pasaje.AMBIENTES.size(), Pasaje.AMBIENTES.size() >= 7)
 	_check("los pisos no son todos iguales (%d distintos)" % pisos.size(), pisos.size() > 1)
@@ -155,8 +167,9 @@ func _ready() -> void:
 	_check("vuelve la cámara del juego", not (get_viewport().get_camera_3d() is CamaraCinematica))
 	await _frames(60)
 	var pa := paloma.global_position
-	_check("al salir por atrás sigue volando, fuera de la casa y dentro de la ciudad", not casa_a.esta_adentro(pa)
-		and pa.z > Ciudad.Z_MIN and pa.x > Ciudad.X_MIN and pa.x < Ciudad.X_MAX and paloma.velocity.length() > 1.0)
+	# (Que siga a toda velocidad depende de qué haya detrás: con el piso al azar puede toparse con otro edificio)
+	_check("al salir por atrás queda fuera de la casa y dentro de la ciudad", not casa_a.esta_adentro(pa)
+		and pa.z > Ciudad.Z_MIN and pa.z < Ciudad.Z_MAX and pa.x > Ciudad.X_MIN and pa.x < Ciudad.X_MAX)
 	await _frames(60)
 
 	# --- Atrás -> adelante: del callejón a la plaza, en otra casa
@@ -214,7 +227,16 @@ func _barrido(desde: Vector3, mov: Vector3, radio := 0.22) -> bool:
 	q.transform = Transform3D(Basis.IDENTITY, desde)
 	q.motion = mov
 	var r := paloma.get_world_3d().direct_space_state.cast_motion(q)
-	return r.size() > 0 and float(r[0]) >= 0.999
+	var ok := r.size() > 0 and float(r[0]) >= 0.999
+	if not ok and r.size() > 0:   # Qué la frenó (para saber qué arreglar)
+		q.transform = Transform3D(Basis.IDENTITY, desde + mov * float(r[1]))
+		q.motion = Vector3.ZERO
+		var info := paloma.get_world_3d().direct_space_state.get_rest_info(q)
+		if not info.is_empty():
+			var obj := instance_from_id(info["collider_id"]) as Node
+			print("    la frena: %s en %s" % [obj.get_path() if obj else "?", info["point"]])
+	return ok
+
 
 
 ## Recorre la curva (local a la casa) con una esfera un poco más gorda que la paloma.

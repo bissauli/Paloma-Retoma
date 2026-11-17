@@ -73,6 +73,7 @@ var _mezcla := 0.0             ## 0..1: de la persecución a la coreografía del
 var _vista := Vector3.ZERO     ## Hacia dónde mira la cámara (con su inercia de giro)
 var _vista_vel := 0.0         ## Velocidad de giro de la mirada (rad/s)
 var _quieta := Vector3.INF    ## El plano final: dónde se queda la cámara viendo cómo se aleja
+var _salida := Vector3.INF    ## De frente: dónde espera la cámara a que salga (libre; ver _punto_salida)
 
 var _cooldown := 0.0
 var _saltear := false
@@ -382,6 +383,7 @@ func _empezar(desde_frente: bool) -> void:
 	_mezcla = 0.0
 	_vista_vel = 0.0
 	_quieta = Vector3.INF
+	_salida = Vector3.INF
 	_efectos_hechos.clear()
 	robo = false
 	if is_instance_valid(_salame):
@@ -577,6 +579,8 @@ func _process(delta: float) -> void:
 	_cam_vel = (r[1] as Vector3) + v_ref
 	if estilo == Estilo.DE_FRENTE:
 		_mantener_distancia(p)
+	if adentro:
+		_no_salir_del_cuarto()
 	var cerca := clampf(inverse_lerp(1.6, 0.7, _cam_pos.distance_to(p)), 0.0, 1.0)
 	var m := _resorte(_cam_mira, mira_obj, _mira_vel, lerpf(0.1, 0.22, cerca), delta)
 	_cam_mira = m[0]
@@ -588,6 +592,29 @@ func _process(delta: float) -> void:
 	var giro_max := lerpf(210.0, 260.0, _saliendo()) if estilo == Estilo.DE_FRENTE else 150.0
 	_girar_vista(_cam_mira - _cam_pos, deg_to_rad(giro_max), delta)
 	_camara.corte(_cam_pos, _cam_pos + _vista * 4.0, _cam_fov)
+
+
+## Mientras la paloma está adentro, la cámara no sale del cuarto (ni la saca el resorte ni el empuje
+## que la aleja de la paloma): si se pasa de una pared vuelve al borde y pierde la velocidad hacia
+## afuera. La única excepción: salir por la ventana de salida en el estilo de frente.
+func _no_salir_del_cuarto() -> void:
+	var lo := to_local(_cam_pos)
+	var vl := global_transform.basis.inverse() * _cam_vel
+	var mx := ancho / 2.0 - ESPESOR - 0.3
+	var mz := fondo / 2.0 - ESPESOR - 0.3
+	var por_ventana := estilo == Estilo.DE_FRENTE and absf(lo.x - _x_ventana_salida()) < VENTANA_ANCHO / 2.0 - 0.2 \
+		and signf(lo.z) == (-1.0 if _desde_frente else 1.0) and lo.y > VENTANA_Y0 and lo.y < VENTANA_Y1
+	if absf(lo.x) > mx:
+		lo.x = clampf(lo.x, -mx, mx)
+		vl.x = 0.0
+	if absf(lo.z) > mz and not por_ventana:
+		lo.z = clampf(lo.z, -mz, mz)
+		vl.z = 0.0
+	if lo.y < 0.4 or lo.y > Pasaje.PLANTA_BAJA - 0.4:
+		lo.y = clampf(lo.y, 0.4, Pasaje.PLANTA_BAJA - 0.4)
+		vl.y = 0.0
+	_cam_pos = to_global(lo)
+	_cam_vel = global_transform.basis * vl
 
 
 ## De frente la cámara nunca se pega a la paloma: si el resorte la trae a menos de DIST_MIN (al dar
@@ -713,10 +740,41 @@ func _x_ventana_salida() -> float:
 ## a un costado. La ve salir y alejarse, y queda detrás de ella para devolverle el mando a la cámara
 ## del juego sin dar vueltas. Al callejón, contra el fondo y del lado contrario al que dobla; a la
 ## plaza, a un costado de la ventana.
+## Como las salas están en un piso al azar, detrás puede haber otro edificio: se toma el primero de
+## varios lugares (de lejos a cerca, y si no, adentro del cuarto junto a la ventana) que esté libre y
+## desde el que se vea la ventana. Se calcula una vez por pasada.
 func _punto_salida() -> Vector3:
-	if _desde_frente:
-		return to_global(Vector3(x_fondo - lado_callejon * 2.3, Y_PASO + 1.2, -fondo / 2.0 - CALLEJON + 0.5))
-	return to_global(Vector3(x_frente + 2.1 * _lado_orbita, Y_PASO + 0.6, fondo / 2.0 + 3.2))
+	if _salida != Vector3.INF:
+		return _salida
+	var z := -1.0 if _desde_frente else 1.0
+	var xv := x_fondo if _desde_frente else x_frente
+	var costado := -lado_callejon if _desde_frente else _lado_orbita
+	var candidatos := [
+		Vector3(xv + costado * 2.3, Y_PASO + 1.2, z * (fondo / 2.0 + CALLEJON - 0.5)),
+		Vector3(xv + costado * 1.8, Y_PASO + 1.0, z * (fondo / 2.0 + 2.0)),
+		Vector3(xv + costado * 1.4, Y_PASO + 0.8, z * (fondo / 2.0 + 1.0)),
+		Vector3(xv + costado * 1.6, Y_PASO + 1.3, z * (fondo / 2.0 - ESPESOR - 1.2)),   # Adentro, junto a la ventana
+	]
+	# En un piso alto, afuera puede haber cosas sin colisión (copas de árboles, adornos de otros
+	# edificios) que la física no ve: ahí la cámara espera adentro, junto a la ventana, y la ve salir
+	if piso > 0:
+		candidatos.push_front(candidatos.pop_back())
+	var espacio := get_world_3d().direct_space_state
+	var ventana := to_global(Vector3(xv, Y_PASO, z * fondo / 2.0))
+	_salida = to_global(candidatos[candidatos.size() - 1])
+	for c: Vector3 in candidatos:
+		var g := to_global(c)
+		var punto := PhysicsPointQueryParameters3D.new()
+		punto.position = g
+		punto.collision_mask = 1
+		if not espacio.intersect_point(punto, 1).is_empty():
+			continue   # Adentro de algo (otro edificio, un árbol...)
+		var rayo := PhysicsRayQueryParameters3D.create(g, ventana + (g - ventana).normalized() * 0.6, 1)
+		if not espacio.intersect_ray(rayo).is_empty():
+			continue   # No se ve la ventana
+		_salida = g
+		break
+	return _salida
 
 
 ## Cuánto lugar hay en un punto (global) dentro del cuarto: distancia a la pared más cercana.
