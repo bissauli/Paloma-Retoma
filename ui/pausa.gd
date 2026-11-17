@@ -7,6 +7,7 @@ const TEMA := preload("res://ui/tema/tema_paloma.tres")
 
 var _opciones: OpcionesMenu
 var _diario: DiarioMisiones
+var _album: PantallaAlbum
 var _hud: CanvasLayer             ## El HUD, escondido mientras están las Opciones (null = no se escondió)
 
 
@@ -26,6 +27,10 @@ func _ready() -> void:
 	add_child(_diario)
 	_diario.cerrada.connect(_al_cerrar_pantalla.bind(%Misiones))
 	%Misiones.pressed.connect(_abrir_diario)
+	_album = PantallaAlbum.new()
+	add_child(_album)
+	_album.cerrada.connect(_al_cerrar_pantalla.bind(%Album))
+	%Album.pressed.connect(_abrir_album)
 	if not Ajustes.movil:
 		_armar_controles()
 
@@ -139,6 +144,7 @@ func continuar() -> void:
 	AudioManager.ui("unpause", -4.0)
 	_opciones.cerrar()
 	_diario.cerrar()
+	_album.cerrar()
 	visible = false
 	get_tree().paused = false
 	Ajustes.capturar_mouse(true)
@@ -154,11 +160,17 @@ func _salir() -> void:
 	GameState.guardar_partida()
 	get_tree().paused = false
 	GameState.en_partida = false
+	AvisoAccion.limpiar()
 	get_tree().change_scene_to_file(ESCENA_MENU)
 
 
 func _abrir_opciones() -> void:
 	_abrir_pantalla(_opciones)
+
+
+func _abrir_album() -> void:
+	_album.refrescar()
+	_abrir_pantalla(_album)
 
 
 func _abrir_diario() -> void:

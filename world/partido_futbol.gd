@@ -43,6 +43,8 @@ const ZONA_PERFECTA := Vector2(0.74, 0.9)   ## Franja de la barra de potencia do
 const PEN_DIST := 8.0             ## Distancia del punto penal al arco
 const GRAB_MAX := 150             ## Cuadros que se graban para la repetición (2,5 s)
 const VEL_REPETICION := 0.5
+const ATASCO_RADIO := 3.5         ## Si la pelota no sale de este radio durante ATASCO_SEG, se desata el atasco
+const ATASCO_SEG := 5.0
 
 const HOMES_A := [Vector3(121.5, SUELO, 68.0), Vector3(127.5, SUELO, 62.0), Vector3(127.5, SUELO, 74.0),
 	Vector3(132.5, SUELO, 68.0)]
@@ -87,6 +89,8 @@ var _perfecto_hasta := 0.0              ## Hasta cuándo el arquero rival sigue 
 var _pase_flag := false                 ## El próximo toque es un pase (para el relator)
 var _ultimo_toque: Node3D
 var _t_casi := 0.0
+var _atasco_ancla := Vector3.ZERO       ## Dónde estaba la pelota cuando empezó a contar el atasco
+var _atasco_t := 0.0
 var _vel_previa := 0.0                  ## Velocidad de caminar de la jugadora antes del partido
 var _sorpresas: Array[Dictionary] = []  ## {pos, t, nodo}
 # Penales
@@ -669,10 +673,42 @@ func _paso_juego(delta: float) -> void:
 		return
 	_ia(delta, b)
 	_jugar_jugadora(delta, b)
+	_vigilar_atasco(delta, b)
 	_t_hud -= delta
 	if _t_hud <= 0.0:
 		_t_hud = 0.25
 		_actualizar_hud(tr("A los %d goles gana") % GOLES_META)
+
+
+## Si la pelota lleva ATASCO_SEG segundos dando vueltas en el mismo lugar (dos palomas que se la sacan una a la
+## otra sin parar), se desata: choque entre las dos más cercanas, que quedan aturdidas, y la pelota sale rebotada.
+func _vigilar_atasco(delta: float, b: Vector3) -> void:
+	if _dxz(b, _atasco_ancla) > ATASCO_RADIO or _balon.freeze:
+		_atasco_ancla = b
+		_atasco_t = 0.0
+		return
+	_atasco_t += delta
+	if _atasco_t < ATASCO_SEG:
+		return
+	_atasco_t = 0.0
+	var cercanas: Array[Dictionary] = []
+	for e in _equipo:
+		var p: PalomaNPC = e["p"]
+		if e["rol"] == "campo" and is_instance_valid(p) and float(e["stun"]) <= 0.0 and _dxz(p.global_position, b) < 4.0:
+			cercanas.append(e)
+	cercanas.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
+		return _dxz((x["p"] as Node3D).global_position, b) < _dxz((y["p"] as Node3D).global_position, b))
+	for i in mini(2, cercanas.size()):
+		_aturdir(cercanas[i], 1.4, tr("¡Chocaron!"))
+	# Sale hacia el centro de la cancha (a lo ancho si ya está en el medio)
+	var dir := Vector3(CENTRO.x - b.x, 0.0, CENTRO.z - b.z)
+	if dir.length() < 3.0:
+		dir = Vector3(randf_range(-1.0, 1.0), 0.0, 1.0 if randf() < 0.5 else -1.0)
+	dir = dir.normalized().rotated(Vector3.UP, randf_range(-0.5, 0.5))
+	_balon.linear_velocity = dir * 7.5 + Vector3.UP * 3.0
+	_balon.angular_velocity = Vector3(dir.z, 0.0, -dir.x) * 8.0
+	_pos_eq = -1
+	_relato(tr("¡Se la disputan y sale rebotada!"), Color.WHITE)
 
 
 ## "¡Casi!" cuando la pelota pasa pegada al palo o se va por arriba del travesaño.
@@ -795,6 +831,9 @@ func _paso_repeticion(delta: float) -> void:
 			var mp: Variant = n.get("modelo")
 			if mp is ModeloPaloma:
 				(mp as ModeloPaloma).rotation.y = rs[k]
+			if n is PalomaJugador:
+				# Si no, la jugadora vuelve a orientar el modelo con su rumbo actual y se ve al revés
+				(n as PalomaJugador)._rumbo = rs[k]
 		return
 	_repeticion_texto.visible = false
 	if is_instance_valid(_jugadora):

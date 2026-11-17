@@ -366,6 +366,33 @@ func bajar_calesita() -> void:
 			p.levantar()
 
 
+## La jugadora hace un emote: al menos la mitad de la bandada cercana hace el mismo y el resto, el mismo u otro
+## al azar. Empiezan escalonadas para que no se vea todo sincronizado.
+func imitar_baile(baile: StringName) -> void:
+	if _jugador == null:
+		_jugador = GameState.jugador
+	var jpos := _jugador.global_position if _jugador else Vector3.ZERO
+	var aptas: Array[PalomaNPC] = []
+	for p in seguidoras:
+		if p.controlada or p.tiene_puesto() or p.global_position.distance_to(jpos) > 40.0:
+			continue
+		aptas.append(p)
+	aptas.shuffle()
+	var iguales := ceili(aptas.size() * 0.5)
+	for i in aptas.size():
+		var p := aptas[i]
+		var cual: StringName = baile
+		if i >= iguales and randf() < 0.6:
+			cual = Coreografia.ORDEN[randi() % Coreografia.ORDEN.size()]
+		p.bailar_emote(cual, randf_range(0.0, 0.6))
+
+
+## La jugadora dejó de bailar: todas retoman lo suyo.
+func parar_baile() -> void:
+	for p in seguidoras:
+		p.parar_emote()
+
+
 ## Cuántas seguidoras ya están sentadas en su puesto.
 func cantidad_sentadas() -> int:
 	var n := 0
@@ -597,6 +624,8 @@ func _mover_seguidoras(delta: float) -> void:
 		var p := seguidoras[i]
 		if p.controlada:
 			continue    # Juega o alienta en el partido de fútbol
+		if p.bailando_emote:
+			continue    # Imita el emote de la jugadora
 		if (descansando or en_calesita != null) and p.tiene_puesto():
 			p.paso_posada(delta, _rumbo_descanso)
 			continue

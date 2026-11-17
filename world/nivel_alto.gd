@@ -651,6 +651,9 @@ static func poste(ci: Ciudad, p: Vector3, dir: Vector3, adentro: Vector3) -> voi
 	caja(n, Vector3(0, 6.68, -1.6), Vector3(0.28, 0.12, 0.55), c("metal"))
 	caja(n, Vector3(0, 6.61, -1.6), Vector3(0.22, 0.03, 0.45), c("luz"))
 	muestras.append(["poste", p + Vector3(0, 1.1, 0)])
+	# La lámpara también se prende de noche (ver LucesNoche)
+	var cabeza := Transform3D(Basis.from_euler(Vector3(0, atan2(adentro.x, adentro.z), 0)), p) * Vector3(0, 6.55, -1.6)
+	LucesNoche.faroles_extra.append([cabeza, p.y, 0.8])
 	contar("poste")
 
 

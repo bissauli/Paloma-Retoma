@@ -382,6 +382,28 @@ var puesto := Vector3.INF
 var sentada := false
 
 
+## Imita un emote de la jugadora (ver Bandada.imitar_baile): se queda en el lugar bailando.
+var bailando_emote := false
+
+
+func bailar_emote(baile: StringName, retraso := 0.0) -> void:
+	if retraso > 0.0:
+		await get_tree().create_timer(retraso).timeout
+	if not is_inside_tree() or modo != Modo.SIGUIENDO or controlada:
+		return
+	modelo.permite_baile = true
+	bailando_emote = true
+	velocidad = Vector3.ZERO
+	modelo.bailar(baile)
+
+
+func parar_emote() -> void:
+	if not bailando_emote:
+		return
+	bailando_emote = false
+	modelo.dejar_de_bailar()
+
+
 ## Partido de fútbol (world/partido_futbol.gd): mientras "controlada" es true, ni la bandada ni sus
 ## propios pasos de física la mueven; el partido la maneja con ir_controlada y animar_hincha.
 var controlada := false

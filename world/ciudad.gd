@@ -113,6 +113,8 @@ var _ocupado := {}                  ## Celda de 4 m -> huellas (Rect2 en X/Z) de
 var _reservado: Array[Rect2] = []   ## Huellas que no son piezas del kit (la obra de la cuadra)
 var colocadas: Array = []           ## [pieza, posición] de todo lo que puso _poner (lo miran las pruebas)
 var _edificios: Array = []          ## Edificios del kit ya puestos: [transformación inversa, formas, posición]
+var luces_fijas: Array = []         ## [pieza, transformación] de los faroles (ver LucesNoche)
+var luces_edificios: Array = []     ## [pieza, transformación] de los edificios con ventanas
 var arboles_achicados := 0          ## Árboles de la ciudad que se achicaron o sacaron para no meterse en un edificio
 
 
@@ -122,6 +124,7 @@ func _ready() -> void:
 	_rng.seed = 20261115
 	_rng_flores.seed = 4242
 	NivelAlto.reiniciar()
+	LucesNoche.faroles_extra.clear()
 	_mat_vereda = Construir.material_lajas("lajas_vereda", 4.0)
 	_mat_peatonal = Construir.material_lajas("lajas_peatonal", 4.0)
 	_locales = LOCALES.duplicate()
@@ -146,6 +149,8 @@ func _ready() -> void:
 	var piezas := get_child_count()
 	Construir.fusionar_estaticas(self, 64.0)
 	etapas.append("fusión de %d piezas %d" % [piezas, (Time.get_ticks_usec() - t1) / 1000])
+	# Luces de la noche: ventanas encendidas y faroles (después de fusionar, así no se las lleva la fusión)
+	LucesNoche.construir(self)
 	# La banda de los BadJokes en sus puntos de la guarida (mapa V4.5)
 	PalomaBadJoke.poblar(self)
 	print_verbose("Ciudad armada en %d ms (%s)" % [Time.get_ticks_msec() - t0, ", ".join(etapas)])
@@ -305,6 +310,11 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 	var mi := Kit.colocar(self, nombre, pos, rot, escala, _cuerpo_en(pos) if colision else null, solo_lejos)
 	mi.set_meta(&"pieza", nombre)
 	colocadas.append([nombre, pos])
+	# Para las luces de la noche (ver LucesNoche): faroles y edificios con su transformación
+	if LucesNoche.es_farol(nombre):
+		luces_fijas.append([nombre, Transform3D(Basis.from_euler(Vector3(0, rot, 0)) * Basis.from_scale(escala), pos)])
+	elif KitDatos.PIEZAS.get(nombre, {}).get("carpeta", "") == "edificios" and not solo_lejos:
+		luces_edificios.append([nombre, Transform3D(Basis.from_euler(Vector3(0, rot, 0)) * Basis.from_scale(escala), pos)])
 	if KitDatos.PIEZAS.get(nombre, {}).get("carpeta", "") == "edificios" and not solo_lejos:
 		var tr := Transform3D(Basis.from_euler(Vector3(0, rot, 0)) * Basis.from_scale(escala), pos)
 		_edificios.append([tr.affine_inverse(), ColisionAuto.formas(nombre), pos])

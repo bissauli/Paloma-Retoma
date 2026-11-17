@@ -35,6 +35,7 @@ const MEZCLA := 0.15   ## Segundos de transición entre animaciones
 @export_enum("Original", "Gris", "Blanca", "Marron", "Oscura", "Canela", "Manchada") var variante := "Original"
 @export var es_jugador := false   ## La jugadora picotea más rápido (el picoteo es una acción del juego)
 
+var permite_baile := false     ## Una paloma NPC que imita los emotes de la jugadora (ver Bandada.imitar_baile)
 var carga_visual: Node3D
 var sombrero_visual: Node3D    ## Dónde se cuelga el sombrero que se le sacó a un humano
 
@@ -256,7 +257,7 @@ func baile_actual() -> StringName:
 ## Empieza un baile de Coreografia (el mismo de los créditos): se apaga la animación del GLB y se giran
 ## los huesos y el cuerpo a mano. Sólo para la paloma de la jugadora. Se repite hasta dejar_de_bailar.
 func bailar(baile: StringName) -> void:
-	if not es_jugador or _glb == null:
+	if not (es_jugador or permite_baile) or _glb == null:
 		return
 	if _baile == &"":
 		_reposo = PoseBaile.reposo_de(_skel)

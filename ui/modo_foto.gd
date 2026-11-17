@@ -28,6 +28,8 @@ var _aviso: PanelContainer
 var _aviso_texto: Label
 var _tween_aviso: Tween
 var _ayuda_oculta := false
+var _raiz: Control
+var _polaroid: PanelContainer
 
 
 func _ready() -> void:
@@ -36,6 +38,7 @@ func _ready() -> void:
 	_cam.name = "CamaraFoto"
 	add_child(_cam)
 	var raiz := Control.new()
+	_raiz = raiz
 	raiz.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	raiz.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	raiz.theme = EstiloUI.TEMA
@@ -200,24 +203,73 @@ func sacar_foto() -> String:
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	_ayuda.visible = not _ayuda_oculta
-	var ruta := ""
-	if img != null:
-		DirAccess.make_dir_recursive_absolute(CARPETA)
-		var f := Time.get_datetime_dict_from_system()
-		ruta = "%s/foto_%04d%02d%02d_%02d%02d%02d.png" % [CARPETA, f["year"], f["month"], f["day"],
-			f["hour"], f["minute"], f["second"]]
-		if img.save_png(ruta) != OK:
-			ruta = ""
+	var ruta := AlbumFotos.guardar(img)
 	_destello.color.a = 0.85
 	create_tween().tween_property(_destello, "color:a", 0.0, 0.35)
 	if ruta != "":
 		AudioManager.ui("unlock", -8.0)
 		Logros.sumar("fotos")
-		_avisar(tr("FOTO GUARDADA") + "  ·  " + ruta.get_file())
+		_avisar(tr("FOTO GUARDADA"))
+		_mostrar_polaroid(ruta)
 	else:
 		_avisar(tr("NO SE PUDO GUARDAR LA FOTO"))
 	_capturando = false
 	return ruta
+
+
+## La foto recién sacada aparece abajo a la derecha como una polaroid que se infla, se queda un rato y se va.
+func _mostrar_polaroid(ruta: String) -> void:
+	var miniatura := AlbumFotos.miniatura(ruta)
+	if miniatura == null:
+		return
+	if _polaroid and is_instance_valid(_polaroid):
+		_polaroid.queue_free()
+	_polaroid = PanelContainer.new()
+	_polaroid.name = "Polaroid"
+	_polaroid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_polaroid.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 36)
+	_polaroid.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_polaroid.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	var papel := StyleBoxFlat.new()
+	papel.bg_color = Color("f6f1e4")
+	papel.set_corner_radius_all(3)
+	papel.content_margin_left = 9
+	papel.content_margin_right = 9
+	papel.content_margin_top = 9
+	papel.content_margin_bottom = 9
+	papel.shadow_size = 8
+	papel.shadow_color = Color(0, 0, 0, 0.5)
+	_polaroid.add_theme_stylebox_override("panel", papel)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 5)
+	_polaroid.add_child(col)
+	var img := TextureRect.new()
+	img.texture = miniatura
+	img.custom_minimum_size = Vector2(230, 130)
+	img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	col.add_child(img)
+	var l := Label.new()
+	l.text = AlbumFotos.fecha_de(ruta)
+	l.add_theme_font_size_override("font_size", 12)
+	AlbumFotos.tinta(l)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(l)
+	_raiz.add_child(_polaroid)
+	_polaroid.rotation = deg_to_rad(-4.0)
+	_polaroid.scale = Vector2(0.6, 0.6)
+	_polaroid.modulate.a = 0.0
+	await get_tree().process_frame
+	if not is_instance_valid(_polaroid):
+		return
+	_polaroid.pivot_offset = _polaroid.size / 2.0
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(_polaroid, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_polaroid, "modulate:a", 1.0, 0.15)
+	tw.chain().tween_interval(2.4)
+	tw.chain().tween_property(_polaroid, "modulate:a", 0.0, 0.5)
+	tw.chain().tween_callback(_polaroid.queue_free)
 
 
 func _avisar(texto: String) -> void:

@@ -460,6 +460,8 @@ func _aplicar(forzado: bool) -> void:
 	entorno.fog_depth_end = lerpf(520.0, 240.0, lluvia)
 	cozy_actual = cozy.lerp(Color.WHITE, _relampago * 0.35)
 	RenderingServer.global_shader_parameter_set(&"cozy_cielo", cozy_actual)
+	# Las luces falsas (ventanas, faroles, faros) se prenden al atardecer y con tormenta
+	LucesNoche.poner_noche(maxf(smoothstep(0.12, -0.08, ds.y), lluvia * 0.45), get_tree())
 
 	cielo_mat.set_shader_parameter("cenit", cenit)
 	cielo_mat.set_shader_parameter("horizonte", horizonte)

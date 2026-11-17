@@ -136,3 +136,21 @@ func _armar() -> void:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		pivote.add_child(mi)
 		_ruedas.append(pivote)
+	_luces()
+
+
+## Faros delanteros y luces de freno (destellos) y el haz sobre el camino. Se prenden de noche (grupo
+## "luces_noche"): son 5 nodos con materiales compartidos, y de día están ocultos.
+func _luces() -> void:
+	var luces := Node3D.new()
+	luces.name = "Luces"
+	luces.add_to_group("luces_noche")
+	luces.visible = LucesNoche.encendido
+	add_child(luces)
+	var y := 0.9 if tipo == "colectivo" else 0.68
+	var z := ancho * 0.32
+	var x := largo / 2.0 - 0.08
+	for lado: float in [-1.0, 1.0]:
+		luces.add_child(LucesNoche.sprite(Vector3(x, y, lado * z), 0.8, Color(1.0, 0.95, 0.78)))
+		luces.add_child(LucesNoche.sprite(Vector3(-x, y, lado * z), 0.34, Color(1.0, 0.18, 0.1)))
+	luces.add_child(LucesNoche.charco(Vector3(x + 3.4, 0.07, 0.0), Vector2(7.5, ancho * 1.5), Color(1.0, 0.95, 0.75, 0.6)))

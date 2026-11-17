@@ -67,6 +67,7 @@ func _jugar_ya() -> void:
 # ---------------------------------------------------------------- Menú principal
 
 func _abrir_menu() -> void:
+	AvisoAccion.limpiar()
 	GameState.menu_activo = true
 	GameState.en_partida = false
 	GameState.partida_terminada = false

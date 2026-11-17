@@ -31,6 +31,14 @@ static func ocultar(arbol: SceneTree, id: String) -> void:
 		_nodo._quitar(id)
 
 
+## Borra todos los pedidos: al volver al menú o reiniciar, los que lo pedían ya no existen (o no van a
+## poder sacarlo) y el aviso se quedaba colgado ("HABLAR CON ..." sobre el menú principal).
+static func limpiar() -> void:
+	if _nodo and is_instance_valid(_nodo):
+		_nodo._pedidos.clear()
+		_nodo._elegir()
+
+
 ## Esconde o muestra el aviso entero (el modo cámara lo saca de la foto).
 static func esconder(si: bool) -> void:
 	if _nodo and is_instance_valid(_nodo):

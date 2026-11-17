@@ -24,10 +24,12 @@ var _modelo: Node3D
 var _ala_izq: Node3D
 var _ala_der: Node3D
 var _fase := 0.0
+var _t_bloqueado := 0.0     ## Segundos que lleva chocando con edificios en la picada
 
 
 func _ready() -> void:
 	add_to_group("enemigos")
+	add_to_group("amenazas")     # Lo marca el indicador de peligro del HUD (ui/indicador_amenaza.gd)
 	_armar_modelo()
 	visible = false
 	GameState.halcon_activado.connect(activar)
@@ -70,6 +72,7 @@ func _physics_process(delta: float) -> void:
 			elif _t <= 0.0:
 				estado = Estado.ATACANDO
 				_t = 5.0
+				_t_bloqueado = 0.0
 		Estado.ATACANDO:
 			_t -= delta
 			if j == null or _t <= 0.0 or not _es_blanco(j, true):
@@ -78,19 +81,36 @@ func _physics_process(delta: float) -> void:
 				var objetivo := j.global_position + j.velocity * 0.25 + Vector3.UP * 0.3
 				var hacia := objetivo - global_position
 				_vel = _vel.lerp(hacia.normalized() * velocidad_ataque, minf(delta * 3.5, 1.0))
-				global_position += _vel * delta
+				# Si hay un edificio en el camino lo esquiva por arriba; si no llega a ver a la presa un rato, abandona
+				if _avanzar(delta):
+					_t_bloqueado += delta
+					if _t_bloqueado > 1.6:
+						_abortar(4.0)
+				else:
+					_t_bloqueado = maxf(_t_bloqueado - delta, 0.0)
 				_orientar(_vel, delta)
-				if global_position.distance_to(j.global_position + Vector3.UP * 0.3) < 1.3:
+				if global_position.distance_to(j.global_position + Vector3.UP * 0.3) < 1.3 \
+						and _ve_a(j.global_position + Vector3.UP * 0.3):
 					_atrapar(j)
 		Estado.SUBIENDO:
 			var punto := Vector3(cos(_angulo) * radio_vuelta, altura_vuelo, sin(_angulo) * radio_vuelta)
 			var hacia := punto - global_position
 			_vel = _vel.lerp(hacia.normalized() * 12.0, minf(delta * 2.0, 1.0))
-			global_position += _vel * delta
+			_avanzar(delta)
 			_orientar(_vel, delta)
 			if hacia.length() < 2.0:
 				estado = Estado.CIRCULANDO
 	_animar_alas(delta)
+
+
+## Qué tan peligroso es ahora, para el indicador del HUD: 0 = nada, 0.6 = te marcó (chilla), 1 = se tira.
+func nivel_amenaza() -> float:
+	match estado:
+		Estado.ALERTA:
+			return 0.6
+		Estado.ATACANDO:
+			return 1.0
+	return 0.0
 
 
 ## Sos un blanco si volás alto y nada te cubre desde arriba.
@@ -112,8 +132,39 @@ func _circular(delta: float) -> void:
 		sin(_angulo) * radio_vuelta)
 	var hacia := punto - global_position
 	_vel = _vel.lerp(hacia * 1.5, minf(delta * 2.0, 1.0)).limit_length(14.0)
-	global_position += _vel * delta
+	_avanzar(delta)
 	_orientar(Vector3(-sin(_angulo), 0, cos(_angulo)), delta)
+
+
+## Mueve al halcón sin atravesar el mundo (capa 1): un rayo adelante; si pega contra un edificio se desliza
+## por la pared y sube para pasarlo por arriba. Devuelve true si algo lo estaba bloqueando.
+func _avanzar(delta: float) -> bool:
+	var rapidez := _vel.length()
+	if rapidez < 0.01:
+		return false
+	var dir := _vel / rapidez
+	var q := PhysicsRayQueryParameters3D.create(global_position, global_position + dir * (rapidez * delta + 2.8), 1)
+	var r := get_world_3d().direct_space_state.intersect_ray(q)
+	if r.is_empty():
+		global_position += _vel * delta
+		global_position.y = minf(global_position.y, 66.0)
+		return false
+	var n: Vector3 = r["normal"]
+	var dist := global_position.distance_to(r["position"])
+	var desliz := _vel - n * minf(_vel.dot(n), 0.0)
+	desliz.y = maxf(desliz.y, 0.0) + 7.0       # Sube para esquivarlo
+	_vel = desliz.limit_length(maxf(rapidez, 8.0))
+	if dist < 1.2:
+		global_position += n * (1.2 - dist)    # No se le pega a la pared
+	global_position += _vel * delta * (0.5 if dist < 1.6 else 1.0)
+	global_position.y = minf(global_position.y, 66.0)
+	return true
+
+
+## ¿Hay línea directa (sin paredes) desde el halcón hasta el punto?
+func _ve_a(punto: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(global_position, punto, 1)
+	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 
 func _abortar(cd: float) -> void:

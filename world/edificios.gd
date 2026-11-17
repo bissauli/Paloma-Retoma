@@ -103,6 +103,7 @@ static func banco(padre: Node3D, pos: Vector3, rot_y := 0.0) -> void:
 static func farol(padre: Node3D, pos: Vector3) -> void:
 	Construir.cilindro(padre, pos + Vector3(0, 2.0, 0), 0.07, 4.0, Color("23282b"), true, 6)
 	Construir.esfera(padre, pos + Vector3(0, 4.15, 0), 0.25, Color("fff6d8"), Vector3.ONE, 8)
+	LucesNoche.farol_directo(padre, pos + Vector3(0, 4.15, 0), pos.y)
 
 
 ## Valla metálica de un tramo (para la Casa Rosada).

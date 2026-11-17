@@ -21,7 +21,6 @@ const MAPA := {
 	# Cargar partida
 	"Cargar partida": "Load game",
 	"Partida guardada": "Saved game",
-	"BORRAR": "DELETE",
 	# Conversaciones y misiones secundarias (dialogos/catalogo_dialogos.gd, misiones/catalogo_misiones.gd)
 	"HABLAR CON %s": "TALK TO %s",
 	# Avisos de misiones
@@ -499,6 +498,15 @@ Talk to those with a ! above their head.",
 	"WASD MOVER  ·  ESPACIO / SHIFT SUBIR Y BAJAR  ·  CTRL RÁPIDO  ·  RUEDA ZOOM  ·  CLICK FOTO  ·  H AYUDA  ·  C SALIR": "WASD MOVE  ·  SPACE / SHIFT UP AND DOWN  ·  CTRL FAST  ·  WHEEL ZOOM  ·  CLICK PHOTO  ·  H HELP  ·  C EXIT",
 	"FOTO GUARDADA": "PHOTO SAVED",
 	"NO SE PUDO GUARDAR LA FOTO": "COULD NOT SAVE THE PHOTO",
+	"ÁLBUM": "ALBUM",
+	"Álbum": "Album",
+	"Fotos (%d)": "Photos (%d)",
+	"Todavía no sacaste ninguna foto.\nApretá C en la partida para entrar al modo cámara.": "You haven't taken any photos yet.\nPress C in game to enter photo mode.",
+	"Se muestran las %d más nuevas.": "Showing the %d newest.",
+	"ABRIR CARPETA DE FOTOS": "OPEN PHOTO FOLDER",
+	"BORRAR": "DELETE",
+	"¿SEGURO? BORRAR": "SURE? DELETE",
+	"CERRAR": "CLOSE",
 	"Descansá (Q) con 3 palomas de tu bandada sentadas a tu lado.": "Rest (Q) with 3 flock pigeons sitting beside you.",
 	"Siesta en grupo": "Group nap",
 	"Descansá con tu bandada 10 veces.": "Rest with your flock 10 times.",

@@ -166,6 +166,9 @@ func bailar(baile: StringName) -> void:
 		var d := cam.global_position - global_position
 		_rumbo = atan2(-d.x, -d.z)
 	modelo.bailar(baile)
+	var b := get_tree().get_first_node_in_group("bandada") as Bandada
+	if b:
+		b.imitar_baile(baile)
 
 
 ## Se mete a bañarse (lo llama una fuente o un charco): hace el baño en el lugar, sin darse vuelta
@@ -207,6 +210,9 @@ func _revisar_baile() -> void:
 		corta = Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras").length() > 0.1 			or Input.is_action_just_pressed("volar") or Input.is_action_just_pressed("picotear") 			or Input.is_action_just_pressed("arrullar") or Input.is_action_just_pressed("aletazo")
 	if corta:
 		modelo.dejar_de_bailar()
+		var b := get_tree().get_first_node_in_group("bandada") as Bandada
+		if b:
+			b.parar_baile()
 
 
 # ---------------------------------------------------------------- Tobogán (E)

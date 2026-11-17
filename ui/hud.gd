@@ -57,6 +57,7 @@ func _armar() -> void:
 	_raiz.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_raiz)
 	_raiz.add_child(AnilloStamina.new())    # Atrás de todo lo demás
+	_raiz.add_child(IndicadorAmenaza.new())  # De dónde viene el halcón
 	_armar_estado()
 	_armar_mision()
 	_armar_brujula()

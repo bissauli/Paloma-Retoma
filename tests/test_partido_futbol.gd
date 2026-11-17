@@ -82,8 +82,35 @@ func _ready() -> void:
 	Input.action_release("descansar")
 	_check("sigue en marcha tras usar los controles", _partido.estado != PartidoFutbol.Estado.INACTIVO)
 
+	# Atasco: la pelota quieta en el mismo lugar mucho tiempo se libera sola
+	_partido._atasco_ancla = _partido._balon.global_position
+	_partido._atasco_t = PartidoFutbol.ATASCO_SEG - 0.01
+	_partido._balon.freeze = false
+	_partido._balon.linear_velocity = Vector3.ZERO
+	_partido._vigilar_atasco(0.1, _partido._balon.global_position)
+	_check("el atasco libera la pelota", _partido._balon.linear_velocity.length() > 5.0)
+	_check("el contador de atasco se reinicia", _partido._atasco_t == 0.0)
+
 	# Goles: fuerza una racha para ver el festejo, la repetición y que vuelve al saque
+	for i in 600:
+		if _partido.estado == PartidoFutbol.Estado.JUGANDO:
+			break
+		await get_tree().physics_frame
+	_j._rumbo = 1.0
+	await _frames(70)                  # Graba cuadros con ella mirando a 1.0
 	_partido._gol(0)
+	_j._rumbo = -2.0                   # Después del gol se da vuelta: la repetición no tiene que heredarlo
+	for i in 600:
+		if _partido._rep_fase == 1:
+			break
+		await get_tree().physics_frame
+	await _frames(10)
+	_check("empezó la repetición", _partido._rep_fase == 1)
+	var k := _partido._participantes().size() - 1
+	var cuadro: Dictionary = _partido._grab[clampi(int(_partido._rep_i), 0, _partido._grab.size() - 1)]
+	var grabado: float = (cuadro["r"] as PackedFloat32Array)[k]
+	_check("en la repetición la jugadora mira como cuando jugó (no al revés)",
+		absf(angle_difference(_j.modelo.rotation.y, grabado)) < 0.05 and absf(angle_difference(_j.modelo.rotation.y, -2.0)) > 0.3)
 	_check("gol suma", _partido.goles[0] == 1)
 	await _frames(60 * 9)
 	_check("tras el gol vuelve a jugarse", _partido.estado == PartidoFutbol.Estado.JUGANDO or _partido.estado == PartidoFutbol.Estado.SAQUE)
@@ -114,6 +141,12 @@ func _ready() -> void:
 		if is_instance_valid(e["p"]) and (e["p"] as PalomaNPC).controlada:
 			_check("sin NPC controlada colgada", false)
 			break
+	# El aviso de acción no queda colgado al volver al menú
+	AvisoAccion.mostrar(get_tree(), "prueba_menu", "E", "HABLAR CON ALGUIEN", 99)
+	await _frames(3)
+	_check("el aviso se ve", AvisoAccion.visible_de("prueba_menu"))
+	AvisoAccion.limpiar()
+	_check("limpiar saca los avisos colgados", not AvisoAccion.visible_de("prueba_menu"))
 	_terminar()
 
 
