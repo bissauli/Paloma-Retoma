@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://drs677154cruf"
-path="res://.godot/imported/capa_de_asesino__albedo2.png-662d25a40001d1233e7a06a6fadd1a2c.ctex"
+path.s3tc="res://.godot/imported/capa_de_asesino__albedo2.png-662d25a40001d1233e7a06a6fadd1a2c.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "a58bead4f42b4801803695f9de175c49"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/accesorios/espalda/capa_de_asesino__albedo2.png"
-dest_files=["res://.godot/imported/capa_de_asesino__albedo2.png-662d25a40001d1233e7a06a6fadd1a2c.ctex"]
+dest_files=["res://.godot/imported/capa_de_asesino__albedo2.png-662d25a40001d1233e7a06a6fadd1a2c.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

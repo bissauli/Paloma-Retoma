@@ -299,18 +299,18 @@ static func cafes(padre: Node3D) -> Array[Vector3]:
 		if not str(n["nombre"]).begins_with("Banco"):
 			for m in 3:
 				var pos := Vector3(x - ancho / 3.0 + m * ancho / 3.0, 0.16, 34.6)
-				mesa(padre, pos)
+				mesa(padre, pos, (m + int(x)) % 2 != 0)
 				mesas.append(pos + Vector3(0, 0.78, 0))
 	return mesas
 
 
-static func mesa(padre: Node3D, pos: Vector3) -> void:
-	Construir.cilindro(padre, pos + Vector3(0, 0.37, 0), 0.05, 0.74, C_METAL, false, 6)
-	Construir.cilindro(padre, pos + Vector3(0, 0.76, 0), 0.5, 0.04, Color("f2f2ee"), true, 12)
-	for lado in [-1.0, 1.0]:
-		var silla := pos + Vector3(0.85 * lado, 0, 0)
-		Construir.caja(padre, silla + Vector3(0, 0.45, 0), Vector3(0.45, 0.06, 0.45), C_MADERA, false)
-		Construir.caja(padre, silla + Vector3(0.2 * lado, 0.75, 0), Vector3(0.05, 0.6, 0.45), C_MADERA, false)
+## Mesa de café con dos sillas y sombrilla (la pieza nueva del kit, con su colisión).
+static func mesa(padre: Node3D, pos: Vector3, verde := false) -> void:
+	var cuerpo := StaticBody3D.new()
+	cuerpo.collision_layer = Construir.CAPA_MUNDO
+	cuerpo.collision_mask = 0
+	padre.add_child(cuerpo)
+	Kit.colocar(padre, "mesa_cafe_verde" if verde else "mesa_cafe_roja", pos, 0.0, Vector3.ONE, cuerpo)
 
 
 ## Boca de subte (el punto de la brújula y de donde salen los oficinistas, ver plaza.gd).

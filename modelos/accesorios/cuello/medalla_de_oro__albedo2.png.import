@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ov2op34rj1k6"
-path="res://.godot/imported/medalla_de_oro__albedo2.png-0f9855fa17cbe323fd9f55e3d64bdf06.ctex"
+path.s3tc="res://.godot/imported/medalla_de_oro__albedo2.png-0f9855fa17cbe323fd9f55e3d64bdf06.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "07a6c917761694d9527ec5ee7b133d01"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/accesorios/cuello/medalla_de_oro__albedo2.png"
-dest_files=["res://.godot/imported/medalla_de_oro__albedo2.png-0f9855fa17cbe323fd9f55e3d64bdf06.ctex"]
+dest_files=["res://.godot/imported/medalla_de_oro__albedo2.png-0f9855fa17cbe323fd9f55e3d64bdf06.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

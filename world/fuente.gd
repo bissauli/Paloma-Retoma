@@ -7,8 +7,6 @@ extends Node3D
 ## baile (moverse, volar, picotear, arrullar). Mientras se baña recarga la stamina, y al llegar a 3 s
 ## sale "fresquita": stamina llena y el logro. Los crea world/plaza.gd; sólo hay baño de agua.
 
-const C_PIEDRA := Color("c8c3b6")
-const C_PIEDRA_BORDE := Color("a9a396")
 const TIEMPO_PREMIO := 3.0
 const RECARGA := 30.0          ## Stamina por segundo mientras se baña
 const RETARDO_AUTO := 1.0      ## En el teléfono: segundos quieta en el agua antes de bañarse
@@ -60,27 +58,19 @@ func _armar() -> void:
 	agua.emission_energy_multiplier = 0.4
 
 	if altura > 0.0:
-		# Un disco macizo hasta la altura del agua: la paloma aterriza y camina "en" la fuente
-		var forma := CylinderShape3D.new()
-		forma.radius = radio + 0.35
-		forma.height = altura
-		Construir.colision(self, Vector3(0, altura * 0.5, 0), forma)
-		Construir.cilindro(self, Vector3(0, altura * 0.5, 0), radio + 0.4, altura, C_PIEDRA, false, 28)
-		# Borde redondeado de piedra
-		var borde := TorusMesh.new()
-		borde.inner_radius = radio + 0.05
-		borde.outer_radius = radio + 0.42
-		borde.rings = 28
-		borde.ring_segments = 8
-		var mi_borde := MeshInstance3D.new()
-		mi_borde.mesh = borde
-		mi_borde.material_override = Construir.material(C_PIEDRA_BORDE)
-		mi_borde.position = Vector3(0, altura + 0.01, 0)
-		add_child(mi_borde)
+		# La fuente de tres pisos del kit (misma que la de las plazas de la ciudad): pileta de r 1,6 y
+		# borde a 0,65 m a escala 1. La escala sale del radio pedido (el borde queda donde estaba el de
+		# antes) y la paloma camina "en" el agua a la altura del borde, sobre la colisión del kit.
+		var escala := (radio + 0.4) / 1.6
+		var cuerpo := StaticBody3D.new()
+		cuerpo.collision_layer = Construir.CAPA_MUNDO
+		cuerpo.collision_mask = 0
+		add_child(cuerpo)
+		Kit.colocar(self, "fuente", Vector3.ZERO, 0.0, Vector3.ONE * escala, cuerpo)
+		altura = 0.65 * escala
+		radio = 1.3 * escala
+		_y_agua = altura + 0.02
 		if surtidor:
-			Construir.cilindro(self, Vector3(0, altura + 0.38, 0), 0.22, 0.72, C_PIEDRA, true, 12)
-			Construir.cilindro(self, Vector3(0, altura + 0.82, 0), 0.34, 0.16, C_PIEDRA_BORDE, false, 16, 0.78)
-			_armar_chorro(Vector3(0, altura + 0.95, 0))
 			_armar_onda_continua(agua)
 
 	# El agua (un disco finito; en el charco, dos discos juntos para que no sea un círculo perfecto)
