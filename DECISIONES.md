@@ -517,3 +517,8 @@ Textura y lugares para posarse a media altura (Fase 2, `world/nivel_medio.gd`, `
 ## Assets viejos cambiados por los nuevos
 - **Fuentes de la plaza** (`world/fuente.gd`): las dos fuentes con baño ya no arman el disco de piedra con un toro y dos cilindros: usan la pieza `fuente` del kit (la de tres pisos con chorros), con su colisión. La escala sale del radio pedido y la paloma se baña a la altura del borde (`altura` = 0,65 × escala). Las pruebas de `test_cortejo_fuentes` pasan.
 - **Mesas de los cafés** (`Edificios.mesa`): en vez de un cilindro y cajas de sillas, `mesa_cafe_roja`/`mesa_cafe_verde` del kit (con sillas de bistró y sombrilla), alternadas por mesa y con colisión.
+
+## Builder de mapa (F2)
+- **F2 en el juego** abre `admin/builder_mapa.tscn` (mientras `Config.BUILDER_ACTIVO` sea `true`), con la cámara sobre donde estaba la paloma; **F9** vuelve al juego. Todo lo que pone `Ciudad._poner` (edificios, árboles, bancos, autos estacionados, juegos, carteles, losetas...) y las piezas armadas con primitivas de la plaza (banco, farol, jacarandá, fuente) se puede mover, girar, escalar por eje, borrar, duplicar y agregar desde la paleta. Elegir varias piezas (Ctrl+clic o recuadro) edita todas juntas.
+- Los cambios van a `mapa/overrides.json` y se aplican encima de lo que genera el código: si el archivo está vacío el mapa queda como siempre. Los pisos de arriba y las luces de ventanas de un edificio movido se arman aparte y no lo siguen.
+- Para el mapa final (**Mapa v1.0**): se sube `mapa/overrides.json` y se pone `Config.BUILDER_ACTIVO := false` (y `admin/*` vuelve al `exclude_filter` de `export_presets.cfg`), así F2 ya no hace nada.

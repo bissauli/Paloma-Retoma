@@ -4,6 +4,11 @@ extends RefCounted
 ## Los valores de movimiento de la paloma están como @export en player/paloma.gd
 ## (así se pueden tocar desde el inspector); acá van los umbrales y la economía.
 
+# --- Builder de mapa ---
+## Mientras sea true, F2 en el juego abre el builder de mapa (admin/builder_mapa.tscn), también en el juego
+## exportado. Al subir el mapa final ("Mapa v1.0") se pone en false y F2 deja de hacer algo.
+const BUILDER_ACTIVO := true
+
 # --- Bandada ---
 const BANDADA_MAX := 60            ## Tope de palomas que te siguen
 const UMBRAL_CHORIPAN := 5         ## Palomas necesarias para levantar el choripán

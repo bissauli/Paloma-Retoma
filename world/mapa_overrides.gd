@@ -16,14 +16,14 @@ extends RefCounted
 const RUTA := "res://mapa/overrides.json"
 const GRUPO := &"piezas_editables"
 
-## Piezas del kit que se pueden editar: todo lo que está a nivel del piso (no autos, bichos ni edificios).
-const PREFIJOS_EDITABLES := ["farola", "arbol", "jacaranda", "pino", "arbusto", "banco", "hidrante",
-	"contenedor", "buzon", "cesto", "tacho", "maceton", "cazuela", "flores", "mata_pasto", "cono",
-	"valla_obra", "reja", "semaforo", "cartel_", "parada_colectivo", "bebedero", "caja_electrica",
-	"mesa_cafe", "cerco", "hamaca", "tobogan", "subibaja", "resorte", "arenero", "pilote", "bolsas",
-	"estatua", "cucha", "tendedero", "guirnalda", "pozo_obra", "chapa_cerco", "tapa_cloaca", "aro_basquet"]
+## Todas las piezas que pone Ciudad._poner se pueden editar: edificios, props de las veredas, el parque,
+## autos estacionados, juegos... (lo que se arma con primitivas, como la fuente, el banco, el farol y la
+## jacarandá de la plaza, también). Las calzadas y veredas de base y lo que anda solo (tránsito, gente,
+## animales) no se tocan.
+const SUELO := ["pasto", "camino_", "plaza_", "piso_", "cancha_", "bosque", "jacaranda_banco"]
 
 static var modo_admin := false          ## Sólo la escena del builder lo pone en true
+static var camara_inicial: Variant = null   ## Dónde está la jugadora al apretar F2 (el builder arranca mirando ahí)
 static var forzar_id := ""              ## Pieza agregada que se está armando ahora (ver Ciudad)
 static var _datos := {}
 static var _cargado := false
@@ -77,10 +77,19 @@ static func reiniciar() -> void:
 
 
 static func es_editable(nombre: String) -> bool:
-	for p: String in PREFIJOS_EDITABLES:
+	return Kit.es_de_ciudad(nombre) or Kit.PARQUE_COL.has(nombre) or nombre in Kit.LOSETAS_PARQUE
+
+
+## "edificio", "suelo" (losetas y pisos grandes) o "prop" (todo lo demás): el builder deja elegir qué se puede agarrar.
+static func categoria(tipo: String, nombre: String) -> String:
+	if tipo != "kit":
+		return "prop"
+	if KitDatos.PIEZAS.get(nombre, {}).get("carpeta", "") == "edificios":
+		return "edificio"
+	for p: String in SUELO:
 		if nombre.begins_with(p):
-			return true
-	return false
+			return "suelo"
+	return "prop"
 
 
 static func _id(tipo: String, nombre: String, pos: Vector3) -> String:
@@ -144,6 +153,7 @@ static func registrar(nodo: Node3D, r: Dictionary) -> void:
 	nodo.set_meta(&"orig_rot", r["orig_rot"])
 	nodo.set_meta(&"orig_escala", r["orig_escala"])
 	nodo.set_meta(&"agregado", r["agregado"])
+	nodo.set_meta(&"categoria", categoria(String(r["tipo"]), String(r["pieza"])))
 	nodo.add_to_group(GRUPO)
 	if r["borrado"]:
 		nodo.visible = false
@@ -235,3 +245,9 @@ static func armar_agregadas(ciudad: Node3D) -> void:
 			"jacaranda":
 				Edificios.jacaranda(ciudad, pos, 1.0)   # su tamaño va en la escala de la entrada
 		forzar_id = ""
+
+
+## Cuántos cambios hay anotados: [movidas, borradas, agregadas].
+static func resumen() -> Array:
+	var d := datos()
+	return [(d["mover"] as Dictionary).size(), (d["borrar"] as Array).size(), (d["agregar"] as Array).size()]

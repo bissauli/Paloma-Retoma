@@ -154,11 +154,13 @@ func _physics_process(delta: float) -> void:
 		GameState.ganar()
 
 
-## F2 abre el builder de mapa (admin/builder_mapa.tscn). Sólo en builds de desarrollo (el editor o una
-## exportación de debug): en el juego publicado no se puede abrir, y la carpeta admin/ ni se exporta.
+## F2 abre el builder de mapa (admin/builder_mapa.tscn) mientras Config.BUILDER_ACTIVO sea true: arranca mirando
+## donde estaba la jugadora. En el mapa final (Mapa v1.0) esa constante queda en false.
 func _unhandled_key_input(event: InputEvent) -> void:
-	if not OS.is_debug_build() or not event.is_pressed() or event.is_echo():
+	if not Config.BUILDER_ACTIVO or not event.is_pressed() or event.is_echo():
 		return
 	if (event as InputEventKey).keycode == KEY_F2 and ResourceLoader.exists(BUILDER_MAPA):
+		if is_instance_valid(_jugador) and _jugador.is_inside_tree():
+			MapaOverrides.camara_inicial = _jugador.global_position
 		get_tree().paused = false
 		get_tree().change_scene_to_file(BUILDER_MAPA)
