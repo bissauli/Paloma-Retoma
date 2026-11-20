@@ -497,3 +497,131 @@ func _gen_victoria() -> AudioStreamWAV:
 		var env := exp(-tn * (3.0 if idx < 3 else 1.5))
 		m[i] = (sin(TAU * f * t) + 0.3 * sin(TAU * f * 2.0 * t)) * 0.3 * env
 	return _a_wav(m)
+
+
+# ---------------------------------------------------------------- Música del baile del caballito
+
+## Música 8 bits para el baile del caballito (Coreografia "gangnam"): un tema PROPIO (no es la canción
+## original), a 150 pulsos por minuto como los saltitos del baile, de 8 s justos (5 compases de 4/4) para
+## que el bucle quede siempre en fase con la coreografía. Como una consola vieja: melodía con onda
+## cuadrada, bajo con onda triangular, arpegio de pulso finito y batería de ruido.
+## Si existe res://audio/baile_caballito.wav (o .ogg) se usa ese archivo.
+const BPM_BAILE := 150.0
+## Por corchea (8 por compás, 40 en total): la nota MIDI de la melodía (-1 = silencio).
+const MELODIA_BAILE := [
+	69, -1, 72, 69, 76, -1, 74, 72,    # La menor
+	69, -1, 72, 69, 77, 76, 74, -1,    # Fa
+	67, -1, 72, 67, 76, -1, 74, 72,    # Do
+	71, -1, 74, 71, 79, -1, 77, 74,    # Sol
+	76, 76, -1, 76, 80, -1, 83, -1,    # Mi (el remate antes de volver a empezar)
+]
+## La fundamental de cada compás (MIDI) y su acorde (semitonos sobre la fundamental).
+const ACORDES_BAILE := [[45, [0, 3, 7]], [41, [0, 4, 7]], [48, [0, 4, 7]], [43, [0, 4, 7]], [40, [0, 4, 7]]]
+
+var _baile_player: AudioStreamPlayer
+
+
+## Arranca (o corta) la música del baile del caballito, desde el principio (en fase con el baile).
+## Mientras suena, la música de fondo baja.
+func musica_baile(sonar: bool) -> void:
+	if _baile_player == null:
+		_baile_player = AudioStreamPlayer.new()
+		_baile_player.bus = &"Musica"
+		_baile_player.volume_db = -7.0
+		add_child(_baile_player)
+	if sonar:
+		if _baile_player.stream == null:
+			_baile_player.stream = _cargar_baile()
+		_baile_player.play(0.0)
+	else:
+		_baile_player.stop()
+	_musica.volume_db = -18.0 if sonar else -6.0
+	_ambiente.volume_db = -24.0 if sonar else -16.0
+
+
+func sonando_baile() -> bool:
+	return _baile_player != null and _baile_player.playing
+
+
+func _cargar_baile() -> AudioStream:
+	for ext: String in [".wav", ".ogg"]:
+		var ruta := "res://audio/baile_caballito" + ext
+		if ResourceLoader.exists(ruta):
+			var s := load(ruta) as AudioStream
+			if s:
+				return s
+	return gen_baile_caballito()
+
+
+static func _hz(midi: float) -> float:
+	return 440.0 * pow(2.0, (midi - 69.0) / 12.0)
+
+
+## Genera el tema (8 s en bucle).
+func gen_baile_caballito() -> AudioStreamWAV:
+	var corchea := 60.0 / BPM_BAILE / 2.0       # 0,2 s
+	var dur := corchea * MELODIA_BAILE.size()   # 8 s
+	var m := _muestras(dur)
+	var ruido := RandomNumberGenerator.new()
+	ruido.seed = 150
+	var fase_mel := 0.0
+	var fase_bajo := 0.0
+	var fase_arp := 0.0
+	var n := m.size()
+	for i in n:
+		var t := float(i) / MEZCLA
+		var paso := int(t / corchea)
+		var tp := t - paso * corchea               # Tiempo dentro de la corchea
+		var compas := paso / 8
+		var en_compas := paso % 8
+		var acorde: Array = ACORDES_BAILE[compas]
+		var raiz := float(acorde[0])
+		var s := 0.0
+		# --- Melodía: cuadrada al 50 %, con un vibrato chiquito al final de las notas largas
+		var nota: int = MELODIA_BAILE[paso]
+		var largo := 1
+		while paso + largo < MELODIA_BAILE.size() and MELODIA_BAILE[paso + largo] == -1 and largo < 2:
+			largo += 1
+		if nota >= 0:
+			var vib := 0.0 if tp < 0.12 else 0.15 * sin(TAU * 6.0 * tp)
+			fase_mel += _hz(nota + vib) / MEZCLA
+			var env_m := clampf(1.0 - tp / (corchea * largo * 0.95), 0.0, 1.0) * minf(tp / 0.004, 1.0)
+			s += (1.0 if fmod(fase_mel, 1.0) < 0.5 else -1.0) * 0.16 * (0.55 + 0.45 * env_m)
+		elif paso > 0 and MELODIA_BAILE[paso - 1] >= 0 and tp < corchea * 0.9:
+			fase_mel += _hz(MELODIA_BAILE[paso - 1]) / MEZCLA   # La nota anterior se estira
+			s += (1.0 if fmod(fase_mel, 1.0) < 0.5 else -1.0) * 0.16 * 0.5 * (1.0 - tp / corchea)
+		# --- Bajo: triangular, fundamental y octava alternadas por corchea
+		var nota_bajo := raiz + (12.0 if en_compas % 2 == 1 else 0.0)
+		fase_bajo += _hz(nota_bajo) / MEZCLA
+		var fb := fmod(fase_bajo, 1.0)
+		var tri := 4.0 * absf(fb - 0.5) - 1.0
+		s += tri * 0.22 * clampf(1.0 - tp / corchea * 0.6, 0.0, 1.0)
+		# --- Arpegio: pulso al 25 %, notas del acorde por semicorchea, una octava arriba
+		var semi := int(tp / (corchea / 2.0))
+		var notas_a: Array = acorde[1]
+		var idx_a := (en_compas * 2 + semi) % notas_a.size()
+		fase_arp += _hz(raiz + 24.0 + float(notas_a[idx_a])) / MEZCLA
+		s += (1.0 if fmod(fase_arp, 1.0) < 0.25 else -1.0) * 0.05
+		# --- Batería: bombo en cada pulso, redoblante en 2 y 4, platillo en los contratiempos
+		var tn := t - (paso / 2) * corchea * 2.0    # Tiempo desde el último pulso
+		var pulso_n := (paso / 2) % 4
+		if tn < 0.12:   # Bombo: un tono que cae rápido
+			var f_b := 140.0 * exp(-tn * 30.0) + 45.0
+			s += sin(TAU * f_b * tn) * exp(-tn * 22.0) * 0.45
+		var rnd := ruido.randf_range(-1.0, 1.0)
+		if (pulso_n == 1 or pulso_n == 3) and tn < 0.14:
+			s += rnd * exp(-tn * 28.0) * 0.22
+		if paso % 2 == 1 and tp < 0.05:
+			s += rnd * exp(-tp * 90.0) * 0.1
+		# El remate: redoblante en semicorcheas en el último pulso, hasta volver a empezar
+		if compas == 4 and en_compas >= 6:
+			var ts := fmod(tp, corchea / 2.0)
+			s += rnd * exp(-ts * 35.0) * 0.16
+		m[i] = clampf(s, -1.0, 1.0) * 0.85
+	# Que el bucle empalme sin "clic": fundido cortito al principio y al final
+	var borde := int(0.004 * MEZCLA)
+	for k in borde:
+		var g := float(k) / borde
+		m[k] *= g
+		m[n - 1 - k] *= g
+	return _a_wav(m, true)

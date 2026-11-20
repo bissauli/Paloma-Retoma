@@ -266,6 +266,9 @@ static func plaza(padre: Node3D) -> void:
 		for v: Vector2 in _ventanas_altas(tam, Vector3(0, 0, -1)):
 			toldo(n, v.x, v.y + 0.95, 1.5, 0.85, color.lightened(0.08))
 	for k in Edificios.ALREDEDORES.size():
+		# Los que tienen un local adentro (Pasaje) ya traen sus ventanas, balcones y toldo
+		if Pasaje.tiene_interior(k):
+			continue
 		var e: Array = Edificios.ALREDEDORES[k]
 		var base: Vector3 = e[0]
 		var tam: Vector3 = e[1]

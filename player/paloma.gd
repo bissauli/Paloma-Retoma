@@ -69,11 +69,19 @@ var bloquea_descanso := false     ## El partido de fútbol usa Q para otra cosa 
 var _t_aviso_sombrero := 0.0
 var _t_descanso := 0.0
 var _descanso_contado := false
+var _tween_rebote: Tween       ## El aplastoncito al aterrizar y el estirón al despegar (ver _rebote)
+var _cabeceo := 0.0           ## Inclinación de adelante a atrás (suavizada, así no da tirones)
 
 const DURACION_APLASTADA := 1.5
 const VELOCIDAD_CHOQUE := 15.0     ## Velocidad contra la pared (m/s) desde la que el golpe la aturde: sólo la picada
 const DURACION_ATURDIDA := 1.7     ## Segundos que queda mareada después de estrellarse (ver chocar)
 const CAPA_GENTE := 4       ## Gente y autos (ver world/auto.gd): mientras está chata le pasan por encima
+
+## En escena: una cinemática la mueve a mano (ver world/casa_enterable.gd). No corre la física
+## (ni gravedad ni colisiones), sólo la animación.
+var en_escena := false
+var _escena_modo := 2       ## Animación en escena: 0 suelo, 1 aleteo, 2 planeo
+var _escena_rapidez := 0.0
 
 @onready var modelo: ModeloPaloma = $Modelo
 @onready var camara: CamaraOrbital = $CamaraOrbital
@@ -106,6 +114,10 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if en_escena:
+		velocity = Vector3.ZERO
+		modelo.animar(delta, _escena_modo, _escena_rapidez)
+		return
 	var entrada := Vector2.ZERO
 	if controlable and _aplastada <= 0.0 and _aturdida <= 0.0:
 		entrada = Input.get_vector("mover_izquierda", "mover_derecha", "mover_adelante", "mover_atras")
@@ -170,6 +182,7 @@ func bailar(baile: StringName) -> void:
 	var b := get_tree().get_first_node_in_group("bandada") as Bandada
 	if b:
 		b.imitar_baile(baile)
+	AudioManager.musica_baile(baile == &"gangnam")   # El caballito tiene su música (en fase: arranca con el baile)
 
 
 ## Se mete a bañarse (lo llama una fuente o un charco): hace el baño en el lugar, sin darse vuelta
@@ -204,6 +217,8 @@ func _al_cortejar() -> void:
 
 
 func _revisar_baile() -> void:
+	if AudioManager.sonando_baile() and modelo.baile_actual() != &"gangnam":
+		AudioManager.musica_baile(false)   # Dejó de bailar (o se puso a bañarse): se corta la música
 	if not modelo.bailando():
 		return
 	var corta := estado == Estado.AIRE or not GameState.en_partida
@@ -504,6 +519,7 @@ func despegar() -> void:
 	velocity.y = impulso_despegue * (0.8 if GameState.carga != "" else 1.0)
 	velocity += adelante * empuje_despegue
 	GameState.set_stamina(GameState.stamina - Config.STAMINA_DESPEGUE)
+	_rebote(true, 0.7)
 	AudioManager.reproducir("aleteo")
 	despego.emit()
 
@@ -619,10 +635,14 @@ func _aterrizar() -> void:
 	if fuerte:
 		camara.sacudir(0.6)
 		AudioManager.reproducir("picoteo", -2.0)
+	_rebote(false, 1.0 if fuerte else clampf(-_velocidad_previa.y / 8.0, 0.35, 0.8))
 	aterrizo.emit(fuerte)
 
 
-## Gira el cuerpo hacia donde se mueve, con alabeo e inclinación en el aire.
+## Gira el cuerpo hacia donde se mueve, con alabeo e inclinación en el aire. En el piso, al caminar
+## rápido se inclina un poquito hacia adelante y en las curvas se ladea apenas (como una paloma
+## apurada). La inclinación se suaviza siempre: al cambiar de golpe la velocidad vertical (despegar,
+## salir de la picada) el cuerpo no pega un tirón.
 func _orientar(delta: float) -> void:
 	var h := Vector2(velocity.x, velocity.z)
 	var rumbo_previo := _rumbo
@@ -630,14 +650,36 @@ func _orientar(delta: float) -> void:
 		var deseado := atan2(-h.x, -h.y)
 		var vel_giro := 12.0 if estado == Estado.SUELO else giro_aire
 		_rumbo = lerp_angle(_rumbo, deseado, minf(vel_giro * delta, 1.0))
-	var cabeceo := 0.0
+	var giro := wrapf(_rumbo - rumbo_previo, -PI, PI) / maxf(delta, 0.001)
+	var cabeceo_obj := 0.0
 	var alabeo_obj := 0.0
 	if estado == Estado.AIRE:
-		var giro := wrapf(_rumbo - rumbo_previo, -PI, PI) / maxf(delta, 0.001)
 		alabeo_obj = clampf(giro * 0.35, -0.8, 0.8)
-		cabeceo = clampf(atan2(velocity.y, maxf(h.length(), 1.0)) * 0.7, -1.0, 0.6)
+		cabeceo_obj = clampf(atan2(velocity.y, maxf(h.length(), 1.0)) * 0.7, -1.0, 0.6)
+	elif _aplastada <= 0.0:
+		var rapidez := clampf(h.length() / maxf(velocidad_caminar, 0.1), 0.0, 1.2)
+		cabeceo_obj = -0.1 * rapidez
+		alabeo_obj = clampf(giro * 0.05, -0.14, 0.14) * rapidez
+	var suave := 10.0 if estado == Estado.AIRE else 8.0
+	_cabeceo = lerpf(_cabeceo, cabeceo_obj, minf(suave * delta, 1.0))
 	_alabeo = lerpf(_alabeo, alabeo_obj, minf(6.0 * delta, 1.0))
-	modelo.rotation = Vector3(cabeceo, _rumbo, _alabeo)
+	modelo.rotation = Vector3(_cabeceo, _rumbo, _alabeo)
+
+
+## Un aplastoncito al aterrizar ("estirar" = false: se achata y vuelve con un rebote) o un estirón al
+## despegar ("estirar" = true). "fuerza" de 0 a 1. No se mete con el aplastamiento del auto.
+func _rebote(estirar: bool, fuerza: float) -> void:
+	if _aplastada > 0.0 or (_tween_aplastar and _tween_aplastar.is_running()):
+		return
+	if _tween_rebote:
+		_tween_rebote.kill()
+	var k := clampf(fuerza, 0.0, 1.0)
+	var forma := Vector3(1.0 - 0.12 * k, 1.0 + 0.18 * k, 1.0 - 0.12 * k) if estirar \
+		else Vector3(1.0 + 0.16 * k, 1.0 - 0.24 * k, 1.0 + 0.16 * k)
+	modelo.scale = Vector3.ONE
+	_tween_rebote = create_tween()
+	_tween_rebote.tween_property(modelo, "scale", forma, 0.06).set_ease(Tween.EASE_OUT)
+	_tween_rebote.tween_property(modelo, "scale", Vector3.ONE, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _animar(delta: float) -> void:
@@ -922,6 +964,56 @@ func chocar(punto: Vector3, normal: Vector3, impacto: float) -> void:
 	EfectoChoque.polvo(get_parent(), punto, normal)
 	modelo.aturdir(DURACION_ATURDIDA)
 	choco.emit(impacto)
+
+
+# ---------------------------------------------------------------- Escenas (cinemáticas)
+
+## Empieza una escena: la paloma deja de usar la física y se queda donde está hasta que la muevan
+## con escena_mover(). El que la llama también bloquea la cámara y esconde el HUD.
+func escena_empezar() -> void:
+	en_escena = true
+	controlable = false
+	velocity = Vector3.ZERO
+	en_picada = false
+	aleteando = false
+	_escena_modo = 1 if estado == Estado.AIRE else 0
+	_escena_rapidez = 0.0
+
+
+## Pone a la paloma en "pos" (global) mirando hacia "rumbo" (yaw) con la animación "modo"
+## (0 suelo, 1 aleteo, 2 planeo, 3 picada). "cabeceo" inclina el pico (positivo = hacia arriba) y
+## "alabeo" la inclina de costado (al doblar).
+func escena_mover(pos: Vector3, rumbo_nuevo: float, modo: int, rapidez: float, cabeceo := 0.0, alabeo := 0.0) -> void:
+	global_position = pos
+	_rumbo = rumbo_nuevo
+	_escena_modo = modo
+	_escena_rapidez = rapidez
+	_alabeo = alabeo
+	_cabeceo = cabeceo
+	modelo.rotation = Vector3(cabeceo, _rumbo, alabeo)
+
+
+## Termina la escena y le devuelve la física. "en_aire": sale volando con la velocidad "vel"
+## (global); si no, queda parada en el piso. El control (controlable) lo devuelve quien la llamó.
+func escena_terminar(pos: Vector3, rumbo_nuevo: float, en_aire: bool, vel: Vector3) -> void:
+	en_escena = false
+	global_position = pos
+	_rumbo = rumbo_nuevo
+	modelo.rotation = Vector3(0.0, _rumbo, 0.0)
+	en_picada = false
+	aleteando = false
+	_tiempo_en_aire = 0.0
+	_coyote = 0.0
+	if en_aire:
+		estado = Estado.AIRE
+		floor_snap_length = 0.0
+		velocity = vel
+	else:
+		estado = Estado.SUELO
+		floor_snap_length = 0.25
+		velocity = Vector3.ZERO
+	reset_physics_interpolation()
+	camara.reubicar()
 
 
 ## Un humano la espanta: sale volando de golpe en esa dirección (no gasta stamina).

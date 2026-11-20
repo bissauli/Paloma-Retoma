@@ -19,6 +19,26 @@ script = ExtResource("1")
 
 [node name="Paloma" parent="." unique_id=58284266 instance=ExtResource("3")]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -35.95, 0.5, 3)
+velocidad_caminar = null
+aceleracion_suelo = null
+gravedad_suelo = null
+velocidad_vuelo = null
+aceleracion_aire = null
+arrastre_aire = null
+impulso_despegue = null
+empuje_despegue = null
+fuerza_aleteo = null
+velocidad_subida = null
+gravedad_planeo = null
+caida_planeo = null
+caida_cansada = null
+giro_aire = null
+velocidad_picada = null
+bajada_picada = null
+rebote_picada = null
+multiplicador_carga = null
+radio_picoteo = null
+enfriamiento_arrullo = null
 
 [node name="CamaraMenu" type="Camera3D" parent="." unique_id=1472494454]
 fov = 36.0

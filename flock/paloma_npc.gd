@@ -34,6 +34,9 @@ var _timer_huida := 0.0
 var _picoteo_timer := 0.0
 var _acum_fisica := 0.0    ## Tiempo acumulado de los pasos de física salteados (sueltas lejanas)
 var _desfase := 0
+var _cabeceo := 0.0       ## Inclinación de adelante a atrás (suavizada)
+var _alabeo := 0.0        ## Ladeo al doblar en el aire
+var _vel_paseo := 0.8     ## Cada una camina a su ritmo (unas más apuradas que otras)
 
 ## Un solo pedido de rayo para todas (crear uno nuevo en cada movimiento cuesta).
 static var _rayo := PhysicsRayQueryParameters3D.new()
@@ -51,6 +54,7 @@ func _ready() -> void:
 	nombre = NOMBRES[randi() % NOMBRES.size()]
 	_rumbo = randf() * TAU
 	_desfase = randi() % 3
+	_vel_paseo = randf_range(0.65, 1.0)
 	_timer_suelo = randf() * 0.5
 	_timer_paseo = randf() * 3.0
 	_destino = global_position
@@ -166,7 +170,8 @@ func _paso_suelta(delta: float) -> void:
 	hacia.y = 0
 	var v := Vector3.ZERO
 	if hacia.length() > 0.3:
-		v = hacia.normalized() * 0.8
+		# Camina a su ritmo y frena al llegar (no se clava de golpe en el lugar)
+		v = hacia.normalized() * _vel_paseo * clampf(hacia.length() / 0.8, 0.35, 1.0)
 	velocidad = velocidad.lerp(v, minf(delta * 4.0, 1.0))
 	if velocidad.length_squared() > 0.0025:
 		mover_con_choques(velocidad * delta)
@@ -204,7 +209,9 @@ func _paso_huida(delta: float) -> void:
 		velocidad.y = lerpf(velocidad.y, clampf(objetivo_y - global_position.y, -2.0, 5.0), delta * 2.0)
 	mover_con_choques(velocidad * delta)
 	global_position.y = maxf(global_position.y, altura_suelo)
-	modo_anim = 1 if velocidad.y > 0.3 else 2
+	# Sube aleteando, planea, y al llegar aletea de nuevo para frenar antes de posarse
+	var llegando := _timer_huida <= 0.0 and Vector2(_destino.x - global_position.x, _destino.z - global_position.z).length() < 2.5
+	modo_anim = 1 if velocidad.y > 0.3 or llegando else 2
 	_mirar(velocidad, delta, 5.0)
 
 
@@ -313,15 +320,22 @@ func espantar(desde: Vector3) -> void:
 	ir_a_zona(zona_centro, zona_radio)
 
 
-## Orienta el modelo hacia la dirección de movimiento.
+## Orienta el modelo hacia la dirección de movimiento. En el aire se ladea al doblar (como la de la
+## jugadora) y la inclinación de adelante a atrás se suaviza, así no da tirones al cambiar de altura.
 func _mirar(v: Vector3, delta: float, rapidez: float) -> void:
 	var h := Vector2(v.x, v.z)
+	var rumbo_previo := _rumbo
 	if h.length() > 0.15:
 		_rumbo = lerp_angle(_rumbo, atan2(-h.x, -h.y), minf(rapidez * delta, 1.0))
-	var cabeceo := 0.0
+	var cabeceo_obj := 0.0
+	var alabeo_obj := 0.0
 	if modo_anim != 0:
-		cabeceo = clampf(atan2(v.y, maxf(h.length(), 1.0)) * 0.6, -0.8, 0.6)
-	modelo.rotation = Vector3(cabeceo, _rumbo, 0.0)
+		cabeceo_obj = clampf(atan2(v.y, maxf(h.length(), 1.0)) * 0.6, -0.8, 0.6)
+		var giro := wrapf(_rumbo - rumbo_previo, -PI, PI) / maxf(delta, 0.001)
+		alabeo_obj = clampf(giro * 0.3, -0.6, 0.6)
+	_cabeceo = lerpf(_cabeceo, cabeceo_obj, minf(8.0 * delta, 1.0))
+	_alabeo = lerpf(_alabeo, alabeo_obj, minf(5.0 * delta, 1.0))
+	modelo.rotation = Vector3(_cabeceo, _rumbo, _alabeo)
 
 
 ## La jugadora la golpeó: se va de la bandada llorando, volando o corriendo (al azar).

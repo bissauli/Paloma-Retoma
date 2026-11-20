@@ -124,7 +124,7 @@ static func _aplicar_accesorios(glb: Node3D, skel: Skeleton3D, perfil: PerfilPal
 		return
 	var skel_en_glb := _relativo(glb, skel)
 	var adjuntos := {}
-	for s in CatalogoPaloma.SLOTS.size():
+	for s in mini(CatalogoPaloma.SLOTS.size(), perfil.accesorios.size()):   # Perfiles viejos: menos slots
 		var pieza := AccesoriosPaloma.crear(s, perfil.accesorios[s])
 		if pieza == null:
 			continue

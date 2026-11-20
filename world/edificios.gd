@@ -284,6 +284,8 @@ static func cafes(padre: Node3D) -> Array[Vector3]:
 		edificio(padre, Vector3(x, 0, 43.0), Vector3(ancho, n["alto"], 10), n["color"], Vector3(0, 0, -1), n["remate"])
 		# Vidriera oscura en planta baja
 		Construir.caja(padre, Vector3(x, 1.6, 37.95), Vector3(ancho - 2.0, 2.6, 0.1), Color("2e3640"), false)
+		# Y lo que se ve adentro, según el nombre (ver world/vidrieras.gd)
+		Vidrieras.poner(padre, Vector3(x, 1.6, 37.89), PI, Vector2(ancho - 2.0, 2.6), n["nombre"], 0.15)
 		# Toldo inclinado (se puede aterrizar encima)
 		var toldo := Construir.caja(padre, Vector3(x, 3.4, 36.6), Vector3(ancho - 1.0, 0.12, 2.8), n["toldo"])
 		toldo.rotation.x = -0.25
@@ -467,15 +469,12 @@ const ALREDEDORES := [
 ]
 
 
-## Edificios bajos alrededor (con techos y cornisas para posarse).
+## Edificios de alrededor (con techos y cornisas para posarse). Cada uno tiene adentro un local que la
+## paloma atraviesa volando (supermercado, verdulería, café...), en un piso al azar: los arma
+## Pasaje.alrededores (ver world/pasaje.gd y world/casa_enterable.gd), con el cartel del local en la
+## planta baja diciendo en qué piso está.
 static func alrededores(padre: Node3D) -> void:
-	for e: Array in ALREDEDORES:
-		edificio(padre, e[0], e[1], e[2], e[3], e[4])
-	# Carteles de comercios inventados, sobre una tabla pegada a la pared
-	Construir.letrero(padre, Vector3(-27, 4.85, -31.8), "Librería El Palomar", Color.WHITE, Color("5b3b2a"), 48,
-		Vector2(6.4, 0.6))
-	Construir.letrero(padre, Vector3(26, 5.0, -31.8), "Seguros La Cornisa", Color.WHITE, Color("2b4a6b"), 48,
-		Vector2(6.0, 0.6))
+	Pasaje.alrededores(padre)
 
 
 ## Rota un nodo recién creado sobre un eje ("x", "y" o "z").

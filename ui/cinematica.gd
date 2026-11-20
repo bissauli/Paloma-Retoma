@@ -12,6 +12,8 @@ var _abajo: ColorRect
 var _texto: Label
 var _saltear: Label
 var _tween: Tween
+var _titulo: Label
+var _raiz: Control
 
 
 func _ready() -> void:
@@ -54,6 +56,7 @@ func _ready() -> void:
 	_saltear.anchor_bottom = 1.0
 	_saltear.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	raiz.add_child(_saltear)
+	_raiz = raiz
 	visible = false
 
 
@@ -97,3 +100,39 @@ func _animar(alto: float, segundos: float) -> void:
 	_tween = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(_arriba, "anchor_bottom", alto, segundos)
 	_tween.tween_property(_abajo, "anchor_top", 1.0 - alto, segundos)
+
+
+## Placa de título (como los lugares de Assassin's Creed): el nombre en grande, arriba a la
+## izquierda bajo la franja, con una raya; entra deslizándose, queda un momento y se va.
+func titulo(texto: String) -> void:
+	if _titulo == null:
+		_titulo = Label.new()
+		_titulo.add_theme_font_size_override("font_size", 40)
+		_titulo.add_theme_color_override("font_color", C_TEXTO)
+		_titulo.add_theme_color_override("font_outline_color", C_BORDE)
+		_titulo.add_theme_constant_override("outline_size", 10)
+		_titulo.anchor_left = 0.06
+		_titulo.anchor_right = 0.9
+		_titulo.anchor_top = ALTO + 0.03
+		_titulo.anchor_bottom = ALTO + 0.12
+		_titulo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var raya := ColorRect.new()
+		raya.color = Color(1, 1, 1, 0.8)
+		raya.anchor_top = 1.0
+		raya.anchor_bottom = 1.0
+		raya.offset_top = 2.0
+		raya.offset_bottom = 4.0
+		raya.anchor_right = 0.35
+		raya.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_titulo.add_child(raya)
+		_raiz.add_child(_titulo)
+	_titulo.text = texto.to_upper()
+	_titulo.modulate.a = 0.0
+	_titulo.offset_left = -30.0
+	_titulo.offset_right = -30.0
+	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_titulo, "modulate:a", 1.0, 0.5).set_delay(0.25)
+	tw.parallel().tween_property(_titulo, "offset_left", 0.0, 0.7).set_delay(0.25)
+	tw.parallel().tween_property(_titulo, "offset_right", 0.0, 0.7).set_delay(0.25)
+	tw.tween_interval(1.6)
+	tw.tween_property(_titulo, "modulate:a", 0.0, 0.6)

@@ -49,11 +49,21 @@ const PALETA_PINTURA := [
 ]
 
 ## Slots de accesorios. "hueso" es donde se ancla. "opciones" no incluye "Ninguno" (índice 0).
+## Las opciones nuevas van siempre AL FINAL de cada lista y los slots nuevos al final de SLOTS: el
+## perfil guarda índices, así una partida guardada sigue mostrando lo mismo.
 const SLOTS := [
-	{"clave": "cabeza", "nombre": "Cabeza", "hueso": "head", "opciones": ["Gorra", "Moño", "Sombrero de copa", "Antenas"]},
-	{"clave": "espalda", "nombre": "Espalda", "hueso": "body", "opciones": ["Mochilita", "Capa", "Jetpack"]},
+	{"clave": "cabeza", "nombre": "Cabeza", "hueso": "head", "opciones": ["Gorra", "Moño", "Sombrero de copa",
+		"Antenas", "Boina", "Corona", "Gorro de lana", "Sombrero de gaucho", "Capucha de asesino",
+		"Casco vikingo", "Gorrito de cumpleaños", "Gorro de chef", "Auriculares"]},
+	{"clave": "espalda", "nombre": "Espalda", "hueso": "body", "opciones": ["Mochilita", "Capa", "Jetpack",
+		"Capa de asesino", "Termo y mate", "Alas de ángel"]},
 	{"clave": "cola", "nombre": "Cola", "hueso": "tail", "opciones": ["Lazo", "Cinta", "Plumas de colores"]},
 	{"clave": "pico", "nombre": "Pico", "hueso": "head", "opciones": ["Bigote", "Pipa", "Anteojos"]},
+	{"clave": "ojos", "nombre": "Ojos", "hueso": "head", "opciones": ["Gafas de sol", "Gafas de aviador",
+		"Lentes redondos", "Gafas 3D", "Antifaz", "Monóculo", "Visor futurista"]},
+	{"clave": "cuello", "nombre": "Cuello", "hueso": "head", "opciones": ["Cadena de oro", "Collar de perlas",
+		"Bufanda albiceleste", "Moño de gala", "Medalla de oro", "Pañuelo de gaucho", "Collar de pinchos",
+		"Collar con cascabel"]},
 ]
 
 

@@ -318,6 +318,7 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 	if KitDatos.PIEZAS.get(nombre, {}).get("carpeta", "") == "edificios" and not solo_lejos:
 		var tr := Transform3D(Basis.from_euler(Vector3(0, rot, 0)) * Basis.from_scale(escala), pos)
 		_edificios.append([tr.affine_inverse(), ColisionAuto.formas(nombre), pos])
+		_ocluir(nombre, tr)
 	if not con_textos:
 		return mi
 	var t := Transform3D(Basis.from_euler(Vector3(0, rot, 0)) * Basis.from_scale(escala), pos)
@@ -335,7 +336,30 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 		if texto != "":
 			var rango := 40.0 if tipo == "kiosco" else (90.0 if tipo == "hospital" or tipo == "comisaria" else 55.0)
 			_texto(c[0], c[1], texto, c[2], c[3], color, rango)
+			if tipo in VIDRIERAS and not solo_lejos:
+				_vidriera(c, texto, escala.x)
 	return mi
+
+
+## Oclusión: las cajas grandes de cada edificio (las mismas de la colisión, achicadas 40 cm de cada lado
+## para no tapar nada de más) esconden lo que queda atrás: en la calle no se dibuja lo que está detrás de
+## las manzanas. Hay que prender rendering/occlusion_culling/use_occlusion_culling en el proyecto.
+const OCLUSOR_MIN := 3.0         ## Las cajas más finas que esto (pretiles, cornisas) no tapan nada
+const OCLUSOR_ACHICAR := 0.8
+
+func _ocluir(nombre: String, tr: Transform3D) -> void:
+	var d := Kit.datos(nombre)
+	for c: Array in d.get("cajas", []):
+		var cj := ColisionAuto.caja(d, c)
+		var tam: Vector3 = cj[2]
+		if minf(minf(tam.x, tam.y), tam.z) < OCLUSOR_MIN:
+			continue
+		var o := OccluderInstance3D.new()
+		var forma := BoxOccluder3D.new()
+		forma.size = tam - Vector3.ONE * OCLUSOR_ACHICAR
+		o.occluder = forma
+		o.transform = tr * Transform3D(cj[0], cj[1])
+		add_child(o)
 
 
 ## Si la copa de la pieza "nombre" (un árbol del kit) en "pos" con escala "e" no toca ningún edificio del
@@ -375,6 +399,26 @@ func _bici(pos: Vector3, rot: float) -> void:
 	var forma := BoxShape3D.new()
 	forma.size = Vector3(0.75, 0.8, 0.08)
 	Kit._forma(_cuerpo_en(pos), forma, Transform3D(b, pos + b * Vector3(0, 0.4, 0.3)))
+
+
+## Los carteles que van sobre una vidriera de planta baja (ver generar_ciudad.py, planta_baja).
+const VIDRIERAS := ["local", "cafe", "farmacia", "golosineria", "minimercado", "panaderia", "ropa"]
+
+
+## El interior que se ve por la vidriera de abajo del cartel "c" (ver world/vidrieras.gd). El vidrio
+## ocupa de 0.62 a 2.92 m y está centrado en la fachada; el cartel está 3.6 m arriba y 0.125 m
+## afuera. Los carteles con dibujo al costado están corridos 0.45 m y son 0.9 m más angostos.
+## El plano va 0.105 m afuera: delante de la persiana del kit (que a veces baja hasta tapar casi todo
+## el vidrio) y de sus parantes, que dibuja el shader. Así los locales se ven abiertos.
+func _vidriera(c: Array, texto: String, esc: float) -> void:
+	var p: Vector3 = c[0]
+	var rot: float = c[1]
+	var n := Vector3(sin(rot), 0, cos(rot))
+	var con_icono := String(c[4]) != "local"
+	var u := Vector3.UP.cross(n)
+	var centro := p - n * (0.125 - 0.105) - Vector3(0, 3.6 - 1.77, 0) - u * (0.45 * esc if con_icono else 0.0)
+	var ancho: float = c[2] + (0.8 * esc if con_icono else -0.1 * esc)
+	Vidrieras.poner(self, centro, rot, Vector2(ancho, 2.3), texto)
 
 
 func _nombre_local(pieza: String) -> String:

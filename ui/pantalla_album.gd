@@ -237,7 +237,7 @@ func _mover(paso: int) -> void:
 		return
 	_indice = wrapi(_indice + paso, 0, _rutas.size())
 	_mostrar()
-	AudioManager.ui("hover", -12.0)
+	AudioManager.ui("highlight", -12.0)
 
 
 ## Primer toque: pide confirmar. Segundo (dentro de 3 s): borra la foto y pasa a la siguiente (o cierra).
