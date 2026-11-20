@@ -476,6 +476,11 @@ func _tecla(k: InputEventKey) -> void:
 	match k.keycode:
 		KEY_ENTER, KEY_KP_ENTER:
 			_ui_ayuda.visible = false
+		KEY_F2:
+			# Menú del builder: ayuda y paleta juntas
+			var abrir := not (_ui_ayuda.visible or _ui_paleta.visible)
+			_ui_ayuda.visible = abrir
+			_ui_paleta.visible = abrir
 		KEY_H:
 			_ui_ayuda.visible = not _ui_ayuda.visible
 		KEY_TAB:
