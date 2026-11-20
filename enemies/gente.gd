@@ -46,9 +46,8 @@ func _poblar() -> void:
 	dona_rosa.tipo = "senora"
 	dona_rosa.preparar_aspecto()
 	var mr := dona_rosa.get_node("Modelo") as ModeloHumano
-	mr.color_ropa = Color("b0577a")
-	mr.accesorio = "sombrero"
-	mr.color_accesorio = Color("f2e6c9")
+	mr.personaje = "dona_rosa"
+	mr.alto = 0.0
 	dona_rosa.generador = _generador("MigasDonaRosa")
 	dona_rosa.intervalo_migas = 2.6
 	dona_rosa.rotation.y = PI / 2.0   # Mira al oeste, hacia el Cabildo
@@ -87,6 +86,12 @@ func _poblar() -> void:
 		s.rotation.y = PI
 		add_child(s)
 		s.global_position = Vector3(x, 0.0, -18.05)
+	# El bandoneonista, sentado en el cuarto banco de la Catedral, tocando
+	var musico := Musico.new()
+	musico.name = "Bandoneonista"
+	musico.rotation.y = PI
+	add_child(musico)
+	musico.global_position = Vector3(7.0, 0.0, -18.05)
 	# La ciudad (world/ciudad.gd) marca más señoras en bancos y zonas donde pasea gente
 	for m in get_tree().get_nodes_in_group("senora_extra"):
 		var p := m as Node3D
@@ -110,9 +115,7 @@ func _poblar() -> void:
 				h.tipo = "turista"   # los oficinistas "de verdad" salen del subte y se van
 				h.preparar_aspecto()
 				var mo := h.get_node("Modelo") as ModeloHumano
-				mo.color_ropa = [Color("2f3540"), Color("4a4f5a"), Color("596b80")][randi() % 3]
-				mo.color_piernas = Color("22252b")
-				mo.accesorio = "ninguno"
+				mo.personaje = Humano.personaje_para("oficinista")
 			else:
 				h.preparar_aspecto()
 			h.zona_centro = p.global_position

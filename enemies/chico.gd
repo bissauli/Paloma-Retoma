@@ -31,13 +31,8 @@ static func crear() -> Chico:
 	c.name = "Chico"
 	var m := ModeloHumano.new()
 	m.name = "Modelo"
+	m.personaje = ["pibe", "pibe", "escolar", "escolar_nena"].pick_random()
 	m.alto = randf_range(1.0, 1.3)
-	var colores := [Color("ef5f50"), Color("5a96dc"), Color("ffd256"), Color("58ba82"), Color("c98cf0"), Color("ffa25a")]
-	m.color_ropa = colores[randi() % colores.size()]
-	m.color_piernas = [Color("2d3a5c"), Color("3a3f4a"), Color("7a4b3a")][randi() % 3]
-	if randf() < 0.5:
-		m.accesorio = "gorra"
-		m.color_accesorio = colores[randi() % colores.size()]
 	c.add_child(m)
 	c.modelo = m
 	return c

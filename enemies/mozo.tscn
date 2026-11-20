@@ -8,6 +8,4 @@ script = ExtResource("1")
 
 [node name="Modelo" type="Node3D" parent="."]
 script = ExtResource("2")
-color_ropa = Color(0.96, 0.96, 0.94, 1)
-color_piernas = Color(0.1, 0.1, 0.12, 1)
-accesorio = "mozo"
+personaje = "mozo"

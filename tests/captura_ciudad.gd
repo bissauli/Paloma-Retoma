@@ -5,6 +5,12 @@ extends Node
 
 const VISTAS := {
 	"aerea": [Vector3(0, 150, 215), Vector3(0, 0, -15)],
+	"gente_catedral": [Vector3(1, 1.7, -11.5), Vector3(2, 0.7, -18)],
+	"gente_cabildo": [Vector3(-30.5, 1.6, -5), Vector3(-36, 0.8, -8)],
+	"gente_plaza": [Vector3(-12, 3.0, 8), Vector3(-2, 0.8, -6)],
+	"fuente_cerca": [Vector3(-140, 6.5, -52.5), Vector3(-140, 0.8, -61)],
+	"cantero_cerca": [Vector3(-130.5, 2.4, -51.5), Vector3(-134.3, 0.6, -55.3)],
+	"mesas_pasaje": [Vector3(-46, 2.2, 49), Vector3(-36, 0.8, 52)],
 	"cenital": [Vector3(0, 330, 0.1), Vector3(0, 0, 0)],
 	"plaza": [Vector3(0, 70, 75), Vector3(0, 0, 0)],
 	"parque_aereo": [Vector3(-95, 65, 5), Vector3(-140, 0, -61)],
