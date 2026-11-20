@@ -18,6 +18,9 @@ const TEXTO_AYUDA := "[center][b][font_size=22]BUILDER DE MAPA[/font_size][/b]\n
 	+ "  • [b]T[/b] apoyar en el piso · [b]Supr[/b] borrar · [b]Ctrl+D[/b] duplicar\n" \
 	+ "  • [b]X[/b] volver a su lugar original · [b]Ctrl+Z[/b] deshacer · [b]Esc[/b] soltar la pieza\n\n" \
 	+ "[b]OTROS[/b]\n" \
+	+ "  • [b]F2[/b] abrir / cerrar este menú del builder (ayuda + paleta)\n" \
+	+ "  • [b]F6[/b] cambia el clima y [b]F7[/b] la hora, como en el juego (para ver cómo queda de noche o con lluvia)\n" \
+	+ "  • [b]F9[/b] volver al juego (y en el juego, [b]F2[/b] te trae de nuevo acá)\n" \
 	+ "  • [b]Tab[/b] paleta para agregar piezas nuevas (doble clic en la lista)\n" \
 	+ "  • [b]G[/b] grilla de 0,5 m · [b]H[/b] mostrar / ocultar esta ayuda\n" \
 	+ "  • Se guarda solo después de cada cambio ([b]Ctrl+S[/b] guarda ya mismo)\n\n" \
@@ -206,7 +209,7 @@ func _estado_texto() -> void:
 			String(_sel.get_meta(&"nombre_pieza")), _sel.position.x, _sel.position.y, _sel.position.z,
 			roundi(g), _sel.scale.x]
 	else:
-		t = "Clic izquierdo sobre una pieza para elegirla   ·   H: ayuda   ·   Tab: paleta\n"
+		t = "Clic izquierdo sobre una pieza para elegirla   ·   F2: menú   ·   F9: volver al juego\n"
 	t += "Grilla %s (G)   ·   Cámara %d m/s (rueda)   ·   %s" % ["SÍ" if _snap else "no", roundi(_vel),
 		_guardado if _guardado != "" else "Sin cambios guardados todavía"]
 	_ui_estado.text = t
@@ -476,6 +479,8 @@ func _tecla(k: InputEventKey) -> void:
 	match k.keycode:
 		KEY_ENTER, KEY_KP_ENTER:
 			_ui_ayuda.visible = false
+		KEY_F9:
+			get_tree().change_scene_to_file("res://main.tscn")   # volver al juego
 		KEY_F2:
 			# Menú del builder: ayuda y paleta juntas
 			var abrir := not (_ui_ayuda.visible or _ui_paleta.visible)
