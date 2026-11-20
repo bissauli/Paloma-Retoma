@@ -11,6 +11,8 @@ extends Node3D
 ## Muestra el menú aunque la escena esté adentro de otra (lo usa tests/captura_menu.tscn).
 @export var forzar_menu := false
 
+const BUILDER_MAPA := "res://admin/builder_mapa.tscn"
+
 var _jugador: PalomaJugador
 var _balcon: Node3D
 var _gestos: GestosPaloma
@@ -150,3 +152,13 @@ func _physics_process(delta: float) -> void:
 		return
 	if GameState.bandada >= Config.UMBRAL_BALCON:
 		GameState.ganar()
+
+
+## F2 abre el builder de mapa (admin/builder_mapa.tscn). Sólo en builds de desarrollo (el editor o una
+## exportación de debug): en el juego publicado no se puede abrir, y la carpeta admin/ ni se exporta.
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not OS.is_debug_build() or not event.is_pressed() or event.is_echo():
+		return
+	if (event as InputEventKey).keycode == KEY_F2 and ResourceLoader.exists(BUILDER_MAPA):
+		get_tree().paused = false
+		get_tree().change_scene_to_file(BUILDER_MAPA)

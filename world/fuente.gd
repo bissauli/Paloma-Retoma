@@ -30,12 +30,20 @@ var _premiada := false
 
 ## Crea una fuente (altura > 0) o un charco (altura 0) en "pos".
 static func crear(padre: Node3D, pos: Vector3, radio_agua: float, altura_agua := 0.0, con_surtidor := false) -> Fuente:
+	# El builder de administrador puede moverla, girarla o borrarla (ver MapaOverrides)
+	var r := MapaOverrides.resolver("fuente", "fuente", pos, 0.0, Vector3.ONE)
+	if r["borrado"] and not MapaOverrides.modo_admin:
+		return null
 	var f := Fuente.new()
 	f.radio = radio_agua
 	f.altura = altura_agua
 	f.surtidor = con_surtidor
 	padre.add_child(f)
-	f.position = pos
+	f.position = r["pos"]
+	f.rotation.y = r["rot"]
+	if MapaOverrides.modo_admin:
+		MapaOverrides.registrar(f, r)
+		f.set_meta(&"sin_escala", true)
 	return f
 
 

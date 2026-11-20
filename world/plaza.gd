@@ -15,6 +15,7 @@ var cielo: Cielo
 
 
 func _ready() -> void:
+	MapaOverrides.reiniciar()   # IDs de las piezas editables (ver MapaOverrides)
 	_crear_ambiente()
 	_crear_piso()
 	_crear_limites()
