@@ -2,11 +2,21 @@ extends CanvasLayer
 ## Contador de FPS arriba a la izquierda (autoload "ContadorFps"). F3 lo muestra u oculta.
 ## Línea 1: FPS (promedio del último segundo). Línea 2: el cuadro más lento de ese segundo (los tirones
 ## se ven ahí aunque el promedio sea alto) y los draw calls. Los números se ponen verdes / amarillos / rojos.
+## Además baja solo la calidad gráfica un escalón si en partida el juego anda por debajo de FPS_MINIMO
+## durante dos ventanas seguidas (PCs viejas, navegadores): no se vuelve a subir sola.
 
 var _label: Label
 var _acum := 0.0
 var _cuadros := 0
 var _peor := 0.0
+var _v_acum := 0.0           ## Ventana de autoajuste (VENTANA_SEG)
+var _v_cuadros := 0
+var _v_peor := 0.0
+var _v_bajas := 0
+var _aviso_t := 0.0
+
+const FPS_MINIMO := 38.0
+const VENTANA_SEG := 4.0
 
 
 func _ready() -> void:
@@ -30,6 +40,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	_autoajustar(delta)
+	if _aviso_t > 0.0:
+		_aviso_t -= delta
 	if not visible:
 		return
 	_acum += delta
@@ -52,3 +65,37 @@ func _color(fps: float) -> Color:
 	if fps >= 40.0:
 		return Color("ffe36b")
 	return Color("ff6b6b")
+
+
+## En partida (sin menú, pausa ni escenas) y con la ventana en foco: si el promedio de la ventana queda por
+## debajo del mínimo dos veces seguidas, baja un escalón de calidad. Se ignoran las ventanas con un cuadro
+## de más de 0,25 s (cargas, alt-tab) y si el jugador puso un límite de FPS bajo (no es culpa de la PC).
+func _autoajustar(delta: float) -> void:
+	var limite_ok := Ajustes.limite_fps == 0 or Ajustes.limite_fps >= 60 or Ajustes.limite_fps == -1
+	var en_juego := GameState.en_partida and not GameState.menu_activo and not get_tree().paused 			and DisplayServer.window_is_focused() and Ajustes.calidad > 0 and limite_ok
+	if not en_juego:
+		_v_acum = 0.0
+		_v_cuadros = 0
+		_v_peor = 0.0
+		_v_bajas = 0
+		return
+	_v_acum += delta
+	_v_cuadros += 1
+	_v_peor = maxf(_v_peor, delta)
+	if _v_acum < VENTANA_SEG:
+		return
+	var fps := _v_cuadros / _v_acum
+	if _v_peor > 0.25:
+		_v_bajas = 0
+	elif fps < FPS_MINIMO:
+		_v_bajas += 1
+	else:
+		_v_bajas = 0
+	_v_acum = 0.0
+	_v_cuadros = 0
+	_v_peor = 0.0
+	if _v_bajas >= 2:
+		_v_bajas = 0
+		Ajustes.set_calidad(Ajustes.calidad - 1)
+		_aviso_t = 8.0
+		visible = true

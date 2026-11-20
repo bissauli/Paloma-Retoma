@@ -36,6 +36,10 @@ var _origen := Transform3D.IDENTITY
 var _t_vuelta := 0.0
 var _t_sonido := 0.0
 var _visual: Node3D       ## Las mallas (se achica este nodo, no el cuerpo físico)
+var _piezas: Array = []   ## [malla, transformación, color] de cada pieza: se funden en una sola malla (_fusionar)
+
+## Desde esta distancia (m) no se dibuja: son cosas de unos centímetros y hay cientos en los cafés y locales
+const RANGO_VISIBLE := 45.0
 
 
 ## Un objeto de mesa en "pos" (global).
@@ -192,6 +196,7 @@ func _armar() -> void:
 			_malla(cupula, color, Vector3(0, 0.11 * k, 0), Vector3(1, 0.8, 1))
 			_malla(_caja(Vector3(0.22, 0.03, 0.18) * k), color.darkened(0.2), Vector3(0, 0.03 * k, -0.17 * k))   # Visera
 	add_child(forma)
+	_fusionar()
 
 
 func _cilindro_forma(r: float, alto: float) -> CylinderShape3D:
@@ -227,10 +232,16 @@ func _esfera(r: float) -> SphereMesh:
 
 
 func _malla(m: Mesh, c: Color, pos: Vector3, esc := Vector3.ONE) -> void:
+	_piezas.append([m, Transform3D(Basis.from_scale(esc), pos), c])
+
+
+## Todas las piezas en una sola malla con el color en los vértices: un dibujo por objeto en vez de hasta 7.
+func _fusionar() -> void:
 	var mi := MeshInstance3D.new()
-	mi.mesh = m
-	mi.material_override = Construir.material(c, 0.7)
-	mi.position = pos
-	mi.scale = esc
+	mi.mesh = Construir.combinar(_piezas, true)
+	mi.material_override = Construir.material_vertices(0.7)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.visibility_range_end = RANGO_VISIBLE * (0.7 if Ajustes.movil else 1.0)
+	mi.visibility_range_end_margin = 3.0
 	_visual.add_child(mi)
+	_piezas.clear()
