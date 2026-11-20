@@ -3,7 +3,7 @@ extends Node
 ## bandada volando alrededor de la paloma), con FPS sin vsync, draw calls, objetos y primitivas;
 ## lo que cuesta cada sistema por paso de física y el costo de un paso de física completo.
 ##
-##   godot --path . res://tests/bench_rendimiento.tscn --disable-vsync -- [calidad=0|1|2] [movil] [bandada=N]
+##   godot --path . res://tests/bench_rendimiento.tscn --disable-vsync -- [calidad=0|1|2] [movil] [bandada=N] [comic=0|1]
 ##
 ## "movil" emula la versión para teléfonos (Ajustes.movil): sus gráficos y su física.
 
@@ -21,6 +21,8 @@ func _ready() -> void:
 			calidad = int(a.get_slice("=", 1))
 		elif a.begins_with("bandada="):
 			bandada = int(a.get_slice("=", 1))
+		elif a.begins_with("comic="):
+			Ajustes.estilo_comic = a.get_slice("=", 1) != "0"
 	if movil:
 		Ajustes.movil = true
 		Ajustes.calidad = 0
@@ -29,6 +31,7 @@ func _ready() -> void:
 	if calidad >= 0:
 		Ajustes.calidad = calidad
 	Ajustes._aplicar_graficos()
+	EstiloComic.aplicar()
 	Engine.max_fps = 0
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	GameState.guardado_habilitado = false
@@ -40,7 +43,7 @@ func _ready() -> void:
 	add_child(cam)
 	for i in 30:
 		await get_tree().process_frame
-	print("BENCH config: calidad %d, movil %s, física %d Hz, escala 3D %.2f" % [Ajustes.calidad, Ajustes.movil,
+	print("BENCH config: calidad %d, movil %s, cómic %s, física %d Hz, escala 3D %.2f" % [Ajustes.calidad, Ajustes.movil, Ajustes.estilo_comic,
 		Engine.physics_ticks_per_second, get_viewport().scaling_3d_scale])
 
 	# 1) Vistas fijas sin bandada

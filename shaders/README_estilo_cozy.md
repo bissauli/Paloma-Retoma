@@ -109,3 +109,36 @@ los colores conviene una energía baja (0.2 a 0.5) con un color frío, y
 | Edificio | `usar_degradado` con altura local, `degradado_fuerza` 0.4 a 0.5. |
 | Árbol (copa) | `usar_altura_mundial`, rango de la copa, `ancho_transicion` 0.25, `umbral_sombra` -0.1. |
 | Suelo, vereda | `rim_intensidad` 0. |
+
+## Modo cómic (Halftone Toon Shade)
+
+Encima del estilo cozy hay un modo cómic que junta tres técnicas. Se prende con la casilla
+**Estilo cómic** de Opciones (`Ajustes.estilo_comic`, prendida por defecto) y lo aplica el autoload
+`EstiloComic` (`autoload/estilo_comic.gd`):
+
+1. **Cel duro**: con la global `comic_activo` en 1, `light()` usa un borde luz/sombra de 0.025 en vez
+   de `ancho_transicion`. Los colores quedan en bloques planos y las sombras siguen teñidas.
+2. **Semitono** (en `estilo_cozy_luz.gdshaderinc`): una trama de puntos en pantalla, girada 45°,
+   con celdas de `comic_celda` px (medidos a 1080 de alto). Los puntos crecen cuanto menos sol recibe
+   la cara y quedan al máximo bajo una sombra proyectada. La tinta es `tinte * comic_tinta`: un tono
+   oscuro del color de sombra, no negro. Truco para Compatibility (la luz del sol con sombras se
+   dibuja en otro pase y no puede oscurecer): `fragment()` pone en el piso los puntos de radio máximo,
+   y el sol "los borra" donde corresponde. Los faroles y luces de los locales iluminan los puntos.
+   No suma dibujos.
+3. **Contorno de tinta** (`contorno_tinta.gdshader`, Inverted Hull): `EstiloComic` lo pone en el
+   `material_overlay` de cada malla opaca e iluminada (shader cozy o `StandardMaterial3D` opaco),
+   también en las que aparecen después (gente, autos, palomas, accesorios). Se saltean los pisos
+   (baldosas y lajas, o lo plano de más de 1 m), lo transparente y lo que tenga la meta
+   `sin_contorno`. Detalles:
+   - Grosor fijo en px (2.6 a 1080) que se afina desde los 25 m hasta los 160 m.
+   - Se empuja un 1% de la distancia hacia atrás: no asoma sobre el piso o la losa de al lado.
+   - Para que no se corte en las aristas de las cajas: `Construir.combinar()` guarda en `CUSTOM0`
+     normales suavizadas (`Construir.normales_suaves()`), y `EstiloComic` se las agrega a las mallas
+     importadas chicas. Las que tienen esqueleto (palomas) inflan desde el centro de la malla,
+     porque `CUSTOM0` no sigue a los huesos.
+   - Cuesta un dibujo más por malla (en una RX 5500 XT, en calidad Alta, la vista aérea pasa de
+     105 a 85 FPS; en Media casi nada). En el teléfono no se dibuja (`Ajustes.contorno_comic()`).
+
+Capturas con y sin el modo: `godot --path . res://tests/captura_comic.tscn -- <carpeta> [vistas]
+[comic:0|1]` (las vistas de `captura_ciudad`). Rendimiento: `tests/bench_rendimiento.tscn` acepta
+`comic=0|1`.

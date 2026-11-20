@@ -23,6 +23,7 @@ BeckettRuntime="*uid://do68dqybesb7r"
 GameState="*res://autoload/game_state.gd"
 AudioManager="*res://autoload/audio_manager.gd"
 Ajustes="*uid://c5a2qcktrxadx"
+EstiloComic="*res://autoload/estilo_comic.gd"
 Misiones="*res://autoload/misiones.gd"
 Dialogos="*res://autoload/dialogos.gd"
 Emotes="*res://ui/rueda_emotes.gd"
@@ -149,4 +150,12 @@ occlusion_culling/use_occlusion_culling=true
 cozy_cielo={
 "type": "color",
 "value": Color(1, 1, 1, 1)
+}
+comic_activo={
+"type": "float",
+"value": 1.0
+}
+comic_celda={
+"type": "float",
+"value": 7.0
 }

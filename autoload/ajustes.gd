@@ -48,6 +48,7 @@ var calidad := 2                ## 0 bajo, 1 medio, 2 alto
 var resolucion := Vector2i.ZERO ## (0, 0) = nativa
 var limite_fps := 0             ## Ver LIMITES_FPS
 var idioma := ""                ## "es" o "en" (ver Idioma). Vacío = el del sistema hasta que elija
+var estilo_comic := true        ## Modo cómic: cel duro, semitono y contorno de tinta (ver EstiloComic)
 
 ## Versión para teléfonos: controles táctiles, sin captura del mouse y gráficos livianos.
 ## Una sola build web sirve para PC y teléfono: se activa sola al abrirla desde Android o iOS
@@ -172,6 +173,17 @@ func set_calidad(c: int) -> void:
 	calidad = clampi(c, 0, PRESETS.size() - 1)
 	_aplicar_graficos()
 	_guardar()
+
+
+func set_estilo_comic(e: bool) -> void:
+	estilo_comic = e
+	_guardar()
+
+
+## ¿Se dibuja el contorno de tinta? Es un dibujo más por malla (medido en PC: +2 ms en Alta, casi
+## nada en Media y Baja); en el teléfono no, ahí cada dibujo pesa mucho más.
+func contorno_comic() -> bool:
+	return estilo_comic and not movil
 
 
 func set_resolucion(r: Vector2i) -> void:
@@ -394,6 +406,7 @@ func _cargar() -> void:
 	calidad = clampi(cfg.get_value("video", "calidad", calidad), 0, PRESETS.size() - 1)
 	resolucion = cfg.get_value("video", "resolucion", resolucion)
 	limite_fps = cfg.get_value("video", "limite_fps", limite_fps)
+	estilo_comic = cfg.get_value("video", "estilo_comic", estilo_comic)
 	if not LIMITES_FPS.has(limite_fps):
 		limite_fps = 0
 	sensibilidad = cfg.get_value("control", "sensibilidad", sensibilidad)
@@ -413,6 +426,7 @@ func _guardar() -> void:
 	cfg.set_value("video", "calidad", calidad)
 	cfg.set_value("video", "resolucion", resolucion)
 	cfg.set_value("video", "limite_fps", limite_fps)
+	cfg.set_value("video", "estilo_comic", estilo_comic)
 	cfg.set_value("control", "sensibilidad", sensibilidad)
 	cfg.set_value("control", "invertir_y", invertir_y)
 	cfg.set_value("general", "idioma", idioma)

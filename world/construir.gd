@@ -284,6 +284,7 @@ static func letrero(padre: Node, pos: Vector3, texto: String, color_texto: Color
 # en pocas mallas grandes: es lo que más rinde, sobre todo en el teléfono (WebGL).
 
 static var _unitarias := {}   ## Forma de primitiva -> arrays de su versión "unitaria" (sin escalar)
+static var _suaves := {}      ## Forma de primitiva -> normales suavizadas de la versión unitaria
 
 
 ## Junta en pocas mallas todas las MeshInstance3D estáticas que cuelgan de "raiz".
@@ -363,6 +364,7 @@ static func combinar(piezas: Array, con_color := true, con_uv := false) -> Array
 	var norms := PackedVector3Array()
 	var cols := PackedColorArray()
 	var uvs := PackedVector2Array()
+	var suaves := PackedVector3Array()
 	var idx := PackedInt32Array()
 	for p: Array in piezas:
 		var u := _unitaria(p[0] as Mesh)
@@ -373,6 +375,9 @@ static func combinar(piezas: Array, con_color := true, con_uv := false) -> Array
 		verts.append_array(t * v)
 		# Normales con la inversa transpuesta (sirve aunque la escala no sea pareja)
 		norms.append_array(Transform3D(t.basis.inverse().transposed(), Vector3.ZERO) * (arr[Mesh.ARRAY_NORMAL] as PackedVector3Array))
+		# Las suavizadas sólo con la rotación: en una caja estirada la esquina sigue saliendo en
+		# diagonal (con la escala quedaría casi pegada a la cara más grande)
+		suaves.append_array(Transform3D(t.basis.orthonormalized(), Vector3.ZERO) * (u[2] as PackedVector3Array))
 		if con_color:
 			var c := PackedColorArray()
 			c.resize(v.size())
@@ -407,9 +412,12 @@ static func combinar(piezas: Array, con_color := true, con_uv := false) -> Array
 		a[Mesh.ARRAY_COLOR] = cols
 	if con_uv:
 		a[Mesh.ARRAY_TEX_UV] = uvs
+	# Normales suavizadas para el contorno de tinta (ver normales_suaves())
+	a[Mesh.ARRAY_CUSTOM0] = suaves.to_byte_array().to_float32_array()
+	var formato := Mesh.ARRAY_CUSTOM_RGB_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
 	var am := ArrayMesh.new()
 	if not verts.is_empty():
-		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
+		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a, [], {}, formato)
 	return am
 
 
@@ -444,7 +452,30 @@ static func _unitaria(m: Mesh) -> Array:
 		esc = Vector3.ONE
 	if not _unitarias.has(firma):
 		_unitarias[firma] = _molde(firma, m).surface_get_arrays(0)
-	return [_unitarias[firma], esc]
+		_suaves[firma] = normales_suaves(_unitarias[firma])
+	return [_unitarias[firma], esc, _suaves[firma]]
+
+
+## Normales "suavizadas" para el contorno de tinta (shaders/contorno_tinta.gdshader): cada vértice
+## se queda con el promedio de las normales de todos los vértices en la misma posición. En la
+## esquina de una caja las tres copias del vértice apuntan en diagonal hacia afuera, así el contorno
+## inflado no se abre en las aristas.
+static func normales_suaves(arr: Array) -> PackedVector3Array:
+	var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var n: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]
+	var suma := {}
+	var claves: Array[Vector3i] = []
+	claves.resize(v.size())
+	for i in v.size():
+		var k := Vector3i((v[i] * 1000.0).round())
+		claves[i] = k
+		suma[k] = suma.get(k, Vector3.ZERO) + n[i]
+	var out := PackedVector3Array()
+	out.resize(v.size())
+	for i in v.size():
+		var s: Vector3 = suma[claves[i]]
+		out[i] = s.normalized() if s.length_squared() > 1e-6 else n[i]
+	return out
 
 
 static func _molde(firma: String, m: Mesh) -> Mesh:
