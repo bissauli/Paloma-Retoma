@@ -75,25 +75,29 @@ static func ventanas(tam: Vector3, frente: Vector3, pisos := -1) -> Array[Vector
 
 
 static func jacaranda(padre: Node3D, pos: Vector3, escala := 1.0) -> void:
+	# El árbol cuelga de su propio nodo en "pos" (así el builder lo puede mover: ver MapaOverrides)
+	var n := MapaOverrides.envolver(padre, "jacaranda", "jacaranda", pos)
+	if n == null:
+		return
+	n.set_meta(&"param_escala", escala)   # el builder lo usa al duplicar el árbol
 	var alto := 3.2 * escala
-	Construir.cilindro(padre, pos + Vector3(0, alto / 2.0, 0), 0.22 * escala, alto, C_TRONCO, true, 6, 0.15 * escala)
+	Construir.cilindro(n, Vector3(0, alto / 2.0, 0), 0.22 * escala, alto, C_TRONCO, true, 6, 0.15 * escala)
 	# Copa: varias esferas violetas. La de arriba tiene colisión para posarse.
 	var copa := [Vector3(0, 0, 0), Vector3(1.0, -0.3, 0.4), Vector3(-0.9, -0.2, -0.5), Vector3(0.2, 0.5, -0.8)]
 	for i in copa.size():
 		var c: Vector3 = copa[i]
 		var color := C_JACARANDA if i % 2 == 0 else C_JACARANDA_2
-		Construir.esfera(padre, pos + Vector3(0, alto + 0.8 * escala, 0) + c * escala, 1.5 * escala, color,
+		Construir.esfera(n, Vector3(0, alto + 0.8 * escala, 0) + c * escala, 1.5 * escala, color,
 			Vector3(1, 0.75, 1), 8)
 	var forma := SphereShape3D.new()
 	forma.radius = 1.6 * escala
-	Construir.colision(padre, pos + Vector3(0, alto + 0.7 * escala, 0), forma)
+	Construir.colision(n, Vector3(0, alto + 0.7 * escala, 0), forma)
 
 
 static func banco(padre: Node3D, pos: Vector3, rot_y := 0.0) -> void:
-	var n := Node3D.new()
-	padre.add_child(n)
-	n.position = pos
-	n.rotation.y = rot_y
+	var n := MapaOverrides.envolver(padre, "banco", "banco", pos, rot_y)
+	if n == null:
+		return
 	Construir.caja(n, Vector3(0, 0.45, 0), Vector3(2.0, 0.08, 0.6), C_MADERA)
 	Construir.caja(n, Vector3(0, 0.8, 0.27), Vector3(2.0, 0.5, 0.06), C_MADERA, false)
 	for x in [-0.85, 0.85]:
@@ -101,9 +105,12 @@ static func banco(padre: Node3D, pos: Vector3, rot_y := 0.0) -> void:
 
 
 static func farol(padre: Node3D, pos: Vector3) -> void:
-	Construir.cilindro(padre, pos + Vector3(0, 2.0, 0), 0.07, 4.0, Color("23282b"), true, 6)
-	Construir.esfera(padre, pos + Vector3(0, 4.15, 0), 0.25, Color("fff6d8"), Vector3.ONE, 8)
-	LucesNoche.farol_directo(padre, pos + Vector3(0, 4.15, 0), pos.y)
+	var n := MapaOverrides.envolver(padre, "farol", "farol", pos)
+	if n == null:
+		return
+	Construir.cilindro(n, Vector3(0, 2.0, 0), 0.07, 4.0, Color("23282b"), true, 6)
+	Construir.esfera(n, Vector3(0, 4.15, 0), 0.25, Color("fff6d8"), Vector3.ONE, 8)
+	LucesNoche.farol_directo(n, Vector3(0, 4.15, 0), 0.0)
 
 
 ## Valla metálica de un tramo (para la Casa Rosada).
