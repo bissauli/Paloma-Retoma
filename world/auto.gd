@@ -20,6 +20,8 @@ var alto := 1.45
 var velocidad := 0.0
 var velocidad_crucero := 11.0
 var bocina_enfriamiento := 0.0
+var ruta := 0                  ## Índice de su ruta en world/transito.gd
+var espera := 0.0              ## Segundos seguidos casi parado (si pasan muchos, ignora los cruces para destrabarse)
 
 var _ruedas: Array[Node3D] = []
 var _radio_rueda := 0.33

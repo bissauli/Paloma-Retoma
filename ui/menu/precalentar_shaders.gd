@@ -41,6 +41,15 @@ func precalentar(jugador: Node3D, camara_juego: Camera3D) -> void:
 		var a := TAU * i / 4.0 + PI / 4.0
 		var desde := centro + Vector3(sin(a) * 60.0, 45.0, cos(a) * 60.0)
 		vistas.append(Transform3D.IDENTITY.translated(desde).looking_at(centro, Vector3.UP))
+	# Recorrido por toda la ciudad (394 x 222 m): lo que está lejos de la paloma queda fuera del alcance de
+	# dibujo en las vistas de arriba, y sus materiales y mallas se compilaban recién al llegar a cada zona
+	# (los tirones al entrar a la plaza o cambiar de zona). Dos vistas por punto, mirando a este y oeste.
+	for gx in range(-150, 151, 100):
+		for gz in range(-80, 81, 80):
+			for sentido in [1.0, -1.0]:
+				var desde := Vector3(gx, 30.0, gz)
+				var hacia := desde + Vector3(sentido * 40.0, -22.0, 0.0)
+				vistas.append(Transform3D.IDENTITY.translated(desde).looking_at(hacia, Vector3.UP))
 	var arriba := centro + Vector3.UP * 140.0
 	vistas.append(Transform3D.IDENTITY.translated(arriba).looking_at(centro, Vector3.FORWARD))
 

@@ -24,6 +24,8 @@ var _t := 0.0
 var _centro := Vector2.ZERO
 var _marca := Vector2.ZERO
 var _marca_visible := false
+var _t_busqueda := 0.0
+var _candidatas: Array[Node] = []
 
 
 func _ready() -> void:
@@ -49,8 +51,14 @@ func _process(delta: float) -> void:
 	_nivel = 0.0
 	if jugadora != null and camara != null and GameState.en_partida and not GameState.partida_terminada:
 		var base_pos := jugadora.global_position
-		for n in get_tree().get_nodes_in_group("amenazas"):
-			if not n.has_method("nivel_amenaza"):
+		# El grupo se recorre 5 veces por segundo (casi siempre está vacío); en los cuadros
+		# intermedios sólo se consulta a la amenaza ya elegida
+		_t_busqueda -= delta
+		if _t_busqueda <= 0.0:
+			_t_busqueda = 0.2
+			_candidatas = get_tree().get_nodes_in_group("amenazas")
+		for n in _candidatas:
+			if not is_instance_valid(n) or not n.is_inside_tree() or not n.has_method("nivel_amenaza"):
 				continue
 			var nivel: float = n.nivel_amenaza()
 			if nivel > _nivel:
@@ -66,8 +74,11 @@ func _process(delta: float) -> void:
 				_marca = camara.unproject_position(_fuente_pos)
 				_marca_visible = Rect2(Vector2.ZERO, size).has_point(_marca)
 	var objetivo := 1.0 if _nivel > 0.0 else 0.0
+	var alfa_antes := _alfa
 	_alfa = move_toward(_alfa, objetivo, delta * (FUNDIDO_ENTRADA if objetivo > _alfa else FUNDIDO_SALIDA))
-	queue_redraw()
+	# Sin aviso en pantalla no hay nada que redibujar (salvo el cuadro en que se apaga)
+	if _alfa > 0.0 or alfa_antes > 0.0:
+		queue_redraw()
 
 
 ## ¿Hay un aviso en pantalla? (para las pruebas)

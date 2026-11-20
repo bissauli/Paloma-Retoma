@@ -64,6 +64,7 @@ var _tween_descanso: Tween
 var montada: Marker3D       ## El caballito de la calesita en el que está sentada (null = ninguno)
 var _t_montar := 0.0
 var _picada_bloqueada := false   ## Shift estaba apretado al despegar: la picada espera a que se suelte
+var en_foto := false              ## Está en el modo cámara (ver ui/modo_foto.gd)
 var bloquea_descanso := false     ## El partido de fútbol usa Q para otra cosa (ver world/partido_futbol.gd)
 var _t_aviso_sombrero := 0.0
 var _t_descanso := 0.0
@@ -412,6 +413,8 @@ func bajar_del_caballito(volando := false) -> void:
 ## Q: se queda quieta descansando y las palomas de la bandada se sientan a su lado (en los cables,
 ## balcones, bordes de fuentes... ver Descanso). Se levanta al moverse, volar, dar un aletazo o con Q.
 func _revisar_descanso() -> void:
+	if descansando and en_foto:
+		return      # Sacando fotos: sigue sentada con la bandada
 	if descansando:
 		# Tras unos segundos, si hay 3 o más palomas sentadas a su lado, cuenta como descanso en grupo
 		_t_descanso += get_physics_process_delta_time()

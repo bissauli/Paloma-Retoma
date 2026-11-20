@@ -84,7 +84,7 @@ func _puede_entrar() -> bool:
 	var j := GameState.jugador
 	return j != null and not Ajustes.movil and GameState.en_partida and not GameState.menu_activo \
 		and not GameState.partida_terminada and not get_tree().paused and not Dialogos.activo \
-		and not Emotes.abierta and j.controlable and not j.descansando
+		and not Emotes.abierta and j.controlable and j.montada == null and not j.deslizando
 
 
 func _input(event: InputEvent) -> void:
@@ -133,12 +133,40 @@ func _process(delta: float) -> void:
 	var vertical := (1.0 if Input.is_action_pressed("volar") else 0.0) - (1.0 if Input.is_action_pressed("picada") else 0.0)
 	var rapidez := VELOCIDAD_RAPIDA if Input.is_key_pressed(KEY_CTRL) else VELOCIDAD
 	var mov := _cam.global_transform.basis * Vector3(entrada.x, 0.0, entrada.y) + Vector3.UP * vertical
-	var pos := _cam.global_position + mov.limit_length(1.0) * rapidez * delta
-	# No se aleja demasiado de la paloma ni se mete bajo el piso
+	var antes := _cam.global_position
+	var pos := antes + mov.limit_length(1.0) * rapidez * delta
+	# No se aleja demasiado de la paloma, ni se sale del mapa, ni se mete bajo el piso
 	var desde := _jugador.global_position + Vector3.UP * 0.5
 	pos = desde + (pos - desde).limit_length(DISTANCIA_MAX)
-	pos.y = maxf(pos.y, 0.25)
+	pos.x = clampf(pos.x, Ciudad.X_MIN + 1.0, Ciudad.X_MAX - 1.0)
+	pos.z = clampf(pos.z, Ciudad.Z_MIN + 1.0, Ciudad.Z_MAX - 1.0)
+	pos.y = clampf(pos.y, 0.25, Ciudad.TECHO - 2.0)
+	# Colisión: no atraviesa edificios ni el piso (un rayo del punto anterior al nuevo, con margen). Si choca,
+	# se desliza: prueba cada eje por separado.
+	var espacio := _cam.get_world_3d().direct_space_state
+	var libre := _camino_libre(espacio, antes, pos)
+	if not libre:
+		var sin_x := Vector3(antes.x, pos.y, pos.z)
+		var sin_z := Vector3(pos.x, pos.y, antes.z)
+		var sin_y := Vector3(pos.x, antes.y, pos.z)
+		if _camino_libre(espacio, antes, sin_x):
+			pos = sin_x
+		elif _camino_libre(espacio, antes, sin_z):
+			pos = sin_z
+		elif _camino_libre(espacio, antes, sin_y):
+			pos = sin_y
+		else:
+			pos = antes
 	_cam.global_position = pos
+
+
+## ¿Se puede ir de "a" a "b" sin tocar el mundo? Revisa el trayecto con un margen de 0,35 m.
+func _camino_libre(espacio: PhysicsDirectSpaceState3D, a: Vector3, b: Vector3) -> bool:
+	var d := b - a
+	if d.length_squared() < 0.000001:
+		return true
+	var q := PhysicsRayQueryParameters3D.create(a, b + d.normalized() * 0.35, Construir.CAPA_MUNDO)
+	return espacio.intersect_ray(q).is_empty()
 
 
 # ---------------------------------------------------------------- Entrar y salir
@@ -150,6 +178,7 @@ func entrar() -> void:
 	activo = true
 	_controlable_previo = _jugador.controlable
 	_jugador.controlable = false
+	_jugador.en_foto = true     # Si está descansando, no se levanta mientras saca fotos
 	_jugador.camara.bloqueada = true
 	var actual := get_viewport().get_camera_3d()
 	if actual:
@@ -174,6 +203,7 @@ func salir() -> void:
 	if not activo:
 		return
 	activo = false
+	_jugador.en_foto = false
 	_jugador.controlable = _controlable_previo
 	_jugador.camara.bloqueada = false
 	_jugador.camara.camara.make_current()

@@ -1725,6 +1725,19 @@ func _fondo() -> void:
 	for x: float in [-69.0, 69.0]:
 		for s: float in [-1.0, 1.0]:
 			_tunel(Vector3(x, 0, s * 158.0), s)
+	# ...y al final de la Av. de Mayo (oeste) y de Reconquista (este), por donde entra el tránsito de esas calles
+	_tunel_ew(Vector3(-214.0, 0, -2.0))
+	_tunel_ew(Vector3(214.0, 0, -6.0))
+
+
+## Lo mismo para una calle este-oeste (la boca mira hacia el mapa: +X en el túnel del oeste, -X en el del este).
+func _tunel_ew(c: Vector3) -> void:
+	var hacia := 1.0 if c.x < 0.0 else -1.0
+	var mi := Construir.caja(self, c + Vector3(0, 9.0, 0), Vector3(28, 18, 22), Color("c8c0b2"), false)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var cara := c.x + hacia * 14.02
+	Construir.caja(self, Vector3(cara, 2.8, c.z), Vector3(0.02, 5.6, 10.4), Color("15171b"), false)
+	Construir.caja(self, Vector3(cara + hacia * 0.15, 6.0, c.z), Vector3(0.3, 0.8, 12.0), Color("9aa0a6"), false)
 
 
 ## Edificio que tapa la calle con la boca oscura de un túnel: los autos aparecen y desaparecen adentro.

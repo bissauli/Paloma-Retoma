@@ -82,6 +82,7 @@ var _arcoiris_t := 0.0        ## Segundos que le quedan al arcoíris
 var _arcoiris_dir := Vector3.FORWARD   ## Hacia dónde está (del lado opuesto al sol)
 var _llovia := false
 var _t_nubes := 0.0
+var _t_aplicar := 0.0
 var _tiempo := 0.0
 
 
@@ -135,7 +136,14 @@ func _process(delta: float) -> void:
 	cantidad = move_toward(cantidad, o[3], paso)
 	_actualizar_rayos(delta, corre)
 	_actualizar_arcoiris(delta)
-	_aplicar(false)
+	# La hora y el clima cambian muy despacio: el cálculo pesado (colores, sol, ~30 parámetros de shader)
+	# se hace 10 veces por segundo, o cada cuadro mientras hay un relámpago
+	_t_aplicar -= delta
+	if _t_aplicar <= 0.0 or _relampago > 0.0:
+		_t_aplicar = 0.1
+		_aplicar(false)
+	else:
+		cielo_mat.set_shader_parameter("tiempo", _tiempo)
 	_seguir_camara()
 	_anillo.rotation.y += delta * 0.003   # Las nubes viajan muy despacio
 
@@ -524,8 +532,11 @@ func _actualizar_nubes(inmediato: bool) -> void:
 				cuanto = cantidad * (1.0 - tormenta * 0.5)
 		for i in mm.instance_count:
 			var objetivo := smoothstep(umb[i] - 0.06, umb[i] + 0.06, cuanto)
-			vis[i] = objetivo if inmediato else move_toward(vis[i], objetivo, 0.1 / 6.0)
-			mm.set_instance_custom_data(i, Color(bri[i], bri[i], bri[i], vis[i]))
+			var nuevo: float = objetivo if inmediato else move_toward(vis[i], objetivo, 0.1 / 6.0)
+			# Sólo se escribe lo que cambió: cada escritura vuelve a subir todo el buffer a la GPU
+			if inmediato or nuevo != vis[i]:
+				vis[i] = nuevo
+				mm.set_instance_custom_data(i, Color(bri[i], bri[i], bri[i], nuevo))
 		_visible[tipo] = vis
 
 
