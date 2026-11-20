@@ -20,29 +20,14 @@ const MAX_ADENTRO := 3        ## Cuántos clientes puede haber a la vez
 const VEREDA := 1.7           ## A cuánto de la vidriera caminan por la vereda
 const LARGO_VEREDA := 7.0     ## Desde dónde llegan (y hasta dónde se van) por la vereda
 
-## Uniforme del empleado por rubro: [color de la ropa, color de las piernas, accesorio, color del accesorio].
-const UNIFORMES := {
-	"supermercado": [Color("3f9a5a"), Color("2f3540"), "gorra", Color("3f9a5a")],
-	"verduleria": [Color("6b8f3a"), Color("4a3a2a"), "ninguno", Color.WHITE],
-	"mecanico": [Color("2f4f7f"), Color("2f4f7f"), "gorra", Color("c8423a")],
-	"panaderia": [Color("f4f1e8"), Color("e8e2d2"), "mozo", Color("f4f1e8")],
-	"fiambreria": [Color("f4f1e8"), Color("3a3c40"), "gorra", Color("b8423a")],
-	"libreria": [Color("8a5a35"), Color("3a3f4a"), "ninguno", Color.WHITE],
-	"cafe": [Color("2a2a2e"), Color("2a2a2e"), "mozo", Color("f4f1e8")],
-	"restaurante": [Color("f4f1e8"), Color("2a2a2e"), "mozo", Color("f4f1e8")],
-	"consultorio": [Color("f4f8f8"), Color("8fc4d8"), "ninguno", Color.WHITE],
-	"oficina": [Color("2b4a6b"), Color("2a2a2e"), "ninguno", Color.WHITE],
-	"farmacia": [Color("f4f8f8"), Color("3f9a5a"), "ninguno", Color.WHITE],
-	"kiosco": [Color("c8423a"), Color("2f3540"), "gorra", Color("c8423a")],
-	"heladeria": [Color("e88aa8"), Color("f4f1e8"), "gorra", Color("e88aa8")],
-	"ferreteria": [Color("d8a03a"), Color("3a3f4a"), "ninguno", Color.WHITE],
-	"peluqueria": [Color("2a2a2e"), Color("2a2a2e"), "ninguno", Color.WHITE],
-	"floreria": [Color("4f8a3a"), Color("6b5a40"), "sombrero", Color("e8d6a0")],
+## Quién atiende cada rubro (uno de los personajes de modelos/personas; si hay varios, uno al azar).
+const EMPLEADOS := {
+	"supermercado": ["almacenero"], "verduleria": ["almacenero"], "mecanico": ["barrendero"],
+	"panaderia": ["cocinero"], "fiambreria": ["cocinero"], "libreria": ["almacenero", "oficinista_mujer"],
+	"cafe": ["mozo"], "restaurante": ["mozo", "cocinero"], "consultorio": ["farmaceutica"], "oficina": ["oficinista", "oficinista_mujer"],
+	"farmacia": ["farmaceutica"], "kiosco": ["almacenero"], "heladeria": ["estudiante"], "ferreteria": ["almacenero"],
+	"peluqueria": ["oficinista_mujer", "bailarina"], "floreria": ["artesano", "abuela"],
 }
-const ROPA_CLIENTES := [Color("e8665a"), Color("4f7cc4"), Color("f0c84b"), Color("9a72d0"), Color("6fbf73"),
-	Color("e89a4a"), Color("78bde8"), Color("e68aa8"), Color("8a8a96"), Color("3a6b5a"), Color("c8c0a8")]
-const PIERNAS := [Color("3a3f4a"), Color("2f4a7a"), Color("5a4a3a"), Color("2a2a2e"), Color("7a6a55")]
-const PIELES := [Color("e0b48f"), Color("c68e62"), Color("8d5a3b"), Color("f1cfae"), Color("a87048")]
 
 enum Paso { MIRANDO, CAMINANDO }
 
@@ -80,8 +65,8 @@ func _armar() -> void:
 	if _libres.is_empty():
 		return
 	# --- El empleado: donde lo dejó PlanoLocal (detrás del mostrador), mirando a la vidriera
-	var u: Array = UNIFORMES.get(ce.tema, [Color("4f7cc4"), Color("3a3f4a"), "ninguno", Color.WHITE])
-	_empleado = _persona(u[0], u[1], u[2], u[3], PIELES[_rng.randi_range(0, PIELES.size() - 1)], 1.72)
+	var quienes: Array = EMPLEADOS.get(ce.tema, ["almacenero"])
+	_empleado = _persona(quienes[_rng.randi_range(0, quienes.size() - 1)], 0.0)
 	_base_empleado = ce.get_meta(&"puesto_empleado", _libres[0])
 	_empleado.position = _base_empleado
 	_empleado.rotation.y = PI   # Mira hacia +Z (la vidriera): el modelo mira hacia -Z
@@ -103,30 +88,18 @@ func _armar() -> void:
 	_proximo = _rng.randf_range(2.0, 6.0)
 
 
-func _persona(ropa: Color, piernas: Color, acc: String, color_acc: Color, piel: Color, alto: float) -> ModeloHumano:
+func _persona(personaje: String, alto: float) -> ModeloHumano:
 	var m := ModeloHumano.new()
+	m.personaje = personaje
 	m.alto = alto
-	m.color_ropa = ropa
-	m.color_piernas = piernas
-	m.color_piel = piel
-	m.accesorio = acc
-	m.color_accesorio = color_acc
 	add_child(m)
 	return m
 
 
 ## Un cliente nuevo (otra ropa, otra altura) parado en "pos".
 func _nuevo_cliente(pos: Vector3) -> Dictionary:
-	var acc := "ninguno"
-	var r := _rng.randf()
-	if r < 0.2:
-		acc = "gorra"
-	elif r < 0.3:
-		acc = "sombrero"
-	var m := _persona(ROPA_CLIENTES[_rng.randi_range(0, ROPA_CLIENTES.size() - 1)],
-		PIERNAS[_rng.randi_range(0, PIERNAS.size() - 1)], acc,
-		ROPA_CLIENTES[_rng.randi_range(0, ROPA_CLIENTES.size() - 1)],
-		PIELES[_rng.randi_range(0, PIELES.size() - 1)], _rng.randf_range(1.55, 1.88))
+	var nombre: String = ModeloHumano.PASEANTES[_rng.randi_range(0, ModeloHumano.PASEANTES.size() - 1)]
+	var m := _persona(nombre, float(ModeloHumano.info(nombre).get("alto", 1.75)) * _rng.randf_range(0.96, 1.04))
 	m.position = pos
 	m.rotation.y = _rng.randf() * TAU
 	var c := {"m": m, "camino": PackedVector3Array(), "paso": Paso.MIRANDO, "espera": 0.0,
