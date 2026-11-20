@@ -3,10 +3,9 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://blct5jusq7jd2"
-path.s3tc="res://.godot/imported/mono_de_gala__albedo.png-f4f69648f1da95f398a7c184a24c6d67.s3tc.ctex"
+path="res://.godot/imported/mono_de_gala__albedo.png-f4f69648f1da95f398a7c184a24c6d67.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 generator_parameters={
 "md5": "f396bac0aa305d1753c704569505bdb5"
@@ -15,11 +14,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/accesorios/cuello/mono_de_gala__albedo.png"
-dest_files=["res://.godot/imported/mono_de_gala__albedo.png-f4f69648f1da95f398a7c184a24c6d67.s3tc.ctex"]
+dest_files=["res://.godot/imported/mono_de_gala__albedo.png-f4f69648f1da95f398a7c184a24c6d67.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -41,4 +40,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=0
+detect_3d/compress_to=1
