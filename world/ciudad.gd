@@ -123,6 +123,8 @@ func _ready() -> void:
 	var t0 := Time.get_ticks_msec()
 	_rng.seed = 20261115
 	_rng_flores.seed = 4242
+	if not (get_parent() and get_parent().has_method("_crear_zonas")):
+		MapaOverrides.reiniciar()   # suelta (si la arma la Plaza, ella ya reinició el conteo de IDs)
 	NivelAlto.reiniciar()
 	LucesNoche.faroles_extra.clear()
 	_mat_vereda = Construir.material_lajas("lajas_vereda", 4.0)
@@ -138,6 +140,8 @@ func _ready() -> void:
 		_rng.seed = 20261115 + hash(etapa.get_method())
 		etapa.call()
 		etapas.append("%s %d" % [etapa.get_method(), (Time.get_ticks_usec() - t) / 1000])
+	# Piezas que se agregaron a mano con el builder de administrador
+	MapaOverrides.armar_agregadas(self)
 	# Los cuerpos entran al árbol recién ahora, con todas sus formas (así cada uno se arma una sola vez)
 	var t1 := Time.get_ticks_usec()
 	for c: Vector2i in _cuerpos:
@@ -295,9 +299,20 @@ func _suelos() -> void:
 ## Pone una pieza del kit (con colisión) y escribe sus carteles.
 func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, colision := true,
 		textos := {}, con_textos := true, solo_lejos := false) -> MeshInstance3D:
+	# Cambios del builder de administrador (ver MapaOverrides): las piezas de piso se pueden mover, girar,
+	# escalar y borrar. Lo que no se tocó queda como lo arma el código.
+	var ov := {}
+	if MapaOverrides.es_editable(nombre) or MapaOverrides.forzar_id != "":
+		ov = MapaOverrides.resolver("kit", nombre, pos, rot, escala)
+		if ov["borrado"] and not MapaOverrides.modo_admin:
+			return _fantasma()
+		pos = ov["pos"]
+		rot = ov["rot"]
+		escala = ov["escala"]
 	# Mapa V4.5: la copa de un árbol no se mete en un edificio (en los toldos y carteles de los locales):
-	# se achica y, si ni así entra, en la cazuela va un arbusto
-	if nombre.begins_with("arbol_grande") or nombre.begins_with("jacaranda_grande") or nombre.begins_with("pino"):
+	# se achica y, si ni así entra, en la cazuela va un arbusto (salvo en los árboles que se tocaron a mano)
+	if not ov.get("movido", false) and not ov.get("agregado", false) \
+			and (nombre.begins_with("arbol_grande") or nombre.begins_with("jacaranda_grande") or nombre.begins_with("pino")):
 		var e := escala.x
 		while e > 0.42 and not _copa_libre(nombre, pos, e):
 			e *= 0.88
@@ -307,7 +322,19 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 				nombre = "arbusto_redondo_A"
 				e = 1.0
 			escala = Vector3.ONE * e
-	var mi := Kit.colocar(self, nombre, pos, rot, escala, _cuerpo_en(pos) if colision else null, solo_lejos)
+	var mi: MeshInstance3D
+	if MapaOverrides.modo_admin and not ov.is_empty():
+		# Modo admin: la pieza cuelga de un nodo propio (sin fusionar ni colisión) que el builder mueve
+		var w := Node3D.new()
+		add_child(w)
+		w.transform = MapaOverrides.transformacion(pos, rot, escala)
+		ov["pieza"] = nombre
+		if not ov["movido"] and not ov["agregado"]:
+			ov["orig_escala"] = escala   # ya con el achique de los árboles: "restaurar" vuelve a lo que arma el código
+		MapaOverrides.registrar(w, ov)
+		mi = Kit.colocar(w, nombre, Vector3.ZERO, 0.0, Vector3.ONE, null, solo_lejos)
+	else:
+		mi = Kit.colocar(self, nombre, pos, rot, escala, _cuerpo_en(pos) if colision else null, solo_lejos)
 	mi.set_meta(&"pieza", nombre)
 	colocadas.append([nombre, pos])
 	# Para las luces de la noche (ver LucesNoche): faroles y edificios con su transformación
@@ -335,6 +362,15 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 		if texto != "":
 			var rango := 40.0 if tipo == "kiosco" else (90.0 if tipo == "hospital" or tipo == "comisaria" else 55.0)
 			_texto(c[0], c[1], texto, c[2], c[3], color, rango)
+	return mi
+
+
+## Pieza borrada por el builder: _poner tiene que devolver algo igual, así que va una malla oculta
+## (la fusión la ignora).
+func _fantasma() -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.visible = false
+	add_child(mi)
 	return mi
 
 
@@ -1498,8 +1534,18 @@ const CICLO_MOBILIARIO := ["banco", "farola", "bebedero", "banco", "cesto", "far
 ## edificios ni lo que está en el aire) más las zonas reservadas.
 func _mapear_ocupado() -> void:
 	_ocupado.clear()
+	# Lista de [malla, transformación del padre]: en modo admin las piezas editables cuelgan de un nodo
+	# propio (ver _poner) y tienen que contar igual que si estuvieran sueltas
+	var piezas: Array = []
 	for h in get_children():
-		var mi := h as MeshInstance3D
+		if h.has_meta(&"id_pieza"):
+			if (h as Node3D).visible:
+				for c in h.get_children():
+					piezas.append([c, (h as Node3D).transform])
+		else:
+			piezas.append([h, Transform3D.IDENTITY])
+	for p: Array in piezas:
+		var mi := p[0] as MeshInstance3D
 		if mi == null or not mi.has_meta(&"pieza") or mi.mesh == null:
 			continue
 		var nombre := String(mi.get_meta(&"pieza"))
@@ -1508,7 +1554,7 @@ func _mapear_ocupado() -> void:
 			sin = sin or nombre.begins_with(pre)
 		if sin:
 			continue
-		var a := mi.transform * mi.mesh.get_aabb()
+		var a := (p[1] as Transform3D) * mi.transform * mi.mesh.get_aabb()
 		if a.position.y > 2.0 or a.size.x > 8.0 or a.size.z > 8.0:
 			continue
 		_ocupar(Rect2(a.position.x, a.position.z, a.size.x, a.size.z))
