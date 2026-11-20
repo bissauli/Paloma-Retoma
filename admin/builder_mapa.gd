@@ -138,6 +138,8 @@ func _armar_ui() -> void:
 	var titulo := Label.new()
 	titulo.text = "AGREGAR PIEZA\n(doble clic: va al centro de la pantalla)"
 	titulo.add_theme_font_size_override("font_size", 13)
+	titulo.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	titulo.custom_minimum_size = Vector2(220, 0)
 	caja.add_child(titulo)
 	_lista = ItemList.new()
 	_lista.size_flags_vertical = Control.SIZE_EXPAND_FILL
