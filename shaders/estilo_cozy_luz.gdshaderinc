@@ -41,10 +41,19 @@ global uniform float comic_celda;
 
 group_uniforms comic;
 // Qué tan oscura es la tinta de los puntos respecto del color de sombra (0 = negro).
-uniform float comic_tinta : hint_range(0.0, 1.0) = 0.3;
+uniform float comic_tinta : hint_range(0.0, 1.0) = 0.62;
 // Radio de los puntos en la sombra plena (1 = tocan el borde de la celda).
-uniform float comic_radio_max : hint_range(0.0, 1.5) = 0.9;
+uniform float comic_radio_max : hint_range(0.0, 1.5) = 0.78;
+// Qué tan opacos son los puntos (1 = tinta plena; menos = más diluidos).
+uniform float comic_opacidad : hint_range(0.0, 1.0) = 0.7;
+// Desde qué distancia a cámara (m) los puntos empiezan a diluirse, y en cuántos metros desaparecen
+// casi del todo: evita el ruido de los edificios lejanos.
+uniform float comic_lejania_ini : hint_range(0.0, 200.0) = 12.0;
+uniform float comic_lejania_largo : hint_range(1.0, 300.0) = 70.0;
 group_uniforms;
+
+// 0 cerca, 1 lejos (se calcula en fragment() con la macro COZY_FRAGMENT).
+varying float lejania;
 
 // Distancia al centro del punto más cercano de la trama (en pantalla, girada 45°), 0 en el centro y
 // 1 en el borde de la celda. aa = medio píxel en esas unidades, para el antialias del borde.
@@ -53,13 +62,14 @@ float comic_dist(vec2 frag, vec2 vp, out float aa) {
 	vec2 p = frag / celda;
 	p = vec2(p.x + p.y, p.y - p.x) * 0.70710678;
 	vec2 g = fract(p) - 0.5;
-	aa = 1.4 / celda;
+	aa = 3.0 / celda; // borde blando, los puntos se ven difuminados
 	return length(g) * 2.0;
 }
 
 // Cuánto del píxel cae dentro de un punto de radio r.
 float comic_cobertura(float d, float r, float aa) {
-	return r <= 0.001 ? 0.0 : 1.0 - smoothstep(r - aa, r + aa, d);
+	float c = r <= 0.001 ? 0.0 : 1.0 - smoothstep(r - aa, r + aa, d);
+	return c * comic_opacidad * (1.0 - 0.85 * lejania);
 }
 
 // Piso (lo que hay sin luz) como multiplicador del albedo: en modo cómic, los puntos de radio
@@ -87,7 +97,7 @@ vec3 cozy_emision(vec3 albedo, vec3 normal, vec3 view, vec2 frag, vec2 vp) {
 }
 
 // Un varying no se puede escribir dentro de una función: por eso es una macro.
-#define COZY_FRAGMENT tinte = shadow_tint.rgb * intensidad_tinte * cozy_cielo.rgb; EMISSION = cozy_emision(ALBEDO, NORMAL, VIEW, FRAGCOORD.xy, VIEWPORT_SIZE)
+#define COZY_FRAGMENT lejania = clamp((-VERTEX.z - comic_lejania_ini) / comic_lejania_largo, 0.0, 1.0); tinte = shadow_tint.rgb * intensidad_tinte * cozy_cielo.rgb; EMISSION = cozy_emision(ALBEDO, NORMAL, VIEW, FRAGCOORD.xy, VIEWPORT_SIZE)
 
 void light() {
 	float ndotl = dot(NORMAL, LIGHT);
