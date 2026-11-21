@@ -134,6 +134,8 @@ func _ready() -> void:
 	# Cada etapa anota cuánto tardó (se ve con --verbose) y tiene su propia semilla: si una zona cambia
 	# (más o menos piezas al azar), las demás quedan igual
 	var etapas: Array[String] = []
+	CarteleraImagenes.reiniciar()
+	SuperficiesSonido.reiniciar()
 	for etapa: Callable in [_suelos, _manzanas, _parque, _barrio, _peatonal, _pasaje, _props_veredas, _estacionamientos,
 			_obras, _obra_cuadra, _mobiliario, _nivel_medio, _nivel_alto, _fondo, _puntos_de_juego]:
 		var t := Time.get_ticks_usec()
@@ -344,6 +346,7 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 		mi = Kit.colocar(self, nombre, pos, rot, escala, _cuerpo_en(pos) if colision else null, solo_lejos)
 	mi.set_meta(&"pieza", nombre)
 	colocadas.append([nombre, pos])
+	SuperficiesSonido.registrar(nombre, pos)
 	# Para las luces de la noche (ver LucesNoche): faroles y edificios con su transformación
 	if LucesNoche.es_farol(nombre):
 		luces_fijas.append([nombre, Transform3D(Basis.from_euler(Vector3(0, rot, 0)) * Basis.from_scale(escala), pos), cuelga])
@@ -1436,6 +1439,7 @@ func _props_vereda(a: Vector3, b: Vector3, adentro: Vector3, paso := 9.0) -> voi
 			_poner("tacho", q + adentro * 0.5)
 		elif extra < 0.28:
 			_poner("cartelera", q + adentro * 1.3, rot_largo)
+			CarteleraImagenes.poner(self, Transform3D(Basis(Vector3.UP, rot_largo), q + adentro * 1.3))
 		elif extra < 0.33:
 			_poner("caja_electrica", q + adentro * 2.6, rot_calle)
 		elif extra < 0.38:
