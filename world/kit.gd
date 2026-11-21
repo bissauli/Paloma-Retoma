@@ -199,6 +199,7 @@ static func _paleta(paleta: Array, solo: Array) -> ImageTexture:
 ## Devuelve la malla principal.
 static func colocar(padre: Node3D, nombre: String, pos: Vector3, rot_y := 0.0, escala := Vector3.ONE,
 		cuerpo: StaticBody3D = null, solo_lejos := false) -> MeshInstance3D:
+	PantallaCarga.refrescar()    # (no hace nada si no hay pantalla de carga)
 	var d := datos(nombre)
 	var t := Transform3D(Basis.from_euler(Vector3(0, rot_y, 0)) * Basis.from_scale(escala), pos)
 	if d.has("props") and d.has("base"):

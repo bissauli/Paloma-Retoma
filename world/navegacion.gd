@@ -26,6 +26,7 @@ static func zona(mundo: World3D, centro: Vector3, tam: Vector2, radio := 0.35) -
 	var clave := "%.1f,%.2f,%.1f|%.1fx%.1f|%.2f" % [centro.x, centro.y, centro.z, tam.x, tam.y, radio]
 	if _zonas.has(clave):
 		return _zonas[clave]
+	PantallaCarga.refrescar()
 	var nm := hornear(mundo.direct_space_state, centro, tam, radio)
 	var mapa := NavigationServer3D.map_create()
 	NavigationServer3D.map_set_cell_size(mapa, CELDA)

@@ -141,22 +141,28 @@ func _ready() -> void:
 		var t := Time.get_ticks_usec()
 		_rng.seed = 20261115 + hash(etapa.get_method())
 		etapa.call()
+		PantallaCarga.refrescar()     # Que la pantalla de carga siga animada entre etapa y etapa
 		etapas.append("%s %d" % [etapa.get_method(), (Time.get_ticks_usec() - t) / 1000])
 	# Piezas que se agregaron a mano con el builder de administrador
 	MapaOverrides.armar_agregadas(self)
 	# Los cuerpos entran al árbol recién ahora, con todas sus formas (así cada uno se arma una sola vez)
 	var t1 := Time.get_ticks_usec()
 	for c: Vector2i in _cuerpos:
+		PantallaCarga.refrescar()
 		add_child(_cuerpos[c])
 	etapas.append("colisiones %d" % ((Time.get_ticks_usec() - t1) / 1000))
+	PantallaCarga.refrescar()
 	# Miles de piezas pasan a ser pocas mallas grandes por celda (los árboles y props chicos van
 	# aparte y se dejan de dibujar lejos)
 	t1 = Time.get_ticks_usec()
 	var piezas := get_child_count()
 	Construir.fusionar_estaticas(self, 64.0)
 	etapas.append("fusión de %d piezas %d" % [piezas, (Time.get_ticks_usec() - t1) / 1000])
+	PantallaCarga.refrescar()
 	# Luces de la noche: ventanas encendidas y faroles (después de fusionar, así no se las lleva la fusión)
+	PantallaCarga.refrescar()
 	LucesNoche.construir(self)
+	PantallaCarga.refrescar()
 	# La banda de los BadJokes en sus puntos de la guarida (mapa V4.5)
 	PalomaBadJoke.poblar(self)
 	print_verbose("Ciudad armada en %d ms (%s)" % [Time.get_ticks_msec() - t0, ", ".join(etapas)])

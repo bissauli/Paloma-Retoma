@@ -14,6 +14,7 @@
 
 [node name="Main" type="Node3D" unique_id=137852250]
 script = ExtResource("1")
+forzar_menu = null
 
 [node name="Plaza" parent="." unique_id=1365492623 instance=ExtResource("2")]
 

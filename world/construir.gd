@@ -138,6 +138,7 @@ static func colision(padre: Node, pos: Vector3, forma: Shape3D, rot := Vector3.Z
 
 
 static func _malla(padre: Node, malla: Mesh, pos: Vector3, mat: Material, rot := Vector3.ZERO) -> MeshInstance3D:
+	PantallaCarga.refrescar()
 	var mi := MeshInstance3D.new()
 	mi.mesh = malla
 	mi.material_override = mat
@@ -300,6 +301,7 @@ static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
 	var pendientes: Array[Node] = [raiz]
 	while not pendientes.is_empty():
 		var n: Node = pendientes.pop_back()
+		PantallaCarga.refrescar()
 		for h in n.get_children():
 			if h.get_script() != null or h.has_meta(&"no_fusionar"):
 				continue
@@ -335,6 +337,7 @@ static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
 			pendientes.append(h)
 	var i := 0
 	for clave: String in grupos:
+		PantallaCarga.refrescar()
 		var g: Dictionary = grupos[clave]
 		var mi := MeshInstance3D.new()
 		mi.name = "Fusion%d" % i

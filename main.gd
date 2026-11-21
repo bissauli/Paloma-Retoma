@@ -11,6 +11,9 @@ extends Node3D
 ## Muestra el menú aunque la escena esté adentro de otra (lo usa tests/captura_menu.tscn).
 @export var forzar_menu := false
 
+## El juego terminó de armarse y el menú (o la partida) ya se puede ver: la pantalla de carga se va.
+signal listo
+
 const BUILDER_MAPA := "res://admin/builder_mapa.tscn"
 
 var _jugador: PalomaJugador
@@ -44,7 +47,9 @@ func _ready() -> void:
 	_buscar_balcon.call_deferred()
 	# El menú sólo aparece cuando esta es la escena que se está jugando: las pruebas automáticas
 	# instancian main.tscn adentro de otra escena y arrancan directo a jugar.
-	var es_el_juego := get_tree().current_scene == self
+	# (al arrancar, la escena actual todavía es la de la pantalla de carga: ver arranque.gd)
+	var actual := get_tree().current_scene
+	var es_el_juego := actual == self or (actual != null and actual.is_in_group("arranque"))
 	GameState.guardado_habilitado = es_el_juego
 	# Las cinemáticas del tutorial, sólo en el juego de verdad (las pruebas manejan la cámara)
 	if _tutorial:
@@ -56,6 +61,7 @@ func _ready() -> void:
 		menu.queue_free()
 		camara_menu.queue_free()
 		_jugar_ya()
+		listo.emit.call_deferred()
 
 
 func _buscar_balcon() -> void:
@@ -102,6 +108,7 @@ func _abrir_menu() -> void:
 	precalentar.precalentar(_jugador, _jugador.camara.camara)
 	await precalentar.terminado
 	menu.mostrar()
+	listo.emit()
 
 
 ## La paloma salta y la cámara pasa del menú al juego sin cortes.
