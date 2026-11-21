@@ -1,12 +1,10 @@
 extends Node
-## Capturas del nivel inferior (Fase 1: pasajes, galería, mercado, subte, mobiliario y obra) (NO headless):
+## Capturas del nivel inferior (Fase 1: pasajes, mercado, subte, mobiliario y obra) (NO headless):
 ## godot --path . res://tests/captura_nivel_inferior.tscn -- <carpeta_salida>
 
 const VISTAS := {
 	"pasajes": [Vector3(-12, 7, 28), Vector3(-12, 2, 42)],
 	"pasaje_adentro": [Vector3(2.5, 1.4, 36.5), Vector3(2.5, 1.6, 46)],
-	"galeria": [Vector3(-34, 7, 34), Vector3(-52, 2, 20)],
-	"galeria_adentro": [Vector3(-46, 1.3, 21), Vector3(-58, 2.2, 21)],
 	"mercado": [Vector3(42, 5, 30), Vector3(31, 1, 21)],
 	"subte": [Vector3(40, 4, -15), Vector3(34, -1, -23)],
 	"subte_escalera": [Vector3(34, 1.6, -18.5), Vector3(34, -1.5, -25)],

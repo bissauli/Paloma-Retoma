@@ -102,7 +102,7 @@ func _crear_zonas() -> void:
 	Edificios.subte(edif, Edificios.SUBTE)
 	posicion_balcon = Edificios.casa_rosada(edif)
 	var mesas := Edificios.cafes(edif)
-	# Nivel inferior (Fase 1): pasajes entre los cafés, galería del Cabildo y mercado
+	# Nivel inferior (Fase 1): pasajes entre los cafés y mercado
 	NivelInferior.armar(self)
 	# La ciudad alrededor de la plaza (mapa V2): arma y fusiona sus propias piezas
 	add_child(Ciudad.new())

@@ -176,9 +176,12 @@ static func cabildo(padre: Node3D) -> void:
 	# Cuerpo trasero y piso superior sobre la galería
 	_col_caja(padre, Vector3(-52.5, 4.5, 0), Vector3(9, 9, 30))
 	_col_caja(padre, Vector3(-46.5, 6.9, 0), Vector3(3, 4.2, 30))
-	# Columnas de la galería (planta baja)
+	# Columnas de la galería (planta baja). Las de las puntas van 0,4 m hacia adentro, al ras de las
+	# paredes de los costados (ver tools/extraer_cabildo.gd)
 	for i in 11:
-		_col_caja(padre, Vector3(x_frente - 0.4, 2.4, -15.0 + i * 3.0), Vector3(0.8, 4.8, 0.8))
+		var z := -15.0 + i * 3.0
+		z -= signf(z) * 0.4 if i == 0 or i == 10 else 0.0
+		_col_caja(padre, Vector3(x_frente - 0.4, 2.4, z), Vector3(0.8, 4.8, 0.8))
 	# Balconcitos del piso alto (para posarse)
 	for i in 10:
 		_col_caja(padre, Vector3(x_frente + 0.35, 5.5, -13.5 + i * 3.0), Vector3(0.7, 0.15, 1.5))

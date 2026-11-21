@@ -453,7 +453,7 @@ def peso_cuello(p):
     return f
 
 
-def peso_falda(p, hem_z, rigidez=0.85):
+def peso_falda(p, hem_z, rigidez=1.0):
     """Falda o faldón: la parte de adelante y de abajo sigue al muslo de su lado (al caminar y al sentarse)."""
     def f(co):
         t = suave((p.cadera_z + 0.02 - co.z) / max(p.cadera_z - hem_z, 0.05))
@@ -461,7 +461,7 @@ def peso_falda(p, hem_z, rigidez=0.85):
             return {"cadera": 1.0}
         lado = "d" if co.x > 0 else "i"
         ax = min(1.0, abs(co.x) / (p.cadera_x * 1.2))
-        w = t * rigidez * (0.5 + 0.5 * ax)
+        w = t * rigidez * (0.85 + 0.15 * ax)
         pierna = 0.0
         if co.z < p.rodilla_z + 0.02:
             pierna = suave((p.rodilla_z + 0.02 - co.z) / 0.25) * 0.5 * w
@@ -1052,7 +1052,11 @@ def piernas(pj, pantalon, zona="piernas", largo="largo", piel=None, media=None, 
         elif largo == "pollera":   # piernas (con medias o piel) debajo de una falda
             cc = hexc(media) if media else piel
             zc = "fijo" if media else zpiel
-            tubo(m, cad + Vector((0, 0, 0.02)), rod, rm * 0.92, rr * 0.9, cc, zc, "muslo_" + lado, seg=12, tapas=("esfera", "esfera"))
+            # El muslo va del color de la falda: parada no se ve, y sentada la falda no alcanza a taparlo
+            # entero (se veía la media color piel, como si fueran piernas desnudas)
+            zf = pj.zona("ropa", pantalon)
+            tubo(m, cad + Vector((0, 0, 0.02)), rod, rm * 0.95, rr * 0.92, pantalon, zf, "muslo_" + lado, seg=12, tapas=("esfera", None),
+                 plano=pl)
             tubo(m, rod, tob, rr * 0.9, rt * 0.95, cc, zc, "pierna_" + lado, seg=12, tapas=("esfera", "plana"))
         if bota:
             tubo(m, rod.lerp(tob, 0.12), tob, rr * 1.12, rt * 1.25, hexc(bota), "fijo", "pierna_" + lado, seg=12,

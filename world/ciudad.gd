@@ -324,9 +324,10 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 				e = 1.0
 			escala = Vector3.ONE * e
 	var mi: MeshInstance3D
+	var w: Node3D = null
 	if MapaOverrides.modo_admin and not ov.is_empty():
 		# Modo admin: la pieza cuelga de un nodo propio (sin fusionar ni colisión) que el builder mueve
-		var w := Node3D.new()
+		w = Node3D.new()
 		add_child(w)
 		w.transform = MapaOverrides.transformacion(pos, rot, escala)
 		ov["pieza"] = nombre
@@ -350,6 +351,7 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 	if not con_textos:
 		return mi
 	var t := Transform3D(Basis.from_euler(Vector3(0, rot, 0)) * Basis.from_scale(escala), pos)
+	var hijos_antes := get_child_count()
 	for c: Array in Kit.carteles(nombre, t):
 		var tipo: String = c[4]
 		var texto: String = textos.get(tipo, "")
@@ -366,6 +368,11 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 			_texto(c[0], c[1], texto, c[2], c[3], color, rango)
 			if tipo in VIDRIERAS and not solo_lejos:
 				_vidriera(c, texto, escala.x)
+	# En el builder, los carteles y las vidrieras (el interior con paralaje) van adentro del nodo de la
+	# pieza: si no, al borrarla o moverla quedaban flotando donde estaba
+	if w != null:
+		for i in range(get_child_count() - 1, hijos_antes - 1, -1):
+			get_child(i).reparent(w)
 	return mi
 
 
@@ -1811,6 +1818,21 @@ func _fondo() -> void:
 		_fila(Vector3(a, 0, 126), Vector3.RIGHT, b - a, PI, POOL_FONDO, false, false, true)
 	_fila(Vector3(-213, 0, -128), Vector3.BACK, 254.0, PI / 2.0, POOL_FONDO, false, false, true)
 	_fila(Vector3(213, 0, -128), Vector3.BACK, 254.0, -PI / 2.0, POOL_FONDO, false, false, true)
+	# Dos filas más, cada una 20 m más afuera (16 m de edificio y 4 de pasillo), hasta donde arranca el
+	# horizonte: si no, entre la primera fila y las siluetas con paralaje se veía el piso vacío (sobre
+	# todo en las esquinas). Dejan libres los túneles de Bolívar y Paseo Colón.
+	for k: int in [1, 2]:
+		var off := 20.0 * k
+		var zn := -128.0 - off
+		var zs := 126.0 + off
+		var xe := 213.0 + off
+		for tramo: Array in [[-xe, -83.0], [-56.0, 56.0], [83.0, xe]]:
+			var a: float = tramo[0]
+			var b: float = tramo[1]
+			_fila(Vector3(a, 0, zn), Vector3.RIGHT, b - a, 0.0, POOL_FONDO, false, false, true)
+			_fila(Vector3(a, 0, zs), Vector3.RIGHT, b - a, PI, POOL_FONDO, false, false, true)
+		_fila(Vector3(-xe, 0, zn), Vector3.BACK, zs - zn, PI / 2.0, POOL_FONDO, false, false, true)
+		_fila(Vector3(xe, 0, zn), Vector3.BACK, zs - zn, -PI / 2.0, POOL_FONDO, false, false, true)
 	# El horizonte (las torres de más allá, en capas con paralaje) lo arma world/horizonte.gd
 	# Túneles por donde entran y salen los autos (al final de Bolívar y de Paseo Colón)
 	for x: float in [-69.0, 69.0]:
