@@ -1343,8 +1343,6 @@ func _barrio() -> void:
 	_cerco("chapa_cerco", Vector3(94, Y_VEREDA, 64), Vector3(94, Y_VEREDA, 79), [2])
 	# El paredón de la guarida, con la entrada frente al portón
 	_cerco("chapa_cerco_b", Vector3(166, Y_VEREDA, 60), Vector3(166, Y_VEREDA, 78), [2, 3])
-	# El cartel pintado en el paredón que se ve al entrar por el pasillo
-	_texto(Vector3(93.9, 1.25, 68.5), -PI / 2.0, "PROHIBIDO\nPALOMAS", 2.6, 1.0, Color("ff5fb0"), 70.0)
 	_poner("auto_abandonado", Vector3(105, Y_VEREDA, 30), 0.3)
 	_poner("auto_abandonado", Vector3(172, Y_VEREDA, 34), 2.5)
 	for p: Vector3 in [Vector3(100, Y_VEREDA, 34), Vector3(158, Y_VEREDA, 32), Vector3(131, Y_VEREDA, 82)]:
