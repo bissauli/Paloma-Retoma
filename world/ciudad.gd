@@ -65,7 +65,7 @@ const POOL_FONDO := ["mod_10_a", "mod_12_a", "mod_14_a", "ladr_8_a", "ph_6_b", "
 const ESQ_CENTRO := ["esq_cupula_a", "esq_cupula_b", "esq_dep_a", "esq_ladr_a"]
 const ESQ_COMERCIAL := ["esq_mod_a", "esq_cupula_a", "esq_dep_a", "esq_mod_a"]
 
-## Negocios inventados (los nombres propios no se traducen)
+## Negocios inventados (su traducción está en autoload/textos_en.gd: el Label3D se traduce solo)
 const LOCALES := ["Kiosco El Pibe", "Pizzería Los Hornos", "Ferretería Don Tito", "Verdulería Los Primos",
 	"Heladería La Cornisa", "Lavadero Burbujas", "Almacén Don Pepe",
 	"Bar El Tero", "Óptica Mirada", "Peluquería Rulos", "Zapatería El Taco", "Regalería Moño", "Disquería Vinilo",
@@ -78,7 +78,7 @@ const OFICINAS := ["Seguros El Vuelo", "Banco del Palomar", "Inmobiliaria El Nid
 	"Compañía de Seguros La Cornisa", "Escuela de Idiomas Arrullo", "Consultora Bandada"]
 
 ## Carteles de los locales temáticos y edificios especiales (por tipo de cartel del kit): texto y color
-## de la letra. "HOSPITAL", "GUARDIA" y "POLICÍA" se traducen (autoload/textos_en.gd).
+## de la letra. Todos se traducen (autoload/textos_en.gd).
 const CARTELES := {
 	"panaderia": ["Panadería La Espiga", Color("8a4a2a")],
 	"golosineria": ["Golosinas El Caramelo", Color("e0507a")],
@@ -500,7 +500,7 @@ func _nombre_local(pieza: String) -> String:
 ## Texto sobre un cartel: el tamaño de letra se ajusta al ancho y al alto del cartel.
 func _texto(pos: Vector3, rot_y: float, texto: String, ancho: float, alto: float, color := Color.WHITE,
 		rango := 75.0) -> Label3D:
-	var tam := clampi(int(minf(alto * 85.0, ancho * 100.0 / (texto.length() * 0.6 + 0.6))), 12, 64)
+	var tam := clampi(int(minf(alto * 85.0, ancho * 100.0 / (Idioma.largo(texto) * 0.6 + 0.6))), 12, 64)
 	var l := Construir.cartel(self, pos, texto, color, tam)
 	l.rotation.y = rot_y
 	l.outline_size = 6

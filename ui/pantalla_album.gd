@@ -33,7 +33,7 @@ func refrescar() -> void:
 		c.queue_free()
 		contenido.remove_child(c)
 	_rutas = AlbumFotos.listar()
-	seccion("Fotos (%d)" % _rutas.size())
+	seccion(tr("Fotos (%d)") % _rutas.size())
 	if _rutas.is_empty():
 		var vacio := Label.new()
 		vacio.theme_type_variation = &"TextoChico"

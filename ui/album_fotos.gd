@@ -81,7 +81,7 @@ static func fecha_de(ruta: String) -> String:
 	var f := String(partes[1])
 	var h := String(partes[2])
 	var mes := clampi(int(f.substr(4, 2)), 1, 12)
-	return "%d %s %s · %s:%s" % [int(f.substr(6, 2)), MESES[mes - 1], f.substr(0, 4), h.substr(0, 2), h.substr(2, 2)]
+	return "%d %s %s · %s:%s" % [int(f.substr(6, 2)), TranslationServer.translate(MESES[mes - 1]), f.substr(0, 4), h.substr(0, 2), h.substr(2, 2)]
 
 
 ## Texto oscuro sin contorno ni sombra (el tema del juego los trae pensados para fondos oscuros) para

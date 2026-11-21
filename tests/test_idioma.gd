@@ -31,6 +31,19 @@ func _ready() -> void:
 	_check("un Label traduce su texto", l.atr("PAUSA") == "PAUSED")
 	_check("los textos con formato siguen funcionando",
 		tr("NIDO · comida %d") % 7 == "NEST · food 7" and tr("Llevá la %s al nido, en la Pirámide de Mayo") % tr("medialuna") == "Take the croissant to the nest, at the May Pyramid")
+	# Los carteles 3D del mundo (locales, kioscos, letreros) se traducen solos, también si se cambia
+	# el idioma con el cartel ya armado
+	var c3 := Construir.cartel(self, Vector3.ZERO, "Panadería La Espiga")
+	await get_tree().process_frame
+	_check("un cartel 3D se traduce", c3.atr(c3.text) == "La Espiga Bakery")
+	_check("los carteles salientes verticales se traducen", tr("L\nI\nB\nR\nO\nS") == "B\nO\nO\nK\nS")
+	_check("los carteles con número se traducen", tr("PASILLO 3") == "AISLE 3")
+	_check("el tamaño del cartel mira el idioma más largo",
+		Idioma.largo("Kiosco El Pibe") == "El Pibe Kiosk".length() + 1 and Idioma.largo("Casa de Cambio La Moneda") == "The Coin Currency Exchange".length())
+	_check("los pisos de los departamentos se traducen", tr("%d.º %s") % [4, "B"] == "Apt 4B")
+	Ajustes.set_idioma("es")
+	_check("el cartel 3D vuelve a español", c3.atr(c3.text) == "Panadería La Espiga" and tr("PASILLO 3") == "PASILLO 3")
+	Ajustes.set_idioma("en")
 	_check("la fecha va en el orden del idioma", Idioma.fecha({"day": 3, "month": 11, "year": 2026}) == "11/03/2026")
 
 	# Se guarda y se recupera

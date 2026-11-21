@@ -12,6 +12,7 @@ const BANDERAS := {
 }
 
 static var _instalado := false
+static var _en: Translation
 
 
 ## Registra las traducciones (una sola vez). El español también tiene la suya, "identidad":
@@ -28,8 +29,24 @@ static func instalar() -> void:
 		var ingles: String = TextosEN.MAPA[clave]
 		_agregar(es, clave, clave)
 		_agregar(en, clave, ingles)
+	for clave: String in TextosEN.VERTICALES:
+		var vertical := "\n".join(clave.split(""))
+		_agregar(es, vertical, vertical)
+		_agregar(en, vertical, "\n".join(String(TextosEN.MAPA[clave]).split("")))
+	for clave: String in TextosEN.NUMERADOS:
+		for n in range(1, 31):
+			_agregar(es, clave % n, clave % n)
+			_agregar(en, clave % n, TextosEN.NUMERADOS[clave] % n)
+	_en = en
 	TranslationServer.add_translation(es)
 	TranslationServer.add_translation(en)
+
+
+## Lo más largo que puede quedar "texto" en cualquiera de los idiomas (para elegir el tamaño de letra
+## de un cartel una sola vez, al armarlo, y que entre en los dos idiomas sin recalcular nada después).
+static func largo(texto: String) -> int:
+	instalar()
+	return maxi(texto.length(), String(_en.get_message(texto)).length())
 
 
 ## Agrega el par y su versión en mayúsculas (muchos textos del menú y del HUD se muestran así).

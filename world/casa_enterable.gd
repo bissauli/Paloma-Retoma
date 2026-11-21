@@ -163,6 +163,19 @@ func puntos_ruta(desde_frente: bool, inicio: Vector3) -> Array[Vector3]:
 
 
 ## ¿Está este punto (global) dentro de la casa (entre las paredes, en la planta baja)?
+## El nombre de la placa de título en el idioma actual. Los departamentos son "Nombre · 3.º B"
+## (ver Pasaje.alrededores): se traducen el nombre y el piso por separado.
+func _titulo_traducido() -> String:
+	var i := nombre.find(" · ")
+	if i < 0:
+		return tr(nombre)
+	var piso_letra := nombre.substr(i + 3).split(".º ")
+	var resto := nombre.substr(i + 3)
+	if piso_letra.size() == 2 and piso_letra[0].is_valid_int():
+		resto = tr("%d.º %s") % [int(piso_letra[0]), piso_letra[1]]
+	return "%s · %s" % [tr(nombre.left(i)), resto]
+
+
 func esta_adentro(punto: Vector3) -> bool:
 	var p := to_local(punto)
 	return absf(p.x) < ancho / 2.0 - ESPESOR and absf(p.z) < fondo / 2.0 - ESPESOR and p.y < 6.0
@@ -418,7 +431,7 @@ func _empezar(desde_frente: bool) -> void:
 	_cabeceo = 0.0
 	_barras.mostrar()
 	if nombre != "":
-		_barras.titulo(nombre)
+		_barras.titulo(_titulo_traducido())
 	_vista = -cam_juego.global_transform.basis.z
 	if not textos.is_empty():
 		_barras.texto(textos.pick_random())
