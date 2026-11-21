@@ -278,7 +278,13 @@ static func antena(n: Node3D, base: Vector3, alto: float) -> void:
 
 
 ## Bandera argentina en su mástil (sólo para ver, sin colisión).
+## Apagadas por ahora (BANDERAS = false): se vuelven a poner más adelante.
+const BANDERAS := false
+
+
 static func bandera(n: Node3D, base: Vector3) -> void:
+	if not BANDERAS:
+		return
 	var alto := 3.2
 	Construir.cilindro(n, base + Vector3(0, alto / 2.0, 0), 0.04, alto, c("blanco"), false, 6)
 	Construir.esfera(n, base + Vector3(0, alto + 0.05, 0), 0.07, c("flor_amarilla"), Vector3.ONE, 6)

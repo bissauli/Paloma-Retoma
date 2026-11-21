@@ -48,26 +48,6 @@ func _ready() -> void:
 	print("  subte (subida): llegó=%s, altura arriba %.2f" % [r["llego"], r["y"]])
 	_check("subte: se vuelve a subir caminando", r["llego"] and r["suelo"] and absf(r["y"]) < 0.15)
 
-	# ---- Galería del Cabildo: por el pasillo y por un cruce, sólida y con terraza
-	var g := NivelInferior.GALERIA_ORIGEN
-	var b := NivelInferior.BAHIA
-	var z_pasillo := g.y + 1.5 * b
-	var x_cruce := g.x + 1.5 * b
-	r = await _caminar(Vector3(-40.0, 0.0, z_pasillo), [Vector3(g.x + 0.6, 0, z_pasillo), Vector3(x_cruce, 0, z_pasillo),
-		Vector3(x_cruce, 0, g.y + 0.4)], 40.0)
-	print("  galería: llegó=%s" % r["llego"])
-	_check("galería: se recorre caminando el pasillo y un cruce", r["llego"] and r["suelo"])
-	var col := espacio.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(g.x + b, 1.0, g.y + b - 2.0),
-		Vector3(g.x + b, 1.0, g.y + b)))
-	_check("galería: las columnas son sólidas", not col.is_empty())
-	var arco := espacio.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(g.x + b * 1.5 + 1.0, 3.6, g.y + b - 2.0),
-		Vector3(g.x + b * 1.5 + 1.0, 3.6, g.y + b + 0.3)))
-	_check("galería: los arcos son sólidos", not arco.is_empty())
-	var y_terraza := _altura_abajo(espacio, Vector3(g.x + b * 2.5, 12, z_pasillo))
-	_check("galería: terraza con colisión (%.2f m)" % y_terraza, absf(y_terraza - NivelInferior.Y_TERRAZA) < 0.05)
-	var posada := await _posar(Vector3(g.x + b * 2.5, y_terraza + 0.6, z_pasillo))
-	_check("galería: la paloma se posa en la terraza", absf(posada - NivelInferior.Y_TERRAZA) < 0.1)
-
 	# ---- Mercado: toldos y mesas con colisión
 	var con_toldo := 0
 	var con_mesa := 0
@@ -81,7 +61,7 @@ func _ready() -> void:
 	_check("mercado: %d puestos con toldo para posarse" % con_toldo, con_toldo == NivelInferior.PUESTOS.size())
 	_check("mercado: mesas para posarse (mesas: %d)" % con_mesa, con_mesa == NivelInferior.PUESTOS.size())
 	var pu0: Array = NivelInferior.PUESTOS[1]
-	posada = await _posar((pu0[0] as Vector3) + Vector3(0.6, 3.0, 0.0))
+	var posada := await _posar((pu0[0] as Vector3) + Vector3(0.6, 3.0, 0.0))
 	_check("mercado: la paloma se posa en un toldo (%.2f m)" % posada, posada > 2.2)
 
 	# ---- Mobiliario de las veredas

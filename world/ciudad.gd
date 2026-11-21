@@ -113,7 +113,7 @@ var _ocupado := {}                  ## Celda de 4 m -> huellas (Rect2 en X/Z) de
 var _reservado: Array[Rect2] = []   ## Huellas que no son piezas del kit (la obra de la cuadra)
 var colocadas: Array = []           ## [pieza, posición] de todo lo que puso _poner (lo miran las pruebas)
 var _edificios: Array = []          ## Edificios del kit ya puestos: [transformación inversa, formas, posición]
-var luces_fijas: Array = []         ## [pieza, transformación] de los faroles (ver LucesNoche)
+var luces_fijas: Array = []         ## [pieza, transformación, nodo del builder o null] de los faroles (ver LucesNoche)
 var luces_edificios: Array = []     ## [pieza, transformación] de los edificios con ventanas
 var arboles_achicados := 0          ## Árboles de la ciudad que se achicaron o sacaron para no meterse en un edificio
 
@@ -236,10 +236,15 @@ func _senda(cx: float, cz: float, cruza_x: bool, largo: float, ancho := 3.0) -> 
 
 
 func _suelos() -> void:
-	# Base de asfalto debajo de todo (por si queda algún hueco) y bien lejos
+	# Base de asfalto debajo de todo (por si queda algún hueco) y bien lejos. Con un material sin luz: así no
+	# lleva el contorno del modo cómic, que en ángulo bajo asomaba sobre el piso como rayas negras en los
+	# bordes de estas cajas (ver EstiloComic).
+	var mat_base := StandardMaterial3D.new()
+	mat_base.albedo_color = C_ASFALTO.darkened(0.1)
+	mat_base.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	# (con el hueco de la escalera del subte, ver Edificios.subte)
 	for r: Rect2 in Edificios.partir(Rect2(-330, -270, 660, 540), Edificios.hueco_subte(true)):
-		_losa(r.position.x, r.position.y, r.end.x, r.end.y, -0.03, 0.3, C_ASFALTO.darkened(0.1))
+		_losa_mat(r.position.x, r.position.y, r.end.x, r.end.y, -0.03, 0.3, mat_base)
 	# Calzadas
 	for c: Array in [BOLIVAR, PASEO_COLON, RIVADAVIA, AV_DE_MAYO, RECONQUISTA]:
 		_calzada(c)
@@ -323,6 +328,7 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 				e = 1.0
 			escala = Vector3.ONE * e
 	var mi: MeshInstance3D
+	var cuelga: Node3D = null   # modo admin: el nodo propio de la pieza (sus carteles cuelgan de él)
 	if MapaOverrides.modo_admin and not ov.is_empty():
 		# Modo admin: la pieza cuelga de un nodo propio (sin fusionar ni colisión) que el builder mueve
 		var w := Node3D.new()
@@ -333,13 +339,14 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 			ov["orig_escala"] = escala   # ya con el achique de los árboles: "restaurar" vuelve a lo que arma el código
 		MapaOverrides.registrar(w, ov)
 		mi = Kit.colocar(w, nombre, Vector3.ZERO, 0.0, Vector3.ONE, null, solo_lejos)
+		cuelga = w
 	else:
 		mi = Kit.colocar(self, nombre, pos, rot, escala, _cuerpo_en(pos) if colision else null, solo_lejos)
 	mi.set_meta(&"pieza", nombre)
 	colocadas.append([nombre, pos])
 	# Para las luces de la noche (ver LucesNoche): faroles y edificios con su transformación
 	if LucesNoche.es_farol(nombre):
-		luces_fijas.append([nombre, Transform3D(Basis.from_euler(Vector3(0, rot, 0)) * Basis.from_scale(escala), pos)])
+		luces_fijas.append([nombre, Transform3D(Basis.from_euler(Vector3(0, rot, 0)) * Basis.from_scale(escala), pos), cuelga])
 	elif KitDatos.PIEZAS.get(nombre, {}).get("carpeta", "") == "edificios" and not solo_lejos:
 		luces_edificios.append([nombre, Transform3D(Basis.from_euler(Vector3(0, rot, 0)) * Basis.from_scale(escala), pos)])
 	if KitDatos.PIEZAS.get(nombre, {}).get("carpeta", "") == "edificios" and not solo_lejos:
@@ -362,10 +369,23 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 			texto = "DIARIOS Y REVISTAS"
 		if texto != "":
 			var rango := 40.0 if tipo == "kiosco" else (90.0 if tipo == "hospital" or tipo == "comisaria" else 55.0)
-			_texto(c[0], c[1], texto, c[2], c[3], color, rango)
+			var rotulo := _texto(c[0], c[1], texto, c[2], c[3], color, rango)
+			if cuelga:
+				_colgar(rotulo, cuelga)   # si el builder borra la pieza, se va con sus letras
 			if tipo in VIDRIERAS and not solo_lejos:
-				_vidriera(c, texto, escala.x)
+				var vid := _vidriera(c, texto, escala.x)
+				if cuelga and vid:
+					_colgar(vid, cuelga)
 	return mi
+
+
+## Pasa "nodo" (hijo de la ciudad) a colgar de "nuevo_padre" (también hijo de la ciudad) sin moverlo del lugar.
+## No usa reparent(): la ciudad se arma antes de entrar al árbol y ahí no hay transformación global.
+func _colgar(nodo: Node3D, nuevo_padre: Node3D) -> void:
+	var t := nodo.transform
+	remove_child(nodo)
+	nuevo_padre.add_child(nodo)
+	nodo.transform = nuevo_padre.transform.affine_inverse() * t
 
 
 ## Oclusión: las cajas grandes de cada edificio (las mismas de la colisión, achicadas 40 cm de cada lado
@@ -445,7 +465,7 @@ const VIDRIERAS := ["local", "cafe", "farmacia", "golosineria", "minimercado", "
 ## afuera. Los carteles con dibujo al costado están corridos 0.45 m y son 0.9 m más angostos.
 ## El plano va 0.105 m afuera: delante de la persiana del kit (que a veces baja hasta tapar casi todo
 ## el vidrio) y de sus parantes, que dibuja el shader. Así los locales se ven abiertos.
-func _vidriera(c: Array, texto: String, esc: float) -> void:
+func _vidriera(c: Array, texto: String, esc: float) -> MeshInstance3D:
 	var p: Vector3 = c[0]
 	var rot: float = c[1]
 	var n := Vector3(sin(rot), 0, cos(rot))
@@ -453,7 +473,7 @@ func _vidriera(c: Array, texto: String, esc: float) -> void:
 	var u := Vector3.UP.cross(n)
 	var centro := p - n * (0.125 - 0.105) - Vector3(0, 3.6 - 1.77, 0) - u * (0.45 * esc if con_icono else 0.0)
 	var ancho: float = c[2] + (0.8 * esc if con_icono else -0.1 * esc)
-	Vidrieras.poner(self, centro, rot, Vector2(ancho, 2.3), texto)
+	return Vidrieras.poner(self, centro, rot, Vector2(ancho, 2.3), texto)
 
 
 func _nombre_local(pieza: String) -> String:
@@ -1130,7 +1150,9 @@ func _juegos() -> void:
 func _plaza_rombo() -> void:
 	var c := Vector3(-140, 0, -61)
 	_poner("plaza_rombo", c)
-	_poner("fuente", c + Vector3(0, Y_PISO, 0), 0.0, Vector3.ONE * 2.1)
+	var fuente := _poner("fuente", c + Vector3(0, Y_PISO, 0), 0.0, Vector3.ONE * 2.1)
+	if fuente.visible and fuente.get_parent() == self:   # donde quedó (el builder la puede mover): ahí se baña
+		Fuente.crear_bano(self, fuente.position, fuente.scale.x)
 	for k in 4:
 		var a := TAU * k / 4.0
 		var d := Vector3(sin(a), 0, cos(a))
@@ -1430,11 +1452,16 @@ func _props_vereda(a: Vector3, b: Vector3, adentro: Vector3, paso := 9.0) -> voi
 
 func _cartel_calle(pos: Vector3, este_oeste: String, norte_sur: String) -> void:
 	var p := Vector3(pos.x, Y_VEREDA, pos.z)
-	_poner("cartel_calle", p)
+	var placa := _poner("cartel_calle", p)
+	if not placa.visible and not placa.has_meta(&"pieza"):
+		return   # la borró el builder: sin placa no quedan letras sueltas
+	var cuelga: Node = placa.get_parent() if placa.get_parent().has_meta(&"id_pieza") else null
 	for c: Array in Kit.carteles("cartel_calle", Transform3D(Basis.IDENTITY, p)):
 		# Las dos primeras caras son de la placa que va a lo largo de X (calle este-oeste)
 		var texto := este_oeste if absf(sin(float(c[1]))) < 0.5 else norte_sur
-		_texto(c[0], c[1], texto.to_upper(), c[2], c[3], Color.WHITE, 35.0)
+		var rotulo := _texto(c[0], c[1], texto.to_upper(), c[2], c[3], Color.WHITE, 35.0)
+		if cuelga:
+			_colgar(rotulo, cuelga)
 
 
 func _props_veredas() -> void:

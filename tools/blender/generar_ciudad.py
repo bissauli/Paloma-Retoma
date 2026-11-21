@@ -1616,7 +1616,19 @@ def hacer_juegos():
     tubo = transformar(bm_anillo(0.45, 0.38, -1.6, 1.6, 14), Matrix.Translation((0, 0, 0.42)) @ R90)
     pieza([obj([P(tubo, "plastico_amarillo")]), obj([P(bm_box(3.0, 0.06, 0.08, 0, s * 0.42, 0), "plastico_verde") for s in (-1, 1)])],
           "agility_tunel")
-    DATOS["agility_tunel"]["col"].cajas.append((Vector((0, 0, 0.42)), Vector((3.2, 0.9, 0.86)), Matrix.Identity(3)))
+    # Túnel hueco: la paloma lo cruza caminando por el piso. El caño son 9 losas curvas (convexos); las de abajo
+    # no van, el piso es el del parque.
+    for k in range(12):
+        if k in (8, 9, 10):
+            continue
+        a_k = math.radians(k * 30)
+        ty, tz = -math.sin(a_k), math.cos(a_k)
+        pts = []
+        for r in (0.38, 0.45):
+            for sg in (-0.12, 0.12):
+                for x in (-1.6, 1.6):
+                    pts.append((x, math.cos(a_k) * r + ty * sg, 0.42 + math.sin(a_k) * r + tz * sg))
+        DATOS["agility_tunel"]["col"].convexos.append([Vector(q) for q in pts])
     empezar()
     rampa = bm_perfil_x([(-1.6, 0), (1.6, 0), (0.15, 1.3), (-0.15, 1.3)], -0.45, 0.45)
     franjas = []

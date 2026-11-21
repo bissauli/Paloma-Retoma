@@ -9,6 +9,7 @@ extends Node3D
 @export var personaje := ""
 @export var alto := 0.0                    ## 0 = el alto propio del personaje (si no, se escala)
 @export var sentado := false
+@export var asiento_extra := 0.0          ## Metros más arriba de la cadera sentado (en un banco el asiento es más alto que el de una silla)
 ## Colores opcionales (alfa 0 = el del personaje). Se multiplican sobre el sombreado de esa zona.
 @export var color_ropa := Color(0, 0, 0, 0)
 @export var color_piernas := Color(0, 0, 0, 0)
@@ -18,17 +19,39 @@ extends Node3D
 ## "sombrero", "gorra", "chef", "morrion" o "ninguno".
 @export var accesorio := ""
 @export var color_accesorio := Color.WHITE
+## Elige al azar una de las variantes de color del personaje (desactivarlo deja siempre el original).
+@export var variar_colores := true
 
 ## Personajes adultos que pueden andar por cualquier lado (turistas, comensales, clientes).
 const PASEANTES := ["turista_gringo", "mochilera", "hincha", "estudiante", "artesano", "jubilado", "bailarina",
 	"oficinista", "oficinista_mujer", "abuela"]
 const CHICOS := ["pibe", "escolar", "escolar_nena"]
 
+## Variantes de color: cada persona sale con una de VARIANTES combinaciones de piel, pelo y (según el personaje)
+## ropa y piernas, sin modelos nuevos. La 0 es el personaje original; las demás se arman con una semilla fija
+## por personaje, así hay pocas mallas repintadas distintas (se comparten entre todas las personas iguales).
+## Los colores que se pidan a mano (color_ropa, etc.) mandan sobre la variante.
+const VARIANTES := 8
+## Qué se puede cambiar según el personaje: "todo" (ropa de calle), "cuerpo" (uniforme o ropa que lo define:
+## sólo piel y pelo) y "nada" (personajes únicos con nombre).
+const TIPO_VARIACION := {"agente": "cuerpo", "barrendero": "cuerpo", "cocinero": "cuerpo", "farmaceutica": "cuerpo",
+	"granadero": "cuerpo", "mozo": "cuerpo", "escolar": "cuerpo", "escolar_nena": "cuerpo", "almacenero": "cuerpo",
+	"bandoneonista": "nada", "dona_rosa": "nada"}
+const PIELES := ["#f6dcc4", "#f1cfae", "#e0b48f", "#c68e62", "#a87048", "#8a5a3a", "#6b4430"]
+const PELOS := ["#16100e", "#2a1e16", "#3a2a20", "#5a3a24", "#8a5a30", "#b5562e", "#d6a44e", "#e0c070", "#7a2a22",
+	"#c9c3d6", "#8a8a90"]
+## La ropa sale de un color del arcoíris (el tono se sortea; saturación y brillo varían poco).
+const PIERNAS := ["#2f3b55", "#4f6f9e", "#1e1e24", "#6a6e78", "#c8b48a", "#6a5a3a", "#3a4f74", "#4a3a30", "#7a6a5a"]
+## Camisetas de hinchas (el hincha de celeste y blanco es el original).
+const HINCHAS := ["#7fb8e4", "#d33a3a", "#1f3a8a", "#f0c020", "#f4f4f0", "#2a8a4a"]
+
 const CAPA_GENTE := 4
 const ZONAS := ["fijo", "piel", "pelo", "ropa", "piernas"]
 const HUESOS := ["cadera", "torso", "cabeza", "brazo_i", "antebrazo_i", "brazo_d", "antebrazo_d",
 	"muslo_i", "pierna_i", "muslo_d", "pierna_d"]
 const ALTO_ASIENTO := 0.47                 ## Altura de la articulación de la cadera sentado (adulto de 1,75)
+
+const EXTRA_BANCO := 0.1                   ## asiento_extra en un banco (asiento a 0,47-0,50 m: la cadera tiene que apoyar encima)
 
 static var _info := {}
 static var _escenas := {}
@@ -86,6 +109,8 @@ func _armar() -> void:
 	if alto <= 0.0:
 		alto = float(_datos["alto"])
 	_escala = alto / float(_datos["alto"])
+	if variar_colores:
+		_elegir_variante()
 	if not _escenas.has(personaje):
 		_escenas[personaje] = load("res://modelos/personas/%s.glb" % personaje)
 	_raiz = (_escenas[personaje] as PackedScene).instantiate() as Node3D
@@ -121,6 +146,36 @@ func _armar() -> void:
 		_rest_l[HUESOS[i]] = _skel.get_bone_rest(b).basis.get_rotation_quaternion()
 	_rest_pos = _skel.get_bone_rest(_idx["cadera"]).origin
 	_aplicar_pose(0.0, 0.0)
+
+
+## Sortea una variante y completa los colores que no se pidieron a mano.
+func _elegir_variante() -> void:
+	var tipo: String = TIPO_VARIACION.get(personaje, "todo")
+	if tipo == "nada":
+		return
+	var k := randi() % VARIANTES
+	if k == 0:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(personaje) + k * 7919
+	var base: Dictionary = _datos.get("zonas", {})
+	var piel := Color(PIELES[rng.randi() % PIELES.size()])
+	var pelo := Color(PELOS[rng.randi() % PELOS.size()])
+	var ropa := Color.from_hsv(rng.randf(), rng.randf_range(0.6, 0.85), rng.randf_range(0.82, 0.95))
+	var piernas := Color(PIERNAS[rng.randi() % PIERNAS.size()])
+	if personaje == "hincha":
+		ropa = Color(HINCHAS[rng.randi() % HINCHAS.size()])
+	if base.get("ropa", "") == base.get("piernas", ""):
+		piernas = ropa   # vestido, uniforme o guardapolvo: de una sola pieza
+	if color_piel.a == 0.0:
+		color_piel = piel
+	if color_pelo.a == 0.0:
+		color_pelo = pelo
+	if tipo == "todo":
+		if color_ropa.a == 0.0:
+			color_ropa = ropa
+		if color_piernas.a == 0.0:
+			color_piernas = piernas
 
 
 ## La malla del personaje o, si se pidieron colores, una copia con esas zonas repintadas.
@@ -192,7 +247,7 @@ func _rot(hueso: String, euler: Vector3) -> void:
 
 
 func _bajada_sentado() -> float:
-	return float(_datos["cadera"]) - ALTO_ASIENTO * float(_datos["alto"]) / 1.75
+	return float(_datos["cadera"]) - (ALTO_ASIENTO + asiento_extra) * float(_datos["alto"]) / 1.75
 
 
 func _aplicar_pose(velocidad: float, delta: float) -> void:

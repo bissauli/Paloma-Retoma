@@ -14,6 +14,7 @@ const RETARDO_AUTO := 1.0      ## En el teléfono: segundos quieta en el agua an
 @export var radio := 2.2        ## Radio del agua
 @export var altura := 0.0       ## Altura a la que se apoya la paloma (0 = charco en el piso)
 @export var surtidor := false
+var solo_bano := false          ## Sólo la zona de baño: la fuente (modelo y colisión) ya la puso otro (ver crear_bano)
 
 var _y_agua := 0.0
 var _chorro: CPUParticles3D
@@ -47,6 +48,18 @@ static func crear(padre: Node3D, pos: Vector3, radio_agua: float, altura_agua :=
 	return f
 
 
+## Zona de baño sobre una fuente del kit que ya está puesta en "pos" con esa "escala" (la grande del rombo
+## de la ciudad): no agrega modelo ni colisión, sólo el "E · BAÑARSE" y el baño.
+static func crear_bano(padre: Node3D, pos: Vector3, escala: float) -> Fuente:
+	var f := Fuente.new()
+	f.solo_bano = true
+	f.altura = 0.65 * escala
+	f.radio = 1.3 * escala
+	padre.add_child(f)
+	f.position = pos
+	return f
+
+
 func _ready() -> void:
 	add_to_group("fuentes")
 	_armar()
@@ -64,6 +77,12 @@ func _armar() -> void:
 	agua.emission_enabled = true
 	agua.emission = Color(0.1, 0.25, 0.35)
 	agua.emission_energy_multiplier = 0.4
+
+	if solo_bano:
+		_y_agua = altura + 0.02
+		_salpicadura = _particulas(34, 0.7, false)
+		_rafaga = _particulas(40, 0.8, true)
+		return
 
 	if altura > 0.0:
 		# La fuente de tres pisos del kit (misma que la de las plazas de la ciudad): pileta de r 1,6 y

@@ -3,7 +3,6 @@ extends RefCounted
 ## Nivel inferior del mapa (Fase 1): lugares para caminar y posarse cerca del piso.
 ## - Pasajes cubiertos con toldo en los huecos entre los cafés (de la vereda de los cafés al Pasaje
 ##   Las Palomas).
-## - Galería con dos cruces de paso al sur del Cabildo (columnas y arcos con colisión).
 ## - Mercado: seis puestos con toldo y mesa en la esquina sudeste de la plaza.
 ## La boca de subte (con escalera) está en Edificios.subte y el mobiliario de las veredas y la obra en
 ## Ciudad (_mobiliario y _obra_cuadra).
@@ -18,18 +17,6 @@ const Z_PASAJE := Vector2(38.0, 48.0)     ## De la fachada de los cafés al pasa
 const Y_VEREDA := 0.16
 const ALERO := 3.4                         ## Altura del toldo contra las paredes
 const CUMBRERA := 4.0                      ## ...y en el medio
-
-## Galería: grilla de bahías cuadradas de BAHIA m; las celdas cubiertas forman un pasillo este-oeste
-## con dos cruces norte-sur.
-const GALERIA_ORIGEN := Vector2(-60.6, 16.2)
-const BAHIA := 3.2
-const GALERIA_CELDAS := [Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1), Vector2i(3, 1), Vector2i(4, 1),
-	Vector2i(1, 0), Vector2i(1, 2), Vector2i(3, 0), Vector2i(3, 2)]
-const ARRANQUE := 2.4                      ## Altura donde arrancan los arcos (capitel)
-const COLUMNA := 0.5
-const ROSCA := 0.25                        ## Espesor de la rosca del arco
-const Y_CORNISA := 4.0                     ## Arriba de los arcos
-const Y_TERRAZA := 4.55                    ## Piso de la terraza
 
 ## Mercado: [posición, giro] de cada puesto (el frente mira a +Z local).
 const PUESTOS := [[Vector3(28.0, 0, 18.5), 0.0], [Vector3(31.4, 0, 18.5), 0.0], [Vector3(34.8, 0, 18.5), 0.0],
@@ -54,15 +41,12 @@ static func armar(padre: Node3D) -> void:
 	n.name = "NivelInferior"
 	padre.add_child(n)
 	pasajes(n)
-	galeria(n)
 	mercado(n)
 
 
-## Zonas donde el mobiliario de las veredas no tiene que ponerse (entradas de la galería y de los pasajes).
+## Zonas donde el mobiliario de las veredas no tiene que ponerse (entradas de los pasajes).
 static func reservas() -> Array[Rect2]:
 	var out: Array[Rect2] = []
-	var g := Rect2(GALERIA_ORIGEN, Vector2(5, 3) * BAHIA)
-	out.append(g.grow(2.5))
 	for p: Array in PASAJES:
 		out.append(Rect2(float(p[0]) - 1.0, Z_PASAJE.x - 4.0, float(p[1]) - float(p[0]) + 2.0, Z_PASAJE.y - Z_PASAJE.x + 8.0))
 	return out
@@ -175,115 +159,6 @@ static func _caja(tam: Vector3) -> BoxMesh:
 	var bm := BoxMesh.new()
 	bm.size = tam
 	return bm
-
-
-# ---------------------------------------------------------------- Galería del Cabildo
-
-## Galería al sur del Cabildo, entre el Cabildo y la avenida: un pasillo este-oeste de cinco bahías con
-## dos cruces norte-sur. Cada bahía tiene columnas en las esquinas, un arco de medio punto en cada lado
-## (también los de adentro) y una terraza con baranda arriba. Todo tiene colisión: se camina por
-## abajo, se pasa por cualquier arco y se aterriza en la terraza, la baranda o la cornisa.
-static func galeria(padre: Node3D) -> void:
-	var n := Node3D.new()
-	n.name = "GaleriaCabildo"
-	padre.add_child(n)
-	var cu := cuerpo(n, "ColisionGaleria")
-	var celdas := {}
-	for k: Vector2i in GALERIA_CELDAS:
-		celdas[k] = true
-	var blanco := c("remate_crema")
-	var piedra := c("piedra")
-	var mat_piso := Construir.material_baldosas(c("piedra"), c("piedra_osc"), Vector2(1.0 / 1.6, 1.0 / 1.6))
-	var vertices := {}
-	var lados := {}   # "h_i_j" (a lo largo de X) / "v_i_j" (a lo largo de Z) -> cuántas celdas lo usan
-	for k: Vector2i in GALERIA_CELDAS:
-		var o := _vertice(k)
-		var centro := o + Vector3(BAHIA / 2.0, 0, BAHIA / 2.0)
-		# Piso de baldosas (1 cm sobre la plaza) y terraza
-		var t_piso := en(centro + Vector3(0, -0.01, 0))
-		var piso := Construir._malla(n, _caja(Vector3(BAHIA, 0.04, BAHIA)), Vector3.ZERO, mat_piso)
-		piso.transform = t_piso
-		solido(cu, t_piso, Vector3(BAHIA, 0.04, BAHIA))
-		bloque(n, cu, en(centro + Vector3(0, Y_TERRAZA - 0.1, 0)), Vector3(BAHIA, 0.2, BAHIA), blanco)
-		for v: Vector2i in [k, k + Vector2i(1, 0), k + Vector2i(0, 1), k + Vector2i(1, 1)]:
-			vertices[v] = true
-		for l: String in ["h_%d_%d" % [k.x, k.y], "h_%d_%d" % [k.x, k.y + 1], "v_%d_%d" % [k.x, k.y], "v_%d_%d" % [k.x + 1, k.y]]:
-			lados[l] = int(lados.get(l, 0)) + 1
-	# Columnas: basa, fuste, capitel y pilar hasta la cornisa (una sola colisión hasta arriba)
-	for v: Vector2i in vertices:
-		var p := _vertice(v)
-		pieza(n, en(p + Vector3(0, 0.1, 0)), Vector3(0.66, 0.2, 0.66), piedra)
-		pieza(n, en(p + Vector3(0, ARRANQUE / 2.0, 0)), Vector3(COLUMNA, ARRANQUE, COLUMNA), blanco)
-		pieza(n, en(p + Vector3(0, ARRANQUE + 0.075, 0)), Vector3(0.64, 0.15, 0.64), piedra)
-		var alto_pilar := Y_CORNISA - ARRANQUE - 0.15
-		pieza(n, en(p + Vector3(0, ARRANQUE + 0.15 + alto_pilar / 2.0, 0)), Vector3(COLUMNA, alto_pilar, COLUMNA), blanco)
-		solido(cu, en(p + Vector3(0, Y_CORNISA / 2.0, 0)), Vector3(COLUMNA, Y_CORNISA, COLUMNA))
-	# Arcos en cada lado, cornisa encima y baranda en los lados de afuera
-	for l: String in lados:
-		var partes := l.split("_")
-		var v := Vector2i(int(partes[1]), int(partes[2]))
-		var a := _vertice(v)
-		var u := Vector3.RIGHT if partes[0] == "h" else Vector3.BACK
-		var m := a + u * BAHIA / 2.0
-		_arco(n, cu, m, u, blanco)
-		var afuera := int(lados[l]) == 1
-		var tam_cornisa := Vector3(BAHIA + COLUMNA, Y_TERRAZA - 0.2 - Y_CORNISA, 0.6)
-		var base := Basis(u, Vector3.UP, u.cross(Vector3.UP))
-		bloque(n, cu, Transform3D(base, m + Vector3(0, (Y_CORNISA + Y_TERRAZA - 0.2) / 2.0, 0)), tam_cornisa, blanco)
-		if afuera:
-			# Moldura que asoma y baranda de la terraza (con el pasamanos más ancho)
-			pieza(n, Transform3D(base, m + Vector3(0, Y_TERRAZA - 0.05, 0)), Vector3(BAHIA + 0.8, 0.12, 0.8), piedra)
-			pieza(n, Transform3D(base, m + Vector3(0, Y_TERRAZA + 0.22, 0)), Vector3(BAHIA + 0.2, 0.44, 0.2), blanco)
-			pieza(n, Transform3D(base, m + Vector3(0, Y_TERRAZA + 0.48, 0)), Vector3(BAHIA + 0.3, 0.08, 0.3), piedra)
-			solido(cu, Transform3D(base, m + Vector3(0, Y_TERRAZA + 0.26, 0)), Vector3(BAHIA + 0.3, 0.52, 0.3))
-	# Faroles colgando en el medio de cada bahía del pasillo
-	for k: Vector2i in GALERIA_CELDAS:
-		if k.y != 1:
-			continue
-		var p := _vertice(k) + Vector3(BAHIA / 2.0, 0, BAHIA / 2.0)
-		pieza(n, en(p + Vector3(0, Y_CORNISA + 0.1, 0)), Vector3(0.02, 0.5, 0.02), c("hierro"))
-		pieza(n, en(p + Vector3(0, Y_CORNISA - 0.2, 0)), Vector3(0.24, 0.14, 0.24), c("hierro"))
-		Construir.esfera(n, p + Vector3(0, Y_CORNISA - 0.33, 0), 0.12, c("luz"), Vector3.ONE, 8)
-
-
-static func _vertice(v: Vector2i) -> Vector3:
-	return Vector3(GALERIA_ORIGEN.x + v.x * BAHIA, 0.0, GALERIA_ORIGEN.y + v.y * BAHIA)
-
-
-## Arco de medio punto entre dos columnas: "m" es el medio del lado al nivel del piso y "u" la
-## dirección del lado. La rosca son 9 dovelas y las enjutas (los rincones entre el arco y la cornisa)
-## se rellenan con tajadas verticales. Todo con colisión.
-static func _arco(n: Node3D, cu: StaticBody3D, m: Vector3, u: Vector3, color: Color) -> void:
-	const DOVELAS := 9
-	var r_in := (BAHIA - COLUMNA) / 2.0
-	var r_medio := r_in + ROSCA / 2.0
-	var r_out := r_in + ROSCA
-	var centro := m + Vector3(0, ARRANQUE + 0.15, 0)
-	var cuerda := 2.0 * r_medio * sin(PI / DOVELAS / 2.0) + 0.03
-	for k in DOVELAS:
-		var a := PI * (k + 0.5) / DOVELAS
-		var radial := u * cos(a) + Vector3.UP * sin(a)
-		var tangente := -u * sin(a) + Vector3.UP * cos(a)
-		var t := Transform3D(Basis(radial, tangente, radial.cross(tangente)), centro + radial * r_medio)
-		bloque(n, cu, t, Vector3(ROSCA, cuerda, COLUMNA), color)
-	# Enjutas: tajadas de 25 cm desde la rosca hasta la cornisa
-	var base := Basis(u, Vector3.UP, u.cross(Vector3.UP))
-	var tajadas := [[0.0, 0.6]]
-	for q in 3:
-		tajadas.append([0.6 + 0.25 * q, 0.85 + 0.25 * q])
-	for s: float in [-1.0, 1.0]:
-		for tj: Array in tajadas:
-			var u0: float = tj[0]
-			var u1: float = tj[1]
-			if u0 == 0.0 and s > 0.0:
-				continue   # la del medio va una sola vez (de -0,6 a 0,6)
-			var abajo := centro.y + sqrt(r_out * r_out - u1 * u1) - 0.02
-			var alto := Y_CORNISA - abajo
-			if alto <= 0.0:
-				continue
-			var ancho := (u1 - u0) if u0 > 0.0 else 2.0 * u1
-			var off := s * (u0 + u1) / 2.0 if u0 > 0.0 else 0.0
-			bloque(n, cu, Transform3D(base, Vector3(m.x, abajo + alto / 2.0, m.z) + u * off), Vector3(ancho, alto, COLUMNA), color)
 
 
 # ---------------------------------------------------------------- Mercado

@@ -43,6 +43,7 @@ var _timer_bocado := 2.0
 
 func _ready() -> void:
 	add_to_group("humanos")
+	esquivar_obstaculos = tipo != "comensal"   # los comensales siguen su ruta hasta la silla, pegados a la mesa
 	_timer_migas = randf() * intervalo_migas
 	_destino = global_position
 	_altura = global_position.y
@@ -64,6 +65,7 @@ func preparar_aspecto() -> void:
 			m.alto = randf_range(1.1, 1.3)
 		"senora":
 			m.sentado = true
+			m.asiento_extra = ModeloHumano.EXTRA_BANCO   # las señoras se sientan en bancos
 	# Un poco de variedad de altura entre los que se repiten
 	if tipo != "escolar":
 		m.alto = float(ModeloHumano.info(m.personaje).get("alto", 1.75)) * randf_range(0.96, 1.04)
