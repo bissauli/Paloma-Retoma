@@ -273,6 +273,8 @@ static func letrero(padre: Node, pos: Vector3, texto: String, color_texto: Color
 	mm.size = Vector3(tam_tabla.x + 0.08, 0.05, 0.12)
 	for y in [-1.0, 1.0]:
 		_malla(n, mm, Vector3(0, y * tam_tabla.y / 2.0, -0.05), material(color_tabla.lightened(0.45)))
+	# La letra se achica si el texto (en el idioma más largo) no entra en la tabla
+	tam = mini(tam, int(tam_tabla.x * 100.0 / (Idioma.largo(texto) * 0.6 + 0.6)))
 	var l := cartel(n, Vector3(0, 0, 0.012), texto, color_texto, tam)
 	l.outline_size = 6
 	return n

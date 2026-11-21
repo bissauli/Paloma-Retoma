@@ -52,7 +52,7 @@ func _process(delta: float) -> void:
 		return
 	var fps := _cuadros / _acum
 	var llamadas := int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
-	_label.text = "%d FPS\npeor %.0f ms · %d draws" % [roundi(fps), _peor * 1000.0, llamadas]
+	_label.text = tr("%d FPS\npeor %.0f ms · %d draws") % [roundi(fps), _peor * 1000.0, llamadas]
 	_label.add_theme_color_override("font_color", _color(fps))
 	_acum = 0.0
 	_cuadros = 0

@@ -29,7 +29,8 @@ const PLANTAS := [["hoja", ""], ["hoja_osc", "flor_rosa"], ["hoja", "flor_amaril
 	["hoja_osc", "flor_violeta"], ["pino", ""], ["hoja", "flor_blanca"]]
 const COLORES_CORNISA := ["blanco", "remate_crema", "piedra", "remate_crema", "piedra_osc"]
 
-## Carteles salientes (verticales, letra por letra). Son rubros, no se traducen.
+## Carteles salientes (verticales, letra por letra). La versión vertical de cada traducción la arma
+## Idioma.instalar() (ver TextosEN.VERTICALES).
 const RUBROS := ["HOTEL", "BAR", "PIZZA", "TANGO", "LIBROS", "BAZAR", "CAFÉ", "PENSIÓN", "SASTRE", "DISCOS"]
 const COLORES_CARTEL := ["toldo_rojo", "remate_azul", "kiosco", "remate_marron", "toldo_naranja", "hierro"]
 
@@ -232,7 +233,7 @@ static func columna_farol(raiz: Node3D, pos: Vector3, rot_y := 0.0) -> void:
 
 ## Cartel saliente vertical (de pie en la fachada, a "x" del centro), letra por letra en las dos caras.
 static func cartel_saliente(n: Node3D, x: float, y: float, texto: String, color: Color) -> void:
-	var letras := texto.length()
+	var letras := Idioma.largo(texto)   # la caja entra con el texto de cualquier idioma
 	var alto := 0.42 * letras + 0.3
 	caja(n, Vector3(x, y, 0.62), Vector3(0.1, alto, 0.78), color, false)
 	caja(n, Vector3(x, y, 0.62), Vector3(0.12, alto + 0.08, 0.06), c("blanco"), false, Vector3.ZERO, true)
