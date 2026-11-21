@@ -634,7 +634,8 @@ func _aterrizar() -> void:
 	velocity = Vector3(h.x, 0.0, h.y)
 	if fuerte:
 		camara.sacudir(0.6)
-		AudioManager.reproducir("picoteo", -2.0)
+	# Suena en todo aterrizaje (más fuerte si fue en picada o desde mucha velocidad)
+	AudioManager.reproducir("landing", -2.0 if fuerte else -9.0 + clampf(-_velocidad_previa.y / 8.0, 0.0, 1.0) * 4.0)
 	_rebote(false, 1.0 if fuerte else clampf(-_velocidad_previa.y / 8.0, 0.35, 0.8))
 	aterrizo.emit(fuerte)
 
@@ -960,7 +961,10 @@ func chocar(punto: Vector3, normal: Vector3, impacto: float) -> void:
 	aleteando = false
 	velocity = n * clampf(impacto * 0.3, 3.0, 6.0) + Vector3.UP * 1.5
 	camara.sacudir(1.0)
-	AudioManager.reproducir("aplastar", -4.0)
+	if SuperficiesSonido.hay_metal_cerca(punto):
+		AudioManager.reproducir("crashMetal", -2.0)
+	else:
+		AudioManager.reproducir("crashWall", -6.0)   # más bajo que el de metal
 	EfectoChoque.polvo(get_parent(), punto, normal)
 	modelo.aturdir(DURACION_ATURDIDA)
 	choco.emit(impacto)

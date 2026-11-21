@@ -11,7 +11,7 @@ extends Node
 const MEZCLA := 22050
 const NOMBRES := ["arrullo", "aleteo", "picoteo", "grito_nene", "silbato",
 	"chillido_halcon", "ambiente", "recoger", "victoria", "bocina", "salpicadura", "aletazo", "tintineo",
-	"aplastar", "boing", "ladrido", "trueno", "lluvia"]
+	"aplastar", "boing", "ladrido", "trueno", "lluvia", "crashWall", "crashMetal", "landing"]
 const CANALES := 10
 const BUS_VOCES := ["arrullo", "grito_nene", "chillido_halcon"]
 
@@ -166,9 +166,13 @@ func bus_de(nombre: String) -> StringName:
 
 # ---------------------------------------------------------------- Carga / síntesis
 
+## Sonidos cuyo archivo se llama distinto (res://audio/bark.mp3 es el "ladrido").
+const ARCHIVOS := {"ladrido": "bark"}
+
+
 func _cargar_o_generar(nombre: String) -> AudioStream:
-	for ext: String in [".wav", ".ogg"]:
-		var ruta := "res://audio/" + nombre + ext
+	for ext: String in [".wav", ".ogg", ".mp3"]:
+		var ruta := "res://audio/" + String(ARCHIVOS.get(nombre, nombre)) + ext
 		if ResourceLoader.exists(ruta):
 			var s := load(ruta) as AudioStream
 			if s:
@@ -455,22 +459,39 @@ func _gen_trueno() -> AudioStreamWAV:
 
 
 func _gen_lluvia() -> AudioStreamWAV:
-	# Siseo de lluvia: ruido blanco suavizado con gotitas sueltas. Se repite en loop.
-	var dur := 3.0
-	var m := _muestras(dur)
-	var suave := 0.0
+	# Lluvia pareja: ruido filtrado (sin graves ni agudos filosos) con rachas lentas de volumen y muchas
+	# gotitas cortas que suenan a "tic". Dura 12 s y el final se funde con el principio (equal-power) para
+	# que el loop no se note; las rachas dan ciclos enteros, así que tampoco saltan.
+	var n := int(12.0 * MEZCLA)
+	var fundido := int(2.0 * MEZCLA)
+	var total := n + fundido
+	var a := PackedFloat32Array()
+	a.resize(total)
+	var lp1 := 0.0
+	var lp2 := 0.0
+	var graves := 0.0
 	var gota := 0.0
-	for i in m.size():
-		suave = lerpf(suave, _rng.randf_range(-1.0, 1.0), 0.45)
-		if _rng.randf() < 0.0012:
-			gota = _rng.randf_range(0.3, 0.7)
-		gota *= 0.992
-		m[i] = suave * 0.32 + _rng.randf_range(-1.0, 1.0) * gota * 0.4
-	var borde := 2000
-	for i in borde:
-		var k := float(i) / borde
-		m[i] *= k
-		m[m.size() - 1 - i] *= k
+	var gota_f := 0.0
+	var gota_fase := 0.0
+	for i in total:
+		var blanco := _rng.randf_range(-1.0, 1.0)
+		lp1 = lerpf(lp1, blanco, 0.30)
+		lp2 = lerpf(lp2, lp1, 0.55)
+		graves = lerpf(graves, blanco, 0.02)
+		var siseo := (lp2 - graves * 1.6) * 0.9
+		if _rng.randf() < 0.006:
+			gota = _rng.randf_range(0.15, 0.45)
+			gota_f = _rng.randf_range(1800.0, 4200.0)
+		gota *= 0.9
+		gota_fase += TAU * gota_f / MEZCLA
+		var racha := 0.85 + 0.15 * sin(TAU * float(i) * 3.0 / n) * sin(TAU * float(i) * 5.0 / n + 1.3)
+		a[i] = (siseo * 0.55 + sin(gota_fase) * gota * 0.35) * racha
+	var m := _muestras(n / float(MEZCLA))
+	for i in n:
+		m[i] = a[i]
+	for i in fundido:
+		var w := float(i) / fundido
+		m[i] = a[i] * sin(w * PI * 0.5) + a[n + i] * cos(w * PI * 0.5)
 	return _a_wav(m, true)
 
 
