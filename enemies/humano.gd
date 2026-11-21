@@ -58,34 +58,34 @@ func _ready() -> void:
 ## Configura el aspecto según el tipo (llamar antes de agregarlo al árbol).
 func preparar_aspecto() -> void:
 	var m := get_node("Modelo") as ModeloHumano
-	var paleta := [Color("4f7cc4"), Color("d9643a"), Color("5aa469"), Color("e3c34b"), Color("9c5fb5"), Color("e07aa0")]
+	m.personaje = personaje_para(tipo)
 	match tipo:
-		"turista":
-			m.color_ropa = paleta[randi() % paleta.size()]
-			m.accesorio = "sombrero" if randf() < 0.4 else "gorra"
-			m.color_accesorio = Color("f2e6c9") if m.accesorio == "sombrero" else paleta[randi() % paleta.size()]
 		"escolar":
 			m.alto = randf_range(1.1, 1.3)
-			m.color_ropa = Color("f4f4f4")  # Guardapolvo blanco
-			m.color_piernas = Color("2d3a5c")
 		"senora":
 			m.sentado = true
-			m.alto = 1.6
-			m.color_ropa = [Color("7a4b6b"), Color("4b6b7a"), Color("8a7255")][randi() % 3]
-			m.color_piel = Color("e8c4a6")
-			m.accesorio = "sombrero" if randf() < 0.5 else "ninguno"
-			m.color_accesorio = Color("5b3b52")
+	# Un poco de variedad de altura entre los que se repiten
+	if tipo != "escolar":
+		m.alto = float(ModeloHumano.info(m.personaje).get("alto", 1.75)) * randf_range(0.96, 1.04)
+
+
+## Qué personaje (modelos/personas) le toca a cada tipo de persona de la plaza.
+static func personaje_para(t: String) -> String:
+	match t:
+		"turista":
+			# Paseantes: más turistas y gente con sombrero o gorra (para los aletazos)
+			return ["turista_gringo", "turista_gringo", "mochilera", "mochilera", "hincha", "hincha", "jubilado",
+				"estudiante", "artesano", "bailarina", "barrendero", "agente"].pick_random()
+		"escolar":
+			return ["escolar", "escolar_nena"].pick_random()
+		"senora":
+			return ["abuela", "abuela", "jubilado"].pick_random()
 		"oficinista":
-			m.color_ropa = [Color("2f3540"), Color("4a4f5a"), Color("596b80")][randi() % 3]
-			m.color_piernas = Color("22252b")
+			return ["oficinista", "oficinista_mujer"].pick_random()
 		"comensal":
-			m.alto = randf_range(1.6, 1.85)
-			m.color_ropa = (paleta + [Color("7a4b6b"), Color("2f3540"), Color("c9b48a")])[randi() % 9]
-			m.color_piernas = [Color("3a3f4a"), Color("2d3a5c"), Color("5a4a3a")][randi() % 3]
-			if randf() < 0.25:
-				m.accesorio = "sombrero"
-				m.color_accesorio = Color("f2e6c9")
-	m.color_piel = m.color_piel.darkened(randf_range(-0.1, 0.35))
+			return ["turista_gringo", "mochilera", "oficinista", "oficinista_mujer", "jubilado", "abuela", "estudiante",
+				"artesano", "hincha", "bailarina"].pick_random()
+	return ""
 
 
 func _physics_process(delta: float) -> void:
@@ -145,12 +145,13 @@ func atender(con_quien: Node3D) -> void:
 ## Devuelve false si no llevaba nada en la cabeza.
 func sombrerazo(dir: Vector3) -> bool:
 	var color := modelo.color_accesorio
-	var k := modelo.alto / 1.75
-	var pos := modelo.global_position + Vector3(0, modelo.altura_sombrero(), 0)
+	var pos := modelo.posicion_sombrero()
+	var malla := modelo.malla_sombrero()
 	var tenia := modelo.quitar_sombrero()
 	if tenia == "":
 		return false
-	var s := Golpeable.crear(get_parent(), tenia, pos, color, k, true)
+	# Sale volando el mismo sombrero que tenía puesto (su malla), con la física de un sombrero o una gorra
+	var s := Golpeable.crear(get_parent(), "gorra" if tenia == "gorra" else "sombrero", pos, color, 1.0, true, malla)
 	s.golpear(dir, 1.6)
 	if _atendiendo == null and not Dialogos.activo:
 		_por_sorpresa = true

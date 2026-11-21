@@ -31,6 +31,9 @@ var color_flor := Color.TRANSPARENT
 @export var escala := 1.0
 @export var desechable := false     ## Un sombrero: se desvanece solo en vez de volver a su lugar
 
+## Si está, se dibuja esta malla (con color en los vértices y el origen en el centro de su base) en vez de la
+## forma del tipo: los sombreros que se le vuelan a la gente son el mismo que tenían puesto.
+var malla_propia: Mesh = null
 var golpeado := false
 var _origen := Transform3D.IDENTITY
 var _t_vuelta := 0.0
@@ -44,8 +47,9 @@ const RANGO_VISIBLE := 45.0
 
 ## Un objeto de mesa en "pos" (global).
 static func crear(padre: Node, tipo_objeto: String, pos: Vector3, color_objeto := Color.WHITE,
-		escala_objeto := 1.0, es_desechable := false) -> Golpeable:
+		escala_objeto := 1.0, es_desechable := false, malla: Mesh = null) -> Golpeable:
 	var g := Golpeable.new()
+	g.malla_propia = malla
 	g.tipo = tipo_objeto
 	g.color = color_objeto
 	g.escala = escala_objeto
@@ -146,6 +150,18 @@ func _armar() -> void:
 	add_child(_visual)
 	var k := escala
 	var forma := CollisionShape3D.new()
+	if malla_propia:
+		var aabb := malla_propia.get_aabb()
+		var r := maxf(aabb.size.x, aabb.size.z) * 0.45
+		forma.shape = _cilindro_forma(r, maxf(aabb.size.y * 0.6, 0.04))
+		forma.position.y = (forma.shape as CylinderShape3D).height / 2.0
+		add_child(forma)
+		var mi := MeshInstance3D.new()
+		mi.mesh = malla_propia
+		mi.material_override = Construir.material_vertices(0.85)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_visual.add_child(mi)
+		return
 	match tipo:
 		"taza":
 			forma.shape = _cilindro_forma(0.045 * k, 0.08 * k)

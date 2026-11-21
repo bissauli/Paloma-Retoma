@@ -388,7 +388,6 @@ func _ocluir(nombre: String, tr: Transform3D) -> void:
 		o.transform = tr * Transform3D(cj[0], cj[1])
 		add_child(o)
 
-
 ## Pieza borrada por el builder: _poner tiene que devolver algo igual, así que va una malla oculta
 ## (la fusión la ignora).
 func _fantasma() -> MeshInstance3D:

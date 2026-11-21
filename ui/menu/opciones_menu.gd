@@ -17,6 +17,7 @@ var _resolucion: OptionButton
 var _resoluciones: Array[Vector2i] = []
 var _fps: OptionButton
 var _pantalla: CheckBox
+var _comic: CheckBox
 var _sensibilidad: HSlider
 var _sensibilidad_txt: Label
 var _invertir: CheckBox
@@ -74,6 +75,10 @@ func _init() -> void:
 		_fps.add_item(Ajustes.nombre_limite_fps(f).to_upper())
 	_fps.tooltip_text = "Con un número fijo se desactiva el VSync"
 	_fps.item_selected.connect(func(i: int) -> void: Ajustes.set_limite_fps(Ajustes.LIMITES_FPS[i]))
+	_comic = CheckBox.new()
+	fila("Estilo cómic", _comic)
+	_comic.tooltip_text = "Sombras con trama de puntos y contorno de tinta"
+	_comic.toggled.connect(Ajustes.set_estilo_comic)
 	_pantalla = CheckBox.new()
 	fila("Pantalla completa", _pantalla)
 	_pantalla.toggled.connect(func(on: bool) -> void:
@@ -91,7 +96,7 @@ func _init() -> void:
 	_invertir = CheckBox.new()
 	fila("Invertir eje Y", _invertir)
 	_invertir.toggled.connect(Ajustes.set_invertir_y)
-	for casilla: BaseButton in [_silencio, _pantalla, _invertir]:
+	for casilla: BaseButton in [_silencio, _comic, _pantalla, _invertir]:
 		casilla.toggled.connect(func(on: bool) -> void: AudioManager.ui("click_in" if on else "click_out", -8.0))
 
 
@@ -115,6 +120,7 @@ func _refrescar() -> void:
 	_sensibilidad.set_value_no_signal(Ajustes.sensibilidad * 100.0)
 	_sensibilidad_txt.text = _porcentaje(Ajustes.sensibilidad * 100.0)
 	_invertir.set_pressed_no_signal(Ajustes.invertir_y)
+	_comic.set_pressed_no_signal(Ajustes.estilo_comic)
 	_calidad.select(Ajustes.calidad)
 	_fps.select(maxi(Ajustes.LIMITES_FPS.find(Ajustes.limite_fps), 0))
 	_refrescar_resoluciones()

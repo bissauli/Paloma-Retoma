@@ -1,0 +1,387 @@
+{
+ "abuela": {
+  "alto": 1.54,
+  "cabeza": 1.406,
+  "cabeza_r": 0.134,
+  "cadera": 0.755,
+  "color_sombrero": "",
+  "nino": false,
+  "pose": {
+   "brazo_i": "codo"
+  },
+  "rodilla": 0.404,
+  "sombrero": "",
+  "zonas": {
+   "pelo": "#c9c3d6",
+   "piel": "#e0b48f",
+   "piernas": "#e3c7a0",
+   "ropa": "#e3c7a0"
+  }
+ },
+ "agente": {
+  "alto": 1.8,
+  "cabeza": 1.666,
+  "cabeza_r": 0.134,
+  "cadera": 0.883,
+  "color_sombrero": "#2a3550",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.472,
+  "sombrero": "gorra",
+  "zonas": {
+   "pelo": "#1a1412",
+   "piel": "#a87048",
+   "piernas": "#2a3550",
+   "ropa": "#2a3550"
+  }
+ },
+ "almacenero": {
+  "alto": 1.7,
+  "cabeza": 1.561,
+  "cabeza_r": 0.139,
+  "cadera": 0.826,
+  "color_sombrero": "",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.442,
+  "sombrero": "",
+  "zonas": {
+   "pelo": "#2a2420",
+   "piel": "#e0b48f",
+   "piernas": "#3a3f4a",
+   "ropa": "#f0ece0"
+  }
+ },
+ "artesano": {
+  "alto": 1.78,
+  "cabeza": 1.641,
+  "cabeza_r": 0.139,
+  "cadera": 0.865,
+  "color_sombrero": "",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.463,
+  "sombrero": "",
+  "zonas": {
+   "pelo": "#4a3220",
+   "piel": "#c68e62",
+   "piernas": "#6a5a3a",
+   "ropa": "#e8dcc0"
+  }
+ },
+ "bailarina": {
+  "alto": 1.7,
+  "cabeza": 1.566,
+  "cabeza_r": 0.134,
+  "cadera": 0.834,
+  "color_sombrero": "",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.446,
+  "sombrero": "",
+  "zonas": {
+   "pelo": "#15100e",
+   "piel": "#e0b48f",
+   "piernas": "#c0283a",
+   "ropa": "#c0283a"
+  }
+ },
+ "bandoneonista": {
+  "alto": 1.74,
+  "cabeza": 1.601,
+  "cabeza_r": 0.139,
+  "cadera": 0.845,
+  "color_sombrero": "#35363c",
+  "nino": false,
+  "pose": {
+   "brazo_d": "adelante",
+   "brazo_i": "adelante"
+  },
+  "rodilla": 0.452,
+  "sombrero": "sombrero",
+  "zonas": {
+   "pelo": "#1e1a18",
+   "piel": "#c68e62",
+   "piernas": "#3e4048",
+   "ropa": "#f0ece2"
+  }
+ },
+ "barrendero": {
+  "alto": 1.72,
+  "cabeza": 1.581,
+  "cabeza_r": 0.139,
+  "cadera": 0.835,
+  "color_sombrero": "#e2762f",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.447,
+  "sombrero": "gorra",
+  "zonas": {
+   "pelo": "#1e1814",
+   "piel": "#a87048",
+   "piernas": "#e2762f",
+   "ropa": "#e2762f"
+  }
+ },
+ "cocinero": {
+  "alto": 1.76,
+  "cabeza": 1.621,
+  "cabeza_r": 0.139,
+  "cadera": 0.855,
+  "color_sombrero": "#fbfaf6",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.457,
+  "sombrero": "chef",
+  "zonas": {
+   "pelo": "#6a4a32",
+   "piel": "#f1cfae",
+   "piernas": "#f6f4ee",
+   "ropa": "#f6f4ee"
+  }
+ },
+ "dona_rosa": {
+  "alto": 1.58,
+  "cabeza": 1.446,
+  "cabeza_r": 0.134,
+  "cadera": 0.775,
+  "color_sombrero": "#efe3c8",
+  "nino": false,
+  "pose": {
+   "brazo_i": "codo"
+  },
+  "rodilla": 0.415,
+  "sombrero": "sombrero",
+  "zonas": {
+   "pelo": "#dcd8d2",
+   "piel": "#f1cfae",
+   "piernas": "#8e3b4f",
+   "ropa": "#8e3b4f"
+  }
+ },
+ "escolar": {
+  "alto": 1.22,
+  "cabeza": 1.09,
+  "cabeza_r": 0.13,
+  "cadera": 0.512,
+  "color_sombrero": "",
+  "nino": true,
+  "pose": {},
+  "rodilla": 0.274,
+  "sombrero": "",
+  "zonas": {
+   "pelo": "#4a3020",
+   "piel": "#e0b48f",
+   "piernas": "#f4f4f0",
+   "ropa": "#f4f4f0"
+  }
+ },
+ "escolar_nena": {
+  "alto": 1.18,
+  "cabeza": 1.056,
+  "cabeza_r": 0.124,
+  "cadera": 0.496,
+  "color_sombrero": "",
+  "nino": true,
+  "pose": {},
+  "rodilla": 0.265,
+  "sombrero": "",
+  "zonas": {
+   "pelo": "#1e1612",
+   "piel": "#a87048",
+   "piernas": "#f4f4f0",
+   "ropa": "#f4f4f0"
+  }
+ },
+ "estudiante": {
+  "alto": 1.65,
+  "cabeza": 1.516,
+  "cabeza_r": 0.134,
+  "cadera": 0.809,
+  "color_sombrero": "",
+  "nino": false,
+  "pose": {
+   "brazo_d": "adelante"
+  },
+  "rodilla": 0.433,
+  "sombrero": "",
+  "zonas": {
+   "pelo": "#5a3a24",
+   "piel": "#c68e62",
+   "piernas": "#2a2a30",
+   "ropa": "#f2e8d8"
+  }
+ },
+ "farmaceutica": {
+  "alto": 1.67,
+  "cabeza": 1.536,
+  "cabeza_r": 0.134,
+  "cadera": 0.819,
+  "color_sombrero": "",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.438,
+  "sombrero": "",
+  "zonas": {
+   "pelo": "#1a1412",
+   "piel": "#f1cfae",
+   "piernas": "#7cc4b8",
+   "ropa": "#7cc4b8"
+  }
+ },
+ "granadero": {
+  "alto": 1.85,
+  "cabeza": 1.711,
+  "cabeza_r": 0.139,
+  "cadera": 0.899,
+  "color_sombrero": "#15161a",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.481,
+  "sombrero": "morrion",
+  "zonas": {
+   "pelo": "#2a1e16",
+   "piel": "#e0b48f",
+   "piernas": "#ecebe6",
+   "ropa": "#1f2a55"
+  }
+ },
+ "hincha": {
+  "alto": 1.76,
+  "cabeza": 1.621,
+  "cabeza_r": 0.139,
+  "cadera": 0.855,
+  "color_sombrero": "#7fb8e4",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.457,
+  "sombrero": "gorra",
+  "zonas": {
+   "pelo": "#2a1e16",
+   "piel": "#c68e62",
+   "piernas": "#3a4f74",
+   "ropa": "#7fb8e4"
+  }
+ },
+ "jubilado": {
+  "alto": 1.68,
+  "cabeza": 1.541,
+  "cabeza_r": 0.139,
+  "cadera": 0.816,
+  "color_sombrero": "#3c4049",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.437,
+  "sombrero": "gorra",
+  "zonas": {
+   "pelo": "#d8d6d0",
+   "piel": "#c68e62",
+   "piernas": "#6a6e78",
+   "ropa": "#a9c4dd"
+  }
+ },
+ "mochilera": {
+  "alto": 1.66,
+  "cabeza": 1.526,
+  "cabeza_r": 0.134,
+  "cadera": 0.814,
+  "color_sombrero": "#5a8f5a",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.436,
+  "sombrero": "gorra",
+  "zonas": {
+   "pelo": "#b5562e",
+   "piel": "#f1cfae",
+   "piernas": "#4f6f9e",
+   "ropa": "#e3b23c"
+  }
+ },
+ "mozo": {
+  "alto": 1.75,
+  "cabeza": 1.611,
+  "cabeza_r": 0.139,
+  "cadera": 0.85,
+  "color_sombrero": "",
+  "nino": false,
+  "pose": {
+   "brazo_i": "bandeja"
+  },
+  "rodilla": 0.455,
+  "sombrero": "",
+  "zonas": {
+   "pelo": "#15120f",
+   "piel": "#e0b48f",
+   "piernas": "#1e2026",
+   "ropa": "#f6f4ee"
+  }
+ },
+ "oficinista": {
+  "alto": 1.78,
+  "cabeza": 1.641,
+  "cabeza_r": 0.139,
+  "cadera": 0.865,
+  "color_sombrero": "",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.463,
+  "sombrero": "",
+  "zonas": {
+   "pelo": "#3a2a20",
+   "piel": "#e0b48f",
+   "piernas": "#2f3b55",
+   "ropa": "#f4f2ec"
+  }
+ },
+ "oficinista_mujer": {
+  "alto": 1.68,
+  "cabeza": 1.546,
+  "cabeza_r": 0.134,
+  "cadera": 0.824,
+  "color_sombrero": "",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.441,
+  "sombrero": "",
+  "zonas": {
+   "pelo": "#2a1e1a",
+   "piel": "#c68e62",
+   "piernas": "#4a4e5a",
+   "ropa": "#f0e8e0"
+  }
+ },
+ "pibe": {
+  "alto": 1.25,
+  "cabeza": 1.119,
+  "cabeza_r": 0.131,
+  "cadera": 0.525,
+  "color_sombrero": "#2d5aa8",
+  "nino": true,
+  "pose": {},
+  "rodilla": 0.281,
+  "sombrero": "gorra",
+  "zonas": {
+   "pelo": "#2a1e16",
+   "piel": "#c68e62",
+   "piernas": "#1e1e24",
+   "ropa": "#d33a3a"
+  }
+ },
+ "turista_gringo": {
+  "alto": 1.82,
+  "cabeza": 1.681,
+  "cabeza_r": 0.139,
+  "cadera": 0.884,
+  "color_sombrero": "#e9d49a",
+  "nino": false,
+  "pose": {},
+  "rodilla": 0.473,
+  "sombrero": "sombrero",
+  "zonas": {
+   "pelo": "#e0c070",
+   "piel": "#f2bfa6",
+   "piernas": "#c8b48a",
+   "ropa": "#3fb6b0"
+  }
+ }
+}
