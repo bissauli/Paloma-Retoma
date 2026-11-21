@@ -62,11 +62,11 @@ func _crear_piso() -> void:
 	mi_tira.set_meta(&"atravesable", true)   # Si tuviera colisión, al subir la escalera la rampa chocaría con el borde
 	var r := Ciudad.PLAZA
 	# Avenida al sur (asfalto con líneas): cruza la manzana y llega hasta Bolívar y Paseo Colón
-	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(128, 0.01, 8), C_ASFALTO, false)
+	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(128, 0.01, 8), C_ASFALTO, false).set_meta(&"sin_contorno", true)
 	for i in range(-6, 7):
 		Construir.caja(piso, Vector3(i * 9.0, 0.012, 30), Vector3(4.0, 0.01, 0.25), Color("f4f3ee"), false)
 	# Vereda del lado de los cafés (las mismas lajas que el resto de las veredas)
-	Construir.caja_mat(piso, Vector3(0, 0.08, 37), Vector3(r.size.x, 0.16, 6), Construir.material_lajas("lajas_vereda", 4.0))
+	Construir.caja_mat(piso, Vector3(0, 0.08, 37), Vector3(r.size.x, 0.16, 6), Construir.material_lajas("lajas_vereda", 4.0)) 		.set_meta(&"sin_contorno", true)
 
 
 ## Paredes invisibles en el borde de la ciudad (y un techo para no irse al espacio).

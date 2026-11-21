@@ -194,13 +194,17 @@ func _cuerpo_en(pos: Vector3) -> StaticBody3D:
 # ---------------------------------------------------------------- Suelos: calles, veredas, sendas
 
 func _losa(x0: float, z0: float, x1: float, z1: float, arriba: float, grosor: float, color: Color, col := true) -> void:
-	Construir.caja(self, Vector3((x0 + x1) / 2.0, arriba - grosor / 2.0, (z0 + z1) / 2.0),
+	var mi := Construir.caja(self, Vector3((x0 + x1) / 2.0, arriba - grosor / 2.0, (z0 + z1) / 2.0),
 		Vector3(x1 - x0, grosor, z1 - z0), color, col)
+	# Calzadas, veredas y cordones van sin contorno de tinta: la losa es un piso y su contorno asoma
+	# sobre el asfalto como una raya negra en el borde de la vereda (ver EstiloComic)
+	mi.set_meta(&"sin_contorno", true)
 
 
 func _losa_mat(x0: float, z0: float, x1: float, z1: float, arriba: float, grosor: float, mat: Material) -> void:
-	Construir.caja_mat(self, Vector3((x0 + x1) / 2.0, arriba - grosor / 2.0, (z0 + z1) / 2.0),
+	var mi := Construir.caja_mat(self, Vector3((x0 + x1) / 2.0, arriba - grosor / 2.0, (z0 + z1) / 2.0),
 		Vector3(x1 - x0, grosor, z1 - z0), mat)
+	mi.set_meta(&"sin_contorno", true)
 
 
 ## Vereda (o piso peatonal) a 16 cm, con cordón claro en los bordes que dan a la calle (N, S, E, O).
