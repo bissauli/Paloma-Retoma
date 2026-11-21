@@ -134,6 +134,7 @@ func _ready() -> void:
 	# Cada etapa anota cuánto tardó (se ve con --verbose) y tiene su propia semilla: si una zona cambia
 	# (más o menos piezas al azar), las demás quedan igual
 	var etapas: Array[String] = []
+	CarteleraImagenes.reiniciar()
 	for etapa: Callable in [_suelos, _manzanas, _parque, _barrio, _peatonal, _pasaje, _props_veredas, _estacionamientos,
 			_obras, _obra_cuadra, _mobiliario, _nivel_medio, _nivel_alto, _fondo, _puntos_de_juego]:
 		var t := Time.get_ticks_usec()
@@ -1412,6 +1413,7 @@ func _props_vereda(a: Vector3, b: Vector3, adentro: Vector3, paso := 9.0) -> voi
 			_poner("tacho", q + adentro * 0.5)
 		elif extra < 0.28:
 			_poner("cartelera", q + adentro * 1.3, rot_largo)
+			CarteleraImagenes.poner(self, Transform3D(Basis(Vector3.UP, rot_largo), q + adentro * 1.3))
 		elif extra < 0.33:
 			_poner("caja_electrica", q + adentro * 2.6, rot_calle)
 		elif extra < 0.38:

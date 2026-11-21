@@ -28,6 +28,9 @@ func _ready() -> void:
 	_jugador = $Paloma as PalomaJugador
 	_tutorial = get_node_or_null("Tutorial")
 	AudioManager.iniciar_ambiente()
+	var ambiente_zonas := AmbienteZonas.new()
+	ambiente_zonas.name = "AmbienteZonas"
+	add_child(ambiente_zonas)
 	# Versión para teléfonos: joystick, botones y deslizar para mirar (se ocultan con el menú)
 	if Ajustes.movil:
 		var tactiles := ControlesTactiles.new()

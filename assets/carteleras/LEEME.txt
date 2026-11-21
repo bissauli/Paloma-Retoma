@@ -1,0 +1,2 @@
+Soltá acá las imágenes (png, jpg o webp) para las carteleras de la vereda.
+Se reparten solas entre todas las carteleras y sus dos caras (ver world/cartelera_imagenes.gd).
