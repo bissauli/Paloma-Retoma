@@ -50,6 +50,10 @@ var destacado := Vector3.ZERO ## Dónde está el esquive en cámara lenta (local
 var obstaculos := 0           ## Cuántos obstáculos hay adentro
 var cajas: Array = []         ## Las cajas de los obstáculos: [centro, medias medidas, giro] (locales)
 var luz: OmniLight3D
+var sala_nodo: Node3D                   ## El nodo con todo lo de la sala (ver _mostrar_interior)
+var _interior: Array[VisualInstance3D] = []
+var _interior_listo := false
+var _interior_visible := true
 var textos: Array[String] = []
 var lado_callejon := 1.0      ## Hacia dónde dobla al salir al callejón (+1 = +X local)
 var activa := false
@@ -195,6 +199,7 @@ func _physics_process(delta: float) -> void:
 	if j == null:
 		return
 	var cerca := global_position.distance_to(j.global_position) < 34.0
+	_mostrar_interior(cerca or activa or _corriendo)
 	if luz:
 		luz.visible = cerca
 		luz.shadow_enabled = activa   # Sombras de los muebles sólo mientras pasa la paloma (cuestan)
@@ -213,6 +218,33 @@ func _physics_process(delta: float) -> void:
 		AvisoPasaje.soltar(self)
 	else:
 		AvisoPasaje.ofrecer(self, lado > 0, global_position.distance_to(j.global_position))
+
+
+## Lo que hay adentro del cuarto (muebles, adornos, gente: lo que no se fusionó con el edificio) sólo se
+## dibuja cuando la paloma está cerca o pasando por la sala. Desde lejos el cuarto no se ve (las
+## ventanas son chicas), y dibujarlo costaba más de 200 llamadas de dibujo en toda la ciudad.
+## Lo de afuera (toldo, cartel, marcos de las ventanas) se queda siempre.
+func _mostrar_interior(ver: bool) -> void:
+	if sala_nodo == null or not is_instance_valid(sala_nodo):
+		return
+	if not _interior_listo:
+		_interior_listo = true      # Se arma recién en el primer paso de física, cuando la fusión ya terminó
+		var hx := ancho / 2.0 - ESPESOR
+		var hz := fondo / 2.0 - ESPESOR
+		for n in sala_nodo.find_children("*", "VisualInstance3D", true, false):
+			var vi := n as VisualInstance3D
+			if vi is Light3D or not vi.is_visible_in_tree():
+				continue
+			var p := sala_nodo.to_local(vi.global_position)
+			if absf(p.x) < hx - 0.05 and absf(p.z) < hz - 0.05 and p.y > -0.05 and p.y < 3.6:
+				_interior.append(vi)
+		_interior_visible = true
+	if ver == _interior_visible:
+		return
+	_interior_visible = ver
+	for vi in _interior:
+		if is_instance_valid(vi):
+			vi.visible = ver
 
 
 ## ¿La paloma está afuera, frente a una de las ventanas (a menos de AVISO metros y a su altura)?

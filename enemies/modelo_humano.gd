@@ -133,6 +133,10 @@ func _armar() -> void:
 	_raiz = (_escenas[personaje] as PackedScene).instantiate() as Node3D
 	_raiz.scale = Vector3.ONE * _escala
 	add_child(_raiz)
+	# Los huesos se mueven por código (_aplicar_pose): los AnimationPlayer del modelo importado (uno por
+	# persona, ~150 en la ciudad) no se usan y sólo suman nodos
+	for ap in _raiz.find_children("*", "AnimationPlayer", true, false):
+		ap.free()
 	_skel = _raiz.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 	for n in _raiz.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
@@ -155,6 +159,10 @@ func _armar() -> void:
 			color_accesorio = Color(String(_datos.get("color_sombrero", "#ffffff")))
 	if not tiene_sombrero():
 		accesorio = "ninguno"
+	# Una persona a más de 100 m (28 px de alto) no se dibuja: son ~170 personas y cada una pesa varios dibujos
+	for g in sombras:
+		g.visibility_range_end = 100.0
+		g.visibility_range_end_margin = 6.0
 	Ajustes.registrar_sombra_dinamica(sombras)
 	for i in HUESOS.size():
 		var b := _skel.find_bone(HUESOS[i])

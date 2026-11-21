@@ -47,6 +47,8 @@ var _t_luz := 0.0
 var _autos: Array[Auto] = []
 var _timer_salida := 0.0
 var _timer_palomas := 0.0
+var _t_gente := 0.0
+var _gente_calzada: Array[Node3D] = []
 var _lamparas: Array = []     ## [MeshInstance3D rojo, amarillo, verde] por semáforo
 ## Rutas: {nombre, curva: Curve3D, largo, peso, lineas: Array[float] (semáforos, sólo la avenida), entradas}
 var _rutas: Array[Dictionary] = []
@@ -479,19 +481,37 @@ func _physics_process(delta: float) -> void:
 	var jugador := GameState.jugador
 	# Sólo importa la gente que está sobre alguna calzada (casi nunca hay nadie): se filtra una vez acá
 	# y no por cada auto
-	var gente: Array[Node3D] = []
-	for n in get_tree().get_nodes_in_group("cuerpos_humanos"):
-		var h := n as Node3D
-		if h == null or not h.is_visible_in_tree():
-			continue
-		var p := h.global_position
-		if absf(p.z - 30.0) < 6.0 or absf(absf(p.x) - 69.0) < 6.5 or absf(p.z + 48.0) < 6.5 \
-				or (absf(p.x) > 70.0 and p.z > -13.0 and p.z < 5.0):
-			gente.append(h)
+	# (se vuelve a filtrar 6 veces por segundo: alcanza para frenar a tiempo y no recorre todo el grupo en cada paso)
+	_t_gente -= delta
+	if _t_gente <= 0.0:
+		_t_gente = 0.16
+		_gente_calzada.clear()
+		for n in get_tree().get_nodes_in_group("cuerpos_humanos"):
+			var h := n as Node3D
+			if h == null or not h.is_visible_in_tree():
+				continue
+			var p := h.global_position
+			if absf(p.z - 30.0) < 6.0 or absf(absf(p.x) - 69.0) < 6.5 or absf(p.z + 48.0) < 6.5 \
+					or (absf(p.x) > 70.0 and p.z > -13.0 and p.z < 5.0):
+				_gente_calzada.append(h)
+	var gente: Array[Node3D] = _gente_calzada
+	if not gente.is_empty() and not is_instance_valid(gente[gente.size() - 1]):
+		_t_gente = 0.0       # alguien desapareció: se vuelve a armar la lista en el próximo paso
+		gente = []
+	var cam := get_viewport().get_camera_3d()
+	var paso := Engine.get_physics_frames()
+	var i_auto := 0
 	for a in _autos:
+		i_auto += 1
 		if not is_instance_valid(a):
 			continue
-		_conducir(a, delta, gente)
+		# Los autos a más de 60 m de la cámara se calculan un paso sí y otro no (con el tiempo acumulado)
+		var d_auto: float = delta + float(a.get_meta(&"acum", 0.0))
+		if cam != null and (paso + i_auto) % 2 != 0 and cam.global_position.distance_squared_to(a.global_position) > 3600.0:
+			a.set_meta(&"acum", d_auto)
+		else:
+			a.set_meta(&"acum", 0.0)
+			_conducir(a, d_auto, gente)
 		if jugador:
 			_revisar_jugador(a, jugador, delta)
 	_timer_palomas -= delta

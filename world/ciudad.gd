@@ -160,7 +160,7 @@ func _ready() -> void:
 	# aparte y se dejan de dibujar lejos)
 	t1 = Time.get_ticks_usec()
 	var piezas := get_child_count()
-	Construir.fusionar_estaticas(self, 64.0)
+	Construir.fusionar_estaticas(self, 96.0)    # celdas más grandes = menos mallas = menos llamadas de dibujo
 	etapas.append("fusión de %d piezas %d" % [piezas, (Time.get_ticks_usec() - t1) / 1000])
 	PantallaCarga.refrescar()
 	# Luces de la noche: ventanas encendidas y faroles (después de fusionar, así no se las lleva la fusión)

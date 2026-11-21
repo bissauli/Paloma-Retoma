@@ -83,6 +83,7 @@ var _arcoiris_dir := Vector3.FORWARD   ## Hacia dónde está (del lado opuesto a
 var _llovia := false
 var _t_nubes := 0.0
 var _t_aplicar := 0.0
+var _luz_aplicada := Vector3.ZERO     ## Dirección con la que está girado el sol ahora
 var _tiempo := 0.0
 
 
@@ -291,7 +292,8 @@ func _crear_nubes() -> void:
 func _crear_lluvia() -> void:
 	_lluvia = CPUParticles3D.new()
 	_lluvia.name = "Lluvia"
-	_lluvia.amount = 900 if not OS.has_feature("mobile") and not OS.has_feature("web") else 450
+	# (CPUParticles3D: cada gota se calcula en el procesador en cada cuadro; 450 se ven igual de tupidas)
+	_lluvia.amount = 450 if not OS.has_feature("mobile") and not OS.has_feature("web") else 260
 	_lluvia.lifetime = 0.9
 	_lluvia.local_coords = false
 	_lluvia.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
@@ -453,7 +455,11 @@ func _aplicar(forzado: bool) -> void:
 	var luz_plana := Vector3(luz_dir.x, 0, luz_dir.z).normalized()
 	if luz_dir.y < 0.105:
 		luz_dir = (luz_plana * cos(0.105) + Vector3.UP * sin(0.105)).normalized()
-	sol.look_at_from_position(Vector3.ZERO, -luz_dir, Vector3.UP if absf(luz_dir.y) < 0.99 else Vector3.FORWARD)
+	# La luz con sombras sólo se gira cuando el sol se movió de verdad (más de ~0,2 grados, o sea cada
+	# medio minuto): si se rotara en cada cuadro, las sombras temblarían y "nadarían" sobre el piso
+	if forzado or _luz_aplicada.dot(luz_dir) < 0.999995:
+		_luz_aplicada = luz_dir
+		sol.look_at_from_position(Vector3.ZERO, -luz_dir, Vector3.UP if absf(luz_dir.y) < 0.99 else Vector3.FORWARD)
 	sol.light_color = sol_color
 	sol.light_energy = sol_energia + _relampago * 0.6
 	# 0 de día, 1 de noche cerrada: según qué tan abajo del horizonte está el sol

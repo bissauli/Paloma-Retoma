@@ -142,4 +142,10 @@ func _resorte() -> void:
 	_consulta_resorte.motion = mov
 	var r := get_world_3d().direct_space_state.cast_motion(_consulta_resorte)
 	var k: float = r[0] if r.size() > 0 else 1.0
-	camara.position = Vector3(0, 0, brazo.spring_length * k)
+	var objetivo_z := brazo.spring_length * k
+	# Acercarse a la paloma (algo tapa) es rápido; volver a alejarse es suave: si no, la cámara pegaba
+	# saltos de más de 3 cm cada vez que el resorte tocaba o soltaba algo
+	var dt := get_process_delta_time()
+	var z := camara.position.z
+	var paso := 1.0 - exp(-(28.0 if objetivo_z < z else 7.0) * dt)
+	camara.position = Vector3(0, 0, lerpf(z, objetivo_z, paso))

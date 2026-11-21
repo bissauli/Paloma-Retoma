@@ -22,9 +22,11 @@ const GRUPO_DISTANCIA_PALOMAS := &"distancia_palomas"
 ## Por calidad: distancia de sombras (m), cortes de la sombra direccional (1, 2 o 4), tamaño del
 ## mapa de sombras, filtro suave (0..5) y MSAA. Las sombras son lo que más cuesta en esta escena.
 const PRESETS := [
-	{"sombra_dist": 70.0, "cortes": 1, "atlas": 2048, "suave": 0, "msaa": Viewport.MSAA_DISABLED},
-	{"sombra_dist": 140.0, "cortes": 2, "atlas": 4096, "suave": 1, "msaa": Viewport.MSAA_2X},
-	{"sombra_dist": 240.0, "cortes": 4, "atlas": 4096, "suave": 2, "msaa": Viewport.MSAA_4X},
+	{"sombra_dist": 60.0, "cortes": 1, "atlas": 2048, "suave": 0, "msaa": Viewport.MSAA_DISABLED},
+	{"sombra_dist": 110.0, "cortes": 1, "atlas": 4096, "suave": 1, "msaa": Viewport.MSAA_2X},
+	# Alta: 2 cortes en vez de 4 (cada corte vuelve a dibujar toda la escena en el mapa de sombras:
+	# eran la mitad de las llamadas de dibujo) y MSAA 2X en vez de 4X
+	{"sombra_dist": 180.0, "cortes": 2, "atlas": 4096, "suave": 2, "msaa": Viewport.MSAA_2X},
 ]
 ## En el teléfono la calidad "Baja" usa un mapa de sombras más chico y menos distancia.
 const PRESET_MOVIL_BAJA := {"sombra_dist": 45.0, "cortes": 1, "atlas": 1024, "suave": 0, "msaa": Viewport.MSAA_DISABLED}
@@ -45,6 +47,17 @@ var pantalla_completa := false
 var sensibilidad := 1.0         ## Multiplica la sensibilidad de la cámara (0,25..2)
 var invertir_y := false
 var calidad := 2                ## 0 bajo, 1 medio, 2 alto
+var calidad_manual := false     ## La jugadora eligió la calidad a mano: no se baja sola (ver _vigilar_fps)
+
+## Ajuste automático de calidad: si el juego anda por debajo de este FPS durante VENTANAS ventanas de
+## VENTANA_S segundos seguidas, baja un escalón de calidad (Alta -> Media -> Baja) y no vuelve a subir.
+const FPS_MINIMO := 50.0
+const VENTANA_S := 4.0
+const VENTANAS := 2
+var _acum_t := 0.0
+var _acum_n := 0
+var _ventanas_lentas := 0
+var _gracia := 0.0
 var resolucion := Vector2i.ZERO ## (0, 0) = nativa
 var limite_fps := 0             ## Ver LIMITES_FPS
 var idioma := ""                ## "es" o "en" (ver Idioma). Vacío = el del sistema hasta que elija
@@ -65,6 +78,13 @@ func _ready() -> void:
 	# En la web arranca en "Medio": el navegador tiene menos margen
 	if OS.has_feature("web"):
 		calidad = 1
+		# La web corre todo en un solo hilo y WebGL cuesta más por píxel: el 3D se dibuja a 720p (la UI
+		# queda nítida, ver _aplicar_resolucion) y la física a 30 pasos por segundo (todo lo que se ve
+		# se interpola). Si el jugador elige otra cosa en Opciones, se respeta (se carga después).
+		resolucion = Vector2i(1280, 720)
+		aplicar_perfil_movil()
+	else:
+		calidad = _calidad_inicial()
 	# En el teléfono: calidad baja y el 3D dibujado a 720p (la pantalla tiene muchos píxeles)
 	if movil:
 		calidad = 0
@@ -86,6 +106,57 @@ func _ready() -> void:
 	_aplicar_resolucion.call_deferred(true)
 	# Si la ventana cambia de tamaño (a mano o al pasar a pantalla completa) se recalcula la escala 3D
 	get_tree().root.size_changed.connect(_aplicar_resolucion)
+
+
+func _process(delta: float) -> void:
+	_vigilar_fps(delta)
+
+
+func _vigilar_fps(delta: float) -> void:
+	# (con un tope de FPS bajo elegido a propósito, por ejemplo 30, no se mide: sería siempre "lento")
+	var tope_bajo := limite_fps > 0 and limite_fps < 60
+	if calidad_manual or calidad == 0 or tope_bajo or not GameState.en_partida or GameState.menu_activo \
+			or get_tree().paused or not DisplayServer.window_is_focused():
+		_gracia = 6.0          # Después de pausar, cargar o cambiar de ventana se espera antes de medir
+		_acum_t = 0.0
+		_acum_n = 0
+		_ventanas_lentas = 0
+		return
+	if _gracia > 0.0:
+		_gracia -= delta
+		return
+	_acum_t += delta
+	_acum_n += 1
+	if _acum_t < VENTANA_S:
+		return
+	var fps := float(_acum_n) / _acum_t
+	_acum_t = 0.0
+	_acum_n = 0
+	if fps < FPS_MINIMO:
+		_ventanas_lentas += 1
+	else:
+		_ventanas_lentas = 0
+	if _ventanas_lentas >= VENTANAS:
+		_ventanas_lentas = 0
+		_gracia = 6.0
+		calidad -= 1
+		_aplicar_graficos()
+		_guardar()
+		cambio.emit()
+		print("Calidad bajada sola a ", CALIDADES[calidad], " (", int(fps), " FPS)")
+
+
+## Calidad de la primera vez que se abre el juego en PC (después manda lo que elija el jugador): Alta
+## sólo con una placa dedicada; con video integrado, Baja; si no se sabe, Media.
+static func _calidad_inicial() -> int:
+	var placa := RenderingServer.get_video_adapter_name().to_lower()
+	for integrada: String in ["intel", "uhd", "iris", "basic render", "llvmpipe", "swiftshader", "vega 3", "vega 6", "vega 8", "graphics"]:
+		if integrada in placa and not ("arc a" in placa or "radeon rx" in placa):
+			return 0
+	for potente: String in ["rtx", "gtx 16", "gtx 10", "radeon rx", "arc a"]:
+		if potente in placa:
+			return 2
+	return 1
 
 
 ## Cambia el idioma de todo el juego y lo guarda.
@@ -170,6 +241,7 @@ func set_invertir_y(i: bool) -> void:
 
 
 func set_calidad(c: int) -> void:
+	calidad_manual = true      # Si la eligió la jugadora, el ajuste automático deja de tocarla
 	calidad = clampi(c, 0, PRESETS.size() - 1)
 	_aplicar_graficos()
 	_guardar()
@@ -183,7 +255,7 @@ func set_estilo_comic(e: bool) -> void:
 ## ¿Se dibuja el contorno de tinta? Es un dibujo más por malla (medido en PC: +2 ms en Alta, casi
 ## nada en Media y Baja); en el teléfono no, ahí cada dibujo pesa mucho más.
 func contorno_comic() -> bool:
-	return estilo_comic and not movil
+	return estilo_comic and not movil and not OS.has_feature("web") and calidad >= 1
 
 
 func set_resolucion(r: Vector2i) -> void:
@@ -291,6 +363,13 @@ func _aplicar_pantalla() -> void:
 func preset_actual() -> Dictionary:
 	if movil and calidad == 0:
 		return PRESET_MOVIL_BAJA
+	if OS.has_feature("web"):
+		# En el navegador el MSAA y las sombras suaves cuestan demasiado: sin MSAA y sin filtro suave
+		var p: Dictionary = (PRESETS[calidad] as Dictionary).duplicate()
+		p["msaa"] = Viewport.MSAA_DISABLED
+		p["suave"] = 0
+		p["atlas"] = mini(int(p["atlas"]), 2048)
+		return p
 	return PRESETS[calidad]
 
 
@@ -404,6 +483,7 @@ func _cargar() -> void:
 	brillo = clampf(cfg.get_value("video", "brillo", brillo), BRILLO_MIN, BRILLO_MAX)
 	pantalla_completa = cfg.get_value("video", "pantalla_completa", pantalla_completa)
 	calidad = clampi(cfg.get_value("video", "calidad", calidad), 0, PRESETS.size() - 1)
+	calidad_manual = cfg.get_value("video", "calidad_manual", calidad_manual)
 	resolucion = cfg.get_value("video", "resolucion", resolucion)
 	limite_fps = cfg.get_value("video", "limite_fps", limite_fps)
 	estilo_comic = cfg.get_value("video", "estilo_comic", estilo_comic)
@@ -424,6 +504,7 @@ func _guardar() -> void:
 	cfg.set_value("video", "brillo", brillo)
 	cfg.set_value("video", "pantalla_completa", pantalla_completa)
 	cfg.set_value("video", "calidad", calidad)
+	cfg.set_value("video", "calidad_manual", calidad_manual)
 	cfg.set_value("video", "resolucion", resolucion)
 	cfg.set_value("video", "limite_fps", limite_fps)
 	cfg.set_value("video", "estilo_comic", estilo_comic)

@@ -353,6 +353,7 @@ static func _sala(padre: Node3D, casa: Node3D, w_edificio: float, d: float, colo
 	ce.nombre = nombre
 	ce.tema = tema
 	ce.piso = piso
+	ce.sala_nodo = sala
 	ce.con_cinematica = not local
 	ce.ruta = ruta_zigzag(w, d, ce.x_frente, ce.x_fondo, esc["alturas"], esc["amp"])
 	if local:   # El local se recorre a pie: la ruta de prueba es recta (vidriera, el medio, ventana de atrás)

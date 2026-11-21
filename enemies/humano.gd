@@ -102,7 +102,23 @@ static func personaje_para(t: String) -> String:
 	return ""
 
 
+var _acum_fisica := 0.0
+
+
+## ¿Está a más de 40 m de la cámara? (no se nota que se mueva a saltos más espaciados)
+func _lejos_de_camara() -> bool:
+	var cam := get_viewport().get_camera_3d()
+	return cam != null and cam.global_position.distance_squared_to(global_position) > 1600.0
+
+
 func _physics_process(delta: float) -> void:
+	# Los que están lejos de la cámara se calculan 1 de cada 3 pasos de física (con el tiempo acumulado):
+	# cada paso de física caía en un solo cuadro y lo hacía más largo que los demás (tirones a 144 FPS)
+	_acum_fisica += delta
+	if _atendiendo == null and (Engine.get_physics_frames() + get_instance_id()) % 3 != 0 and _lejos_de_camara():
+		return
+	delta = _acum_fisica
+	_acum_fisica = 0.0
 	_enfriamiento_susto = maxf(_enfriamiento_susto - delta, 0.0)
 	modelo.actividad = _actividad()
 	if _atendiendo != null:

@@ -124,6 +124,9 @@ func _armar() -> void:
 	var cuerpo := MeshInstance3D.new()
 	cuerpo.mesh = Kit.malla(modelo)
 	cuerpo.material_override = Kit.material()
+	# Un auto a más de 140 m ocupa unos pocos píxeles (y la niebla ya lo tapa): no se dibuja
+	cuerpo.visibility_range_end = 140.0
+	cuerpo.visibility_range_end_margin = 6.0
 	add_child(cuerpo)
 	_con_sombra.append(cuerpo)
 	_radio_rueda = float(d["radio_rueda"])
@@ -136,6 +139,8 @@ func _armar() -> void:
 		mi.mesh = Kit.malla(rueda)
 		mi.material_override = Kit.material()
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.visibility_range_end = 100.0     # Las ruedas desaparecen antes que el auto: de lejos no se notan
+		mi.visibility_range_end_margin = 5.0
 		pivote.add_child(mi)
 		_ruedas.append(pivote)
 	_luces()
