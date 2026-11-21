@@ -20,6 +20,10 @@ const COLUMNA_CORRIDA := 0.4
 const FONDO_LIMITE := -58.0
 const FONDO_CORRIDA := 2.0
 const FONDO_TOPE := 9.3
+## La cara de la caja que da al edificio (x = -57) no se corre ni se baja (no pasa de FONDO_LIMITE) y quedó
+## sola por arriba de la cornisa: una tabla de 70 cm de alto y 30 m de largo parada sobre el alero, sin
+## colisión. Se sacan los triángulos que están todos en el plano del fondo y asoman sobre la cornisa.
+const FONDO_PLANO := -56.9
 
 
 ## Corre hacia adentro los vértices de las dos columnas de las puntas (sólo las caras de la columna:
@@ -64,6 +68,30 @@ static func arreglar_fondo(v: PackedVector3Array) -> PackedVector3Array:
 	return v
 
 
+## Saca de la superficie (arreglos de Mesh, con índices) los triángulos del fondo que asoman sobre la
+## cornisa (ver FONDO_PLANO). Devuelve los arreglos con los índices nuevos.
+static func quitar_sobre_cornisa(a: Array) -> Array:
+	if a[Mesh.ARRAY_INDEX] == null:
+		return a
+	var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
+	var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var quedan := PackedInt32Array()
+	for t in range(0, idx.size(), 3):
+		var en_fondo := true
+		var asoma := false
+		for k in 3:
+			var p := v[idx[t + k]]
+			en_fondo = en_fondo and p.x < FONDO_PLANO
+			asoma = asoma or p.y > FONDO_TOPE + 0.01
+		if en_fondo and asoma:
+			continue
+		quedan.append_array([idx[t], idx[t + 1], idx[t + 2]])
+	if quedan.size() < idx.size():
+		print("fondo: %d triángulos sobre la cornisa, afuera" % ((idx.size() - quedan.size()) / 3))
+	a[Mesh.ARRAY_INDEX] = quedan
+	return a
+
+
 func _ready() -> void:
 	var ruta := OS.get_cmdline_user_args()[0]
 	var raiz: Node = (load(ruta) as PackedScene).instantiate()
@@ -88,6 +116,7 @@ func _ready() -> void:
 			a[Mesh.ARRAY_VERTEX] = arreglar_fondo(correr_columnas_esquina(v))
 			a[Mesh.ARRAY_NORMAL] = n
 			a[Mesh.ARRAY_TANGENT] = null
+			a = quitar_sobre_cornisa(a)
 			var std := mi.get_active_material(s) as BaseMaterial3D
 			malla.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
 			var m := Construir.material_cozy(0.9)

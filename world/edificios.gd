@@ -215,8 +215,10 @@ static func cabildo(padre: Node3D) -> void:
 
 
 ## Lo que le faltaba al fondo del Cabildo (la pared del oeste, que está en x = -57): zócalo de piedra,
-## pilastras entre las ventanas, una cinta entre los dos pisos, la cornisa de arriba y una puerta de
-## servicio en el medio con su fronton y dos escalones. Todo decorativo (sin colisión).
+## pilastras entre las ventanas, una cinta entre los dos pisos y una puerta de servicio en el medio con su
+## fronton y dos escalones. Todo decorativo (sin colisión). La cornisa es la del modelo: la que se ponía
+## acá (para cuando el fondo estaba en x = -59) quedaba como un bloque blanco encima del alero, 26 cm
+## más alto que la colisión de la cornisa y asomando en las esquinas.
 static func _cabildo_fondo(padre: Node3D) -> void:
 	const X := -57.0
 	var piedra := Color("c9bfa9")
@@ -231,9 +233,6 @@ static func _cabildo_fondo(padre: Node3D) -> void:
 		Construir.caja(padre, Vector3(X - 0.1, 5.0, z), Vector3(0.2, 8.2, 0.55), blanco, false)
 		Construir.caja(padre, Vector3(X - 0.16, 0.95, z), Vector3(0.32, 0.12, 0.7), piedra, false)   # basa
 		Construir.caja(padre, Vector3(X - 0.16, 9.1, z), Vector3(0.32, 0.12, 0.7), piedra, false)    # capitel
-	# Cornisa con alero
-	Construir.caja(padre, Vector3(X - 0.3, 9.45, 0), Vector3(0.6, 0.22, 31.4), blanco, false)
-	Construir.caja(padre, Vector3(X - 0.2, 9.25, 0), Vector3(0.4, 0.18, 31.0), piedra, false)
 	# Puerta de servicio en el medio: marco, hoja, dintel, fronton y dos escalones
 	Construir.caja(padre, Vector3(X - 0.1, 1.55, 0), Vector3(0.2, 3.1, 2.0), blanco, false)
 	Construir.caja(padre, Vector3(X - 0.2, 1.4, 0), Vector3(0.2, 2.8, 1.5), sombra, false)

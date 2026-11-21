@@ -13,6 +13,7 @@ func _init() -> void:
 		var a := viejo.surface_get_arrays(s)
 		var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
 		a[Mesh.ARRAY_VERTEX] = Extraer.arreglar_fondo(v)
+		a = Extraer.quitar_sobre_cornisa(a)
 		nuevo.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
 		nuevo.surface_set_material(nuevo.get_surface_count() - 1, viejo.surface_get_material(s))
 	print("superficies: ", nuevo.get_surface_count(), " aabb ", nuevo.get_aabb())

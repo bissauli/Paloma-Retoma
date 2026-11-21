@@ -55,8 +55,12 @@ const VISTAS := {
 	"cabildo_sur": [Vector3(-52, 9, 32), Vector3(-52, 5, 10)],
 	"cabildo_se": [Vector3(-36, 12, 30), Vector3(-50, 4, 8)],
 	"cabildo_jugador": [Vector3(-68, 13, 24), Vector3(-48, 4, 12)],
+	"cabildo_cornisa": [Vector3(-66, 12.5, 12), Vector3(-56, 9.4, 4)],
+	"cabildo_cornisa_cerca": [Vector3(-60.5, 10.6, 18.5), Vector3(-57, 9.5, 14)],
 	"banco_cabildo": [Vector3(-33.5, 2.2, 5.0), Vector3(-36, 0.3, 3)],
 	"parque_piso": [Vector3(-128, 2.5, -40), Vector3(-140, 0, -55)],
+	"transito_bolivar": [Vector3(-48, 42, 30), Vector3(-70, 0, 12)],
+	"transito_colon": [Vector3(48, 42, 30), Vector3(70, 0, 12)],
 	"avenida_cafes": [Vector3(-40, 1.5, 30), Vector3(10, 0.5, 30)],
 }
 
