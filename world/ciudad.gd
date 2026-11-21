@@ -135,6 +135,7 @@ func _ready() -> void:
 	# (más o menos piezas al azar), las demás quedan igual
 	var etapas: Array[String] = []
 	CarteleraImagenes.reiniciar()
+	SuperficiesSonido.reiniciar()
 	for etapa: Callable in [_suelos, _manzanas, _parque, _barrio, _peatonal, _pasaje, _props_veredas, _estacionamientos,
 			_obras, _obra_cuadra, _mobiliario, _nivel_medio, _nivel_alto, _fondo, _puntos_de_juego]:
 		var t := Time.get_ticks_usec()
@@ -338,6 +339,7 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 		mi = Kit.colocar(self, nombre, pos, rot, escala, _cuerpo_en(pos) if colision else null, solo_lejos)
 	mi.set_meta(&"pieza", nombre)
 	colocadas.append([nombre, pos])
+	SuperficiesSonido.registrar(nombre, pos)
 	# Para las luces de la noche (ver LucesNoche): faroles y edificios con su transformación
 	if LucesNoche.es_farol(nombre):
 		luces_fijas.append([nombre, Transform3D(Basis.from_euler(Vector3(0, rot, 0)) * Basis.from_scale(escala), pos)])

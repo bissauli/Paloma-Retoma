@@ -507,7 +507,7 @@ func _aplicar(forzado: bool) -> void:
 	_lluvia_mat.albedo_color = gotas
 	if lluvia > 0.02 and not _sonido_lluvia.playing and DisplayServer.get_name() != "headless":
 		_sonido_lluvia.play()
-	_sonido_lluvia.volume_db = linear_to_db(maxf(lluvia, 0.0001)) - 8.0
+	_sonido_lluvia.volume_db = linear_to_db(maxf(lluvia, 0.0001)) - 15.0
 	if lluvia <= 0.02 and _sonido_lluvia.playing:
 		_sonido_lluvia.stop()
 
