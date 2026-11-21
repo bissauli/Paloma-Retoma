@@ -32,6 +32,11 @@ const LOSA_LADO := 0.8            ## ...y por lo menos así de ancha de cada lad
 const TAPA_TOLERANCIA := 0.015    ## Cuánto más abajo que la cara de arriba de una losa puede estar su colisión
 const ATRAVESABLES := ["ventana", "puerta", "cortina", "vidrio", "vidriera", "guirnalda"]
 const SCRIPTS_PERMITIDOS := ["casa_enterable.gd"]
+## Piezas del kit huecas o que se recorren por adentro: la envolvente convexa de su malla sería un bloque
+## macizo (la boca del arco de fútbol, el hueco bajo el tobogán, entre los palos de la hamaca...). Se
+## quedan sólo con las cajas que les da el kit (o su propia colisión armada a mano, ver Ciudad._juegos).
+const SIN_ENVOLVENTE := ["arco_futbol", "tobogan_torre", "hamaca_madera", "hamaca_marco", "subibaja_base",
+	"arenero", "calesita_base"]
 
 static var _envolventes := {}     ## id de malla (o malla y escala) -> ConvexPolygonShape3D en su espacio
 
@@ -96,6 +101,8 @@ static func completar(raiz: Node3D) -> int:
 
 
 static func _es_atravesable(mi: MeshInstance3D) -> bool:
+	if String(mi.get_meta(&"kit_pieza", "")) in SIN_ENVOLVENTE:
+		return true
 	var nombre := (String(mi.name) + " " + String(mi.get_meta(&"pieza", "")) + " " + String(mi.get_meta(&"kit_pieza", ""))).to_lower()
 	for a: String in ATRAVESABLES:
 		if nombre.contains(a):
