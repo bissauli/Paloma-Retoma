@@ -20,6 +20,8 @@ func _ready() -> void:
 	_crear_piso()
 	_crear_limites()
 	_crear_zonas()
+	# Todo lo de la plaza que se ve tiene colisión (ver ColisionFaltante; la ciudad hace lo suyo)
+	ColisionFaltante.completar(self)
 	# Miles de piezas fijas (edificios, árboles, bancos...) pasan a ser unas pocas mallas grandes
 	Construir.fusionar_estaticas(self)
 

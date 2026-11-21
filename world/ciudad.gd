@@ -148,6 +148,10 @@ func _ready() -> void:
 	for c: Vector2i in _cuerpos:
 		add_child(_cuerpos[c])
 	etapas.append("colisiones %d" % ((Time.get_ticks_usec() - t1) / 1000))
+	# Lo que quedó sin colisión (autos estacionados, bicis, carteles, arbustos...) recibe la suya
+	t1 = Time.get_ticks_usec()
+	var completadas := ColisionFaltante.completar(self)
+	etapas.append("%d colisiones completadas %d" % [completadas, (Time.get_ticks_usec() - t1) / 1000])
 	# Miles de piezas pasan a ser pocas mallas grandes por celda (los árboles y props chicos van
 	# aparte y se dejan de dibujar lejos)
 	t1 = Time.get_ticks_usec()
@@ -1833,6 +1837,13 @@ func _fondo() -> void:
 			_fila(Vector3(a, 0, zs), Vector3.RIGHT, b - a, PI, POOL_FONDO, false, false, true)
 		_fila(Vector3(-xe, 0, zn), Vector3.BACK, zs - zn, PI / 2.0, POOL_FONDO, false, false, true)
 		_fila(Vector3(xe, 0, zn), Vector3.BACK, zs - zn, -PI / 2.0, POOL_FONDO, false, false, true)
+	# Detrás de la primera fila, el piso de los pasillos entre filas y hasta el horizonte va oscuro (como
+	# en sombra): visto desde arriba se leía como un piso vacío claro entre los edificios
+	var sombra := C_ASFALTO.darkened(0.45)
+	_losa(-330, -270, 330, -145, 0.2, 0.1, sombra, false)
+	_losa(-330, 143, 330, 270, 0.2, 0.1, sombra, false)
+	_losa(-330, -145, -230, 143, 0.2, 0.1, sombra, false)
+	_losa(230, -145, 330, 143, 0.2, 0.1, sombra, false)
 	# El horizonte (las torres de más allá, en capas con paralaje) lo arma world/horizonte.gd
 	# Túneles por donde entran y salen los autos (al final de Bolívar y de Paseo Colón)
 	for x: float in [-69.0, 69.0]:
