@@ -19,6 +19,9 @@ extends Node3D
 ## "sombrero", "gorra", "chef", "morrion" o "ninguno".
 @export var accesorio := ""
 @export var color_accesorio := Color.WHITE
+## Lo que está haciendo ahora ("" = nada): "barrer", "guardia", "comer", "revolver", "ordenar", "escribir",
+## "teclear" o "atender". Se mezcla con la pose base (cambiar de actividad hace un fundido de ~0,25 s).
+@export var actividad := ""
 ## Elige al azar una de las variantes de color del personaje (desactivarlo deja siempre el original).
 @export var variar_colores := true
 
@@ -44,6 +47,11 @@ const PELOS := ["#16100e", "#2a1e16", "#3a2a20", "#5a3a24", "#8a5a30", "#b5562e"
 const PIERNAS := ["#2f3b55", "#4f6f9e", "#1e1e24", "#6a6e78", "#c8b48a", "#6a5a3a", "#3a4f74", "#4a3a30", "#7a6a5a"]
 ## Camisetas de hinchas (el hincha de celeste y blanco es el original).
 const HINCHAS := ["#7fb8e4", "#d33a3a", "#1f3a8a", "#f0c020", "#f4f4f0", "#2a8a4a"]
+
+## Qué hace cada personaje cuando trabaja (un empleado de local, un agente en su esquina, un barrendero).
+const ACTIVIDAD_POR_PERSONAJE := {"barrendero": "barrer", "agente": "guardia", "cocinero": "revolver",
+	"almacenero": "ordenar", "artesano": "ordenar", "farmaceutica": "escribir", "oficinista": "teclear",
+	"oficinista_mujer": "teclear", "abuela": "atender", "bailarina": "atender", "estudiante": "atender"}
 
 const CAPA_GENTE := 4
 const ZONAS := ["fijo", "piel", "pelo", "ropa", "piernas"]
@@ -75,6 +83,9 @@ var _mirar_obj := Vector2.ZERO
 var _t_mirar := 0.0
 var _respira := 0.0
 var _escala := 1.0
+var _act_cur := ""                         ## Actividad que se está mostrando (la que se pidió, cuando termina el fundido)
+var _act_w := 0.0                          ## Cuánto pesa la actividad en la pose (0..1)
+var _t_act := 0.0
 var _salteados := 0                        ## Cuadros sin rearmar la pose (los que están lejos se animan menos seguido)
 
 
@@ -97,6 +108,12 @@ func _ready() -> void:
 	add_to_group("cuerpos_humanos")
 	_fase = randf() * TAU
 	_t_mirar = randf_range(1.0, 4.0)
+	_t_act = randf() * 10.0   # Así dos que hacen lo mismo no se mueven al unísono
+
+
+## La actividad propia del personaje ("" si no tiene una).
+func actividad_propia() -> String:
+	return String(ACTIVIDAD_POR_PERSONAJE.get(personaje, ""))
 
 
 func _armar() -> void:
@@ -295,6 +312,97 @@ func _aplicar_pose(velocidad: float, delta: float) -> void:
 		cad.y = s * 0.12 * amp
 		torso.y = -s * 0.16 * amp
 		torso.x += 0.05 * amp
+	var cab_x := 0.0
+	var cab_y := 0.0
+	if _act_w > 0.001 and _act_cur != "":
+		var t := _t_act
+		var tbi := bi
+		var tbd := bd
+		var tai := ai
+		var tad := ad
+		var ttorso := Vector3.ZERO
+		var tcad := Vector3.ZERO
+		var tcab := Vector2.ZERO
+		match _act_cur:
+			"barrer":
+				# Escoba en la mano izquierda: pasadas largas con el cuerpo inclinado y un paso corto
+				var sw := sin(t * 3.2)
+				tbi = Vector3(sw * 0.3, 0, 0)
+				tai = Vector3(0.12 + 0.1 * (1.0 - sw), 0, 0)
+				tbd = Vector3(0.2 - sw * 0.25, 0, 0.12)
+				tad = Vector3(0.5, 0, 0)
+				ttorso = Vector3(0.22, sw * 0.14, 0)
+				tcad = Vector3(0, -sw * 0.05, 0)
+				tcab = Vector2(0.28, 0)
+			"guardia":
+				# Firme en la esquina: peso de un pie al otro, mano en el cinturón y, de a ratos, ordena el tránsito
+				var k := fmod(t, 11.0)
+				var g := smoothstep(5.0, 5.8, k) - smoothstep(8.6, 9.4, k)
+				tcad = Vector3(0, 0, sin(t * 0.45) * 0.04)
+				ttorso = Vector3(0, 0, -tcad.z * 0.8)
+				tbi = Vector3(0.05, 0, -0.33)
+				tai = Vector3(1.5, 0, 0)
+				var bd_reposo := Vector3(0.05, 0, 0.33)
+				var ad_reposo := Vector3(1.5, 0, 0)
+				tbd = bd_reposo.lerp(Vector3(1.5, 0, 0.3), g)
+				tad = ad_reposo.lerp(Vector3(0.15 + sin(t * 5.0) * 0.45, 0, 0), g)
+				tcab = Vector2(0, 0)
+			"comer":
+				# Sentado a la mesa: cada ~3,6 s se lleva un bocado a la boca y mastica; la otra mano apoya en la mesa
+				var k := fmod(t, 3.6) / 3.6
+				var sube := smoothstep(0.05, 0.3, k) - smoothstep(0.58, 0.82, k)
+				tbd = bd.lerp(Vector3(1.0, 0, -0.15), sube)
+				tad = ad.lerp(Vector3(2.0, 0, 0), sube)
+				tbi = Vector3(0.75, 0, 0.1)
+				tai = Vector3(0.7, 0, 0)
+				ttorso = Vector3(0.1 - sube * 0.06, 0, 0)
+				tcab = Vector2(0.2 - sube * 0.22 + (sin(t * 14.0) * 0.04 if sube > 0.8 else 0.0), 0)
+			"revolver":
+				var ph := t * 5.0
+				tbi = Vector3(0.9, 0, -0.1)
+				tbd = Vector3(0.9 + sin(ph) * 0.12, 0, 0.1 + cos(ph) * 0.2)
+				tai = Vector3(1.0, 0, 0)
+				tad = Vector3(1.0 + sin(ph) * 0.15, 0, 0)
+				ttorso = Vector3(0.12, sin(ph) * 0.05, 0)
+				tcab = Vector2(0.3, 0)
+			"ordenar":
+				# Acomoda cosas en los estantes: estira un brazo y después el otro
+				var ph := t * 1.3
+				tbi = Vector3(0.7 + 0.7 * maxf(0.0, sin(ph)), 0, -0.1)
+				tbd = Vector3(0.7 + 0.7 * maxf(0.0, -sin(ph)), 0, 0.1)
+				tai = Vector3(0.5, 0, 0)
+				tad = Vector3(0.5, 0, 0)
+				ttorso = Vector3(0.05, sin(ph) * 0.18, 0)
+				tcab = Vector2(0.0, 0.0)
+			"escribir":
+				tbd = Vector3(0.8, 0, -0.15)
+				tad = Vector3(1.4 + sin(t * 6.0) * 0.08, 0, 0)
+				tbi = Vector3(0.6, 0, 0.1)
+				tai = Vector3(1.2, 0, 0)
+				ttorso = Vector3(0.1, 0, 0)
+				tcab = Vector2(0.4, 0)
+			"teclear":
+				tbi = Vector3(0.5, 0, -0.05)
+				tbd = Vector3(0.5, 0, 0.05)
+				tai = Vector3(1.5 + sin(t * 13.0) * 0.07, 0, 0)
+				tad = Vector3(1.5 + sin(t * 11.0 + 1.0) * 0.07, 0, 0)
+				ttorso = Vector3(0.06, 0, 0)
+				tcab = Vector2(0.15, 0)
+			"atender":
+				# Charla con el cliente gesticulando con una mano y apoyada la otra
+				tbd = Vector3(0.7 + sin(t * 2.1) * 0.25, 0, -0.35)
+				tad = Vector3(1.2 + sin(t * 3.3) * 0.4, 0, 0)
+				tbi = Vector3(0.5, 0, 0.1)
+				tai = Vector3(0.9, 0, 0)
+		var w := _act_w
+		bi = bi.lerp(tbi, w)
+		bd = bd.lerp(tbd, w)
+		ai = ai.lerp(tai, w)
+		ad = ad.lerp(tad, w)
+		torso += ttorso * w
+		cad += tcad * w
+		cab_x = tcab.x * w
+		cab_y = tcab.y * w
 	# brazos levantados (gritar, espantar, festejar)
 	if _arriba > 0.01:
 		var sacude := sin(_fase * 3.0) * 0.25
@@ -330,7 +438,7 @@ func _aplicar_pose(velocidad: float, delta: float) -> void:
 	_skel.set_bone_pose_position(_idx["cadera"], _rest_pos + Vector3(0, y_cad, 0))
 	_rot("cadera", cad)
 	_rot("torso", torso)
-	_rot("cabeza", Vector3(_mirar.y - torso.x * 0.5, _mirar.x - torso.y * 0.6, 0))
+	_rot("cabeza", Vector3(_mirar.y - torso.x * 0.5 + cab_x, _mirar.x - torso.y * 0.6 + cab_y, 0))
 	_rot("muslo_i", mi)
 	_rot("muslo_d", md)
 	_rot("pierna_i", pi_)
@@ -349,6 +457,13 @@ func animar(delta: float, velocidad: float, agitado := false) -> void:
 	else:
 		_fase += delta * 2.0
 	_arriba = lerpf(_arriba, 1.0 if agitado else 0.0, minf(delta * 8.0, 1.0))
+	_t_act += delta
+	if actividad != _act_cur:
+		_act_w = move_toward(_act_w, 0.0, delta * 4.0)   # termina la anterior y recién ahí cambia
+		if _act_w <= 0.01:
+			_act_cur = actividad
+	else:
+		_act_w = move_toward(_act_w, 1.0 if _act_cur != "" else 0.0, delta * 4.0)
 	# mirar alrededor de vez en cuando (más quieto si camina)
 	_t_mirar -= delta
 	if _t_mirar <= 0.0:

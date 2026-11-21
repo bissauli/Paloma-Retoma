@@ -1,15 +1,17 @@
 class_name Humano
 extends Enemigo
-## Humano "pasivo": turistas, escolares, señoras y oficinistas.
+## Humano "pasivo": turistas, escolares, señoras, oficinistas, comensales, agentes y barrenderos.
 ## - turista/escolar: pasea por su zona y tira migas; con 15+ palomas se asusta y suelta comida.
 ## - senora: sentada en un banco, tira migas cada tanto (zona segura).
 ## - oficinista: sale del subte, camina hasta el borde del mapa y a veces se le cae una factura.
+## - agente: parado en su esquina (guardia, y de a ratos ordena el tránsito). Un aletazo le vuela la gorra.
+## - barrendero: barre despacio su zona con la escoba.
 ## - comensal: llega por la vereda de los cafés, se sienta a una mesa, come un rato (se le caen
 ##   migas) y se va. Los maneja enemies/gente.gd, que reparte las sillas.
 
 signal se_levanto
 
-@export_enum("turista", "escolar", "senora", "oficinista", "comensal") var tipo := "turista"
+@export_enum("turista", "escolar", "senora", "oficinista", "comensal", "agente", "barrendero") var tipo := "turista"
 @export var velocidad := 1.1
 @export var intervalo_migas := 6.0
 
@@ -28,6 +30,7 @@ var _soltar_factura_en := -1.0
 var _altura := 0.0
 var _por_sorpresa := false          ## Un aletazo le tiró el sombrero: se frena un rato con los brazos arriba
 var _sorpresa := 0.0
+var _rumbo_puesto := 0.0            ## Hacia dónde mira cuando está en su puesto (agente) o en su silla (comensal)
 
 # Comensales
 var ruta: Array[Vector3] = []       ## Puntos por los que camina (el último es la silla o la salida)
@@ -49,6 +52,11 @@ func _ready() -> void:
 	_altura = global_position.y
 	_rumbo = rotation.y
 	rotation = Vector3.ZERO
+	_rumbo_puesto = _rumbo
+	if tipo == "agente":
+		esquivar_obstaculos = false
+	if tipo == "barrendero":
+		velocidad = randf_range(0.35, 0.5)   # barre andando despacito
 	if tipo == "oficinista":
 		_destino = destino_final
 		velocidad = randf_range(1.6, 2.1)
@@ -77,13 +85,17 @@ static func personaje_para(t: String) -> String:
 		"turista":
 			# Paseantes: más turistas y gente con sombrero o gorra (para los aletazos)
 			return ["turista_gringo", "turista_gringo", "mochilera", "mochilera", "hincha", "hincha", "jubilado",
-				"estudiante", "artesano", "bailarina", "barrendero", "agente"].pick_random()
+				"estudiante", "artesano", "bailarina"].pick_random()
 		"escolar":
 			return ["escolar", "escolar_nena"].pick_random()
 		"senora":
 			return ["abuela", "abuela", "jubilado"].pick_random()
 		"oficinista":
 			return ["oficinista", "oficinista_mujer"].pick_random()
+		"agente":
+			return "agente"
+		"barrendero":
+			return "barrendero"
 		"comensal":
 			return ["turista_gringo", "mochilera", "oficinista", "oficinista_mujer", "jubilado", "abuela", "estudiante",
 				"artesano", "hincha", "bailarina"].pick_random()
@@ -92,10 +104,19 @@ static func personaje_para(t: String) -> String:
 
 func _physics_process(delta: float) -> void:
 	_enfriamiento_susto = maxf(_enfriamiento_susto - delta, 0.0)
+	modelo.actividad = _actividad()
 	if _atendiendo != null:
 		_paso_conversando(delta)
 		return
 	match tipo:
+		"agente":
+			# En su esquina: no se mueve; si lo sacaron de la mirada (sorpresa) vuelve a mirar hacia su puesto
+			_rumbo = lerp_angle(_rumbo, _rumbo_puesto, minf(delta * 3.0, 1.0))
+			modelo.rotation.y = _rumbo
+			modelo.animar(delta, 0.0)
+			return
+		"barrendero":
+			_pasear(delta)
 		"senora":
 			_tirar_migas(delta)
 			modelo.animar(delta, 0.0)
@@ -106,6 +127,7 @@ func _physics_process(delta: float) -> void:
 		"comensal":
 			if _comiendo:
 				_paso_comer(delta)
+				_rumbo = lerp_angle(_rumbo, _rumbo_puesto, minf(delta * 3.0, 1.0))
 				modelo.rotation.y = _rumbo
 				modelo.animar(delta, 0.0)
 				return
@@ -118,6 +140,20 @@ func _physics_process(delta: float) -> void:
 	_girar_hacia_velocidad(delta, 6.0)
 	modelo.rotation.y = _rumbo
 	modelo.animar(delta, _vel.length(), _miedo > 0.0)
+
+
+## Lo que está haciendo ahora, para la animación del modelo ("" mientras habla, se asusta o se sorprende).
+func _actividad() -> String:
+	if _atendiendo != null or _miedo > 0.0:
+		return ""
+	match tipo:
+		"agente":
+			return "guardia"
+		"barrendero":
+			return "barrer"
+		"comensal":
+			return "comer" if _comiendo else ""
+	return ""
 
 
 ## Hablando con la paloma (o sorprendido por un aletazo): se frena, la mira y deja de tirar migas
@@ -152,14 +188,24 @@ func sombrerazo(dir: Vector3) -> bool:
 	var tenia := modelo.quitar_sombrero()
 	if tenia == "":
 		return false
+	sobresaltar()
 	# Sale volando el mismo sombrero que tenía puesto (su malla), con la física de un sombrero o una gorra
 	var s := Golpeable.crear(get_parent(), "gorra" if tenia == "gorra" else "sombrero", pos, color, 1.0, true, malla)
 	s.golpear(dir, 1.6)
-	if _atendiendo == null and not Dialogos.activo:
-		_por_sorpresa = true
-		_sorpresa = 2.2
-		_atendiendo = GameState.jugador
 	return true
+
+
+## Un aletazo lo sorprende (con o sin sombrero): deja lo que estaba haciendo (barrer, comer, dirigir el
+## tránsito), levanta los brazos un par de segundos y después sigue. Al que está comiendo se le cae una miga.
+func sobresaltar() -> void:
+	if (_atendiendo != null and not _por_sorpresa) or Dialogos.activo:
+		return
+	_por_sorpresa = true
+	_sorpresa = 2.2
+	_atendiendo = GameState.jugador
+	if _comiendo:
+		Comida.soltar(get_parent(), "miga", Vector3(asiento.x - lado * randf_range(0.2, 0.5),
+			asiento.y + 0.01, asiento.z + randf_range(-0.45, 0.45)), 45.0)
 
 
 func _pasear(delta: float) -> void:
@@ -269,6 +315,7 @@ func _sentarse() -> void:
 	_vel = Vector3.ZERO
 	global_position = asiento
 	_rumbo = lado * PI / 2.0
+	_rumbo_puesto = _rumbo
 	modelo.cambiar_postura(true)
 	_timer_bocado = randf_range(1.0, 3.0)
 
@@ -278,7 +325,6 @@ func _paso_comer(delta: float) -> void:
 	_timer_bocado -= delta
 	if _timer_bocado <= 0.0 and tiempo_comida > 1.0:
 		_timer_bocado = randf_range(2.5, 5.5)
-		modelo.gesto_comer()
 		# A veces se le cae una miga al piso (las palomas lo saben...)
 		if randf() < 0.3:
 			Comida.soltar(get_parent(), "miga", Vector3(asiento.x - lado * randf_range(0.2, 0.5),

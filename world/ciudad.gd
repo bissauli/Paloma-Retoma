@@ -1145,6 +1145,7 @@ func _juegos() -> void:
 	for p: Vector3 in [Vector3(-14.5, 0, -11.5), Vector3(14.5, 0, -11.5), Vector3(14.5, 0, 11.5)]:
 		_poner("arbol_grande_B", c + p + Vector3(0, T_PARQUE, 0), _rng.randf() * TAU, Vector3.ONE * 0.8)
 	_paseo(c + Vector3(0, y, 3), Vector2(22, 14), 3, "turista", "")
+	_paseo(c + Vector3(0, y, 0), Vector2(20, 12), 1, "barrendero", "")
 
 
 func _plaza_rombo() -> void:
@@ -1380,6 +1381,7 @@ func _peatonal() -> void:
 		x += 7.5
 		k += 1
 	_paseo(Vector3(-137, Y_VEREDA, z), Vector2(110, 5), 6, "oficinista", "MigasPeatonal")
+	_paseo(Vector3(-137, Y_VEREDA, z), Vector2(110, 5), 2, "barrendero", "")
 
 
 func _pasaje() -> void:
@@ -1500,6 +1502,9 @@ func _props_veredas() -> void:
 				_cartel_calle(q[0], q[1], q[2])
 				var esq: Vector3 = q[0]
 				var hacia := Vector3(signf(r.get_center().x - esq.x), 0, signf(r.get_center().y - esq.z))
+				_esquinas_vistas += 1
+				if _esquinas_vistas % 3 == 1:
+					_agente(esq + Vector3(hacia.x * 1.5, Y_VEREDA, hacia.z * 1.5), atan2(hacia.x, hacia.z))
 				_poner("pilote", esq + Vector3(0, Y_VEREDA, 0) + Vector3(hacia.x, 0, 0) * 1.2)
 				# Semáforo de vereda mirando a la esquina (los de la avenida los maneja Transito)
 				_poner("semaforo_vereda", esq + Vector3(0, Y_VEREDA, 0) + Vector3(0, 0, hacia.z) * 1.6, atan2(-hacia.x, -hacia.z))
@@ -1888,10 +1893,22 @@ func _migas(nombre: String, pos: Vector3, radio: float, maximo: int, intervalo: 
 
 
 ## Una señora sentada en un banco que les tira migas a las palomas (la crea enemies/gente.gd).
+var _esquinas_vistas := 0   ## Cuántas esquinas con carteles se recorrieron (un agente cada tres)
+
+
 func _senora(pos: Vector3, rumbo: float, migas: String) -> void:
 	var m := Marker3D.new()
 	m.add_to_group("senora_extra")
 	m.set_meta("migas", migas)
+	m.set_meta("rumbo", rumbo)
+	add_child(m)
+	m.position = pos
+
+
+## Un agente de tránsito parado en una esquina, mirando hacia "rumbo" (lo crea enemies/gente.gd).
+func _agente(pos: Vector3, rumbo: float) -> void:
+	var m := Marker3D.new()
+	m.add_to_group("puesto_agente")
 	m.set_meta("rumbo", rumbo)
 	add_child(m)
 	m.position = pos

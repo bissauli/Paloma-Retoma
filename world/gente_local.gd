@@ -70,6 +70,7 @@ func _armar() -> void:
 	_base_empleado = ce.get_meta(&"puesto_empleado", _libres[0])
 	_empleado.position = _base_empleado
 	_empleado.rotation.y = PI   # Mira hacia +Z (la vidriera): el modelo mira hacia -Z
+	_empleado.actividad = _empleado.actividad_propia()   # Trabaja: ordena, revuelve, escribe, tipea...
 	# --- La puerta (adentro) y la caja: los puntos libres más cercanos
 	var hz := ce.fondo / 2.0 - CasaEnterable.ESPESOR
 	_puerta_adentro = _mas_cercano(Vector3(ce.x_frente, 0, hz - 0.6))
@@ -314,9 +315,10 @@ func _process(delta: float) -> void:
 	_t += delta
 	# El empleado: se mueve apenas de un lado al otro detrás del mostrador
 	var ancho: float = ce.get_meta(&"ancho_mostrador", 1.4)
-	var x := sin(_t * 0.4) * minf(0.35, ancho * 0.3)
+	var quieto := _empleado.actividad in ["revolver", "escribir", "teclear"]   # Esos trabajan sin moverse del lugar
+	var x := 0.0 if quieto else sin(_t * 0.4) * minf(0.35, ancho * 0.3)
 	_empleado.position = _base_empleado + Vector3(x, 0, 0)
-	_empleado.animar(delta, absf(cos(_t * 0.4)) * 0.14)
+	_empleado.animar(delta, 0.0 if quieto else absf(cos(_t * 0.4)) * 0.14)
 	# Llegan clientes nuevos de a uno
 	_proximo -= delta
 	if _proximo <= 0.0:
