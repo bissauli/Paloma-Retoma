@@ -74,6 +74,7 @@ Talk to those with a ! above their head.",
 	"¿SEGURO?": "ARE YOU SURE?",
 	"TODAVÍA NO HAY NINGUNA PARTIDA GUARDADA.\nLA PARTIDA SE GUARDA SOLA MIENTRAS JUGÁS.":
 		"THERE IS NO SAVED GAME YET.\nTHE GAME SAVES BY ITSELF AS YOU PLAY.",
+	"PALOMA\nRETOMA": "SMIDGEON\nPIDGEON",   # título del menú principal (misma fuente TituloJuego)
 	"PALOMA": "PIGEON",
 	"PALOMAS": "PIGEONS",
 	"%d %s  ·  %d DE COMIDA": "%d %s  ·  %d FOOD",
