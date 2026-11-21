@@ -14,6 +14,9 @@ const SHADERS_CON_CONTORNO := ["res://shaders/estilo_cozy.gdshader", "res://shad
 ## calle, pasto, carteles pegados. Las piezas chicas (perlas, bandas de un accesorio) sí llevan.
 const ALTO_MINIMO := 0.12
 const ANCHO_PLANO := 1.0
+## Una malla cuyo punto más alto (en el mundo) queda por debajo de esto (m) y es más ancha que
+## ANCHO_PLANO es una losa de piso: sin contorno.
+const ALTURA_PISO := 0.3
 ## Mallas importadas de hasta tantos vértices reciben normales suavizadas (ver _suavizar()).
 const VERTICES_MAX_SUAVIZAR := 6000
 
@@ -146,6 +149,12 @@ func lleva_contorno(g: GeometryInstance3D) -> bool:
 		return false
 	var tam := g.get_aabb().size * g.global_basis.get_scale()
 	if tam.y < ALTO_MINIMO and maxf(tam.x, tam.z) > ANCHO_PLANO:
+		return false
+	# Losas a ras del suelo (calzadas, veredas, cordones, el piso de la plaza): son pisos aunque tengan
+	# grosor. Su contorno asoma sobre el asfalto como una raya negra en el borde (en ángulo bajo, y se
+	# ve de más cerca todavía), así que no llevan.
+	if g is MeshInstance3D and (g.global_transform * g.get_aabb()).end.y < ALTURA_PISO \
+			and maxf(tam.x, tam.z) > ANCHO_PLANO:
 		return false
 	if g.material_override:
 		return _material_con_contorno(g.material_override)
