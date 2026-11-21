@@ -211,7 +211,7 @@ static func toldo(n: Node3D, x: float, y: float, ancho: float, salida: float, co
 
 
 ## Columna de farol de tres globos. Base maciza con colisión (se posa arriba, a 0,95 m); el fuste, los
-## brazos y los globos son decorativos.
+## brazos y los globos reciben su colisión de ColisionFaltante.
 static func columna_farol(raiz: Node3D, pos: Vector3, rot_y := 0.0) -> void:
 	var n := marco(raiz, Transform3D(Basis.from_euler(Vector3(0, rot_y, 0)), pos))
 	var verde := Color("2f4a3c")

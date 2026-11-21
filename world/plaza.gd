@@ -54,8 +54,9 @@ func _crear_piso() -> void:
 	# La tira de piso donde sale la rampa de la escalera: sólo se ve
 	var h := Edificios.hueco_subte()
 	var tira := Rect2(h.position.x, h.end.y, h.size.x, Edificios.hueco_subte(true).end.y - h.end.y)
-	Construir.caja_mat(piso, Vector3(tira.get_center().x, -0.5, tira.get_center().y), Vector3(tira.size.x, 1.0, tira.size.y),
+	var mi_tira := Construir.caja_mat(piso, Vector3(tira.get_center().x, -0.5, tira.get_center().y), Vector3(tira.size.x, 1.0, tira.size.y),
 		baldosas, false)
+	mi_tira.set_meta(&"atravesable", true)   # Si tuviera colisión, al subir la escalera la rampa chocaría con el borde
 	var r := Ciudad.PLAZA
 	# Avenida al sur (asfalto con líneas): cruza la manzana y llega hasta Bolívar y Paseo Colón
 	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(128, 0.01, 8), C_ASFALTO, false)
