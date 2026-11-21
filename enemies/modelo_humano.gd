@@ -225,7 +225,13 @@ func _malla_pintada(orig: Mesh, es_sombrero: bool) -> Mesh:
 					c = Color(c.r * p.r / maxf(b.r, 0.02), c.g * p.g / maxf(b.g, 0.02), c.b * p.b / maxf(b.b, 0.02))
 			cols[i] = c
 		arr[Mesh.ARRAY_COLOR] = cols
-		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+		# Los canales extra (CUSTOM0..3) vienen en floats: hay que pasar su formato, si no Godot los espera en
+		# bytes, rechaza la superficie y la persona queda sin cuerpo
+		var flags := 0
+		for sh: int in [Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT, Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT,
+				Mesh.ARRAY_FORMAT_CUSTOM2_SHIFT, Mesh.ARRAY_FORMAT_CUSTOM3_SHIFT]:
+			flags |= orig.surface_get_format(s) & (Mesh.ARRAY_FORMAT_CUSTOM_MASK << sh)
+		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr, [], {}, flags)
 	_mallas[clave] = am
 	return am
 
