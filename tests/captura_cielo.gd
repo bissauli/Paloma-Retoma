@@ -16,6 +16,10 @@ const CASOS := {
 	"noche": [23.0, Cielo.Clima.DESPEJADO, "plaza"],
 	"noche_calle": [1.0, Cielo.Clima.DESPEJADO, "calle"],
 	"noche_lluvia": [2.0, Cielo.Clima.LLUVIA, "aerea"],
+	# Sombras largas de la luna y del sol bajo sobre la avenida y el pasto del parque
+	"noche_avenida": [21.0, Cielo.Clima.LLUVIA, "avenida"],
+	"madrugada_avenida": [4.5, Cielo.Clima.LLUVIA, "avenida"],
+	"tarde_parque": [17.5, Cielo.Clima.DESPEJADO, "parque"],
 }
 const VISTAS := {
 	"plaza": [Vector3(0, 4, 32), Vector3(0, 30, -90)],
@@ -23,6 +27,8 @@ const VISTAS := {
 	"calle": [Vector3(-80, 2.2, -2), Vector3(-170, 8, -2)],
 	"este": [Vector3(-40, 6, 0), Vector3(60, 25, 10)],
 	"oeste": [Vector3(10, 5, 30), Vector3(-90, 22, 20)],
+	"avenida": [Vector3(-30, 1.3, 33), Vector3(10, 0.0, 26)],
+	"parque": [Vector3(-128, 2.5, -40), Vector3(-140, 0, -55)],
 }
 
 var salida := "user://"

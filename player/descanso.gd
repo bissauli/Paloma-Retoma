@@ -10,6 +10,7 @@ const SEPARACION := 0.45          ## Distancia mínima entre dos palomas sentada
 const PASO := 0.25                ## Paso de la grilla de búsqueda de superficies
 const RADIO_DISCO := 0.12
 const SALTO_MAX := 0.25           ## Desnivel máximo entre dos celdas vecinas
+const ALTO_LIBRE := 0.45          ## Lugar libre que necesita arriba una paloma sentada
 const ALCANCE_BALCONES := 16.0
 const DIRS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
 	Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]
@@ -146,7 +147,7 @@ static func _por_superficie(jugador: PalomaJugador, cantidad: int) -> Array[Vect
 			var x := pj.x + v.x * PASO
 			var z := pj.z + v.y * PASO
 			var y := _altura(espacio, q, x, y_ref + 0.4, z)
-			if is_nan(y) or absf(y - y_ref) > SALTO_MAX:
+			if is_nan(y) or absf(y - y_ref) > SALTO_MAX or _techo_bajo(espacio, x, y, z):
 				continue
 			alturas[v] = y
 			cola.append(v)
@@ -181,6 +182,14 @@ static func _altura(espacio: PhysicsDirectSpaceState3D, q: PhysicsShapeQueryPara
 	if r.size() < 2 or r[0] <= 0.0 or r[0] >= 1.0:
 		return NAN
 	return y_inicio - r[0] * 0.7 - 0.01
+
+
+## ¿Hay algo justo encima (el asiento de un banco, una mesa)? Ahí abajo no se sienta ninguna: para
+## llegar tenía que atravesarlo.
+static func _techo_bajo(espacio: PhysicsDirectSpaceState3D, x: float, y: float, z: float) -> bool:
+	var rq := PhysicsRayQueryParameters3D.create(Vector3(x, y + 0.05, z), Vector3(x, y + ALTO_LIBRE, z),
+		Construir.CAPA_MUNDO)
+	return not espacio.intersect_ray(rq).is_empty()
 
 
 static func _lejos_de(p: Vector3, pj: Vector3) -> bool:

@@ -333,6 +333,11 @@ func _mirar(v: Vector3, delta: float, rapidez: float) -> void:
 		cabeceo_obj = clampf(atan2(v.y, maxf(h.length(), 1.0)) * 0.6, -0.8, 0.6)
 		var giro := wrapf(_rumbo - rumbo_previo, -PI, PI) / maxf(delta, 0.001)
 		alabeo_obj = clampf(giro * 0.3, -0.6, 0.6)
+	# Al ras del piso no se inclina: el modelo gira desde las patas y la cabeza o la cola se metían
+	# en el piso
+	var libre := clampf((global_position.y - altura_suelo) / 0.5, 0.0, 1.0)
+	cabeceo_obj *= libre
+	alabeo_obj *= libre
 	_cabeceo = lerpf(_cabeceo, cabeceo_obj, minf(8.0 * delta, 1.0))
 	_alabeo = lerpf(_alabeo, alabeo_obj, minf(5.0 * delta, 1.0))
 	modelo.rotation = Vector3(_cabeceo, _rumbo, _alabeo)
@@ -394,6 +399,7 @@ func _paso_llanto(delta: float) -> void:
 ## Descanso de la jugadora: lugar donde se sienta (INF = ninguno) y si ya llegó.
 var puesto := Vector3.INF
 var sentada := false
+var _t_hacia_puesto := 0.0   ## Segundos volando hacia el puesto (ver paso_posada)
 
 
 ## Imita un emote de la jugadora (ver Bandada.imitar_baile): se queda en el lugar bailando.
@@ -516,6 +522,7 @@ func paso_posada(delta: float, rumbo: float) -> void:
 			_bailar_en_puesto(delta)
 			return
 	if dist < 0.06 or (sobre_caballito and dist < 0.35):
+		_t_hacia_puesto = 0.0
 		global_position = puesto
 		velocidad = Vector3.ZERO
 		sentada = true
@@ -528,8 +535,24 @@ func paso_posada(delta: float, rumbo: float) -> void:
 		return
 	sentada = false
 	var rapidez := clampf(dist * 3.0, 1.5, 10.0)
-	velocidad = d / dist * rapidez
-	global_position += velocidad * minf(delta, dist / rapidez)
+	# Vuela en arco (por encima de bancos, canteros y rejas) y baja derecho al final. Antes iba en
+	# línea recta sin chocar con nada y atravesaba lo que hubiera en el camino, piso incluido.
+	var plano := Vector2(d.x, d.z).length()
+	var meta := puesto + Vector3.UP * clampf((plano - 0.3) * 0.6, 0.0, 2.5)
+	var hacia := meta - global_position
+	if hacia.y > 0.0:
+		hacia.y *= 3.0   # Primero sube (empinado) y después planea hasta el puesto
+	var largo := maxf(hacia.length(), 0.001)
+	velocidad = hacia / largo * rapidez
+	var desp := velocidad * minf(delta, largo / rapidez)
+	_t_hacia_puesto += delta
+	if _t_hacia_puesto < 3.0:
+		mover_con_choques(desp)
+		_actualizar_suelo(delta, 0.2)
+		if global_position.y < altura_suelo and plano > 0.3:
+			global_position.y = altura_suelo
+	else:
+		global_position += desp   # Si se trabó contra algo, llega igual
 	modo_anim = 1 if dist > 0.4 else 0
 	_mirar(velocidad, delta, 8.0)
 	modelo.animar(delta, modo_anim, 0.0 if dist < 0.4 else rapidez)
@@ -573,6 +596,7 @@ func levantar() -> void:
 	modelo.rotation = Vector3(0.0, _rumbo, 0.0)
 	puesto = Vector3.INF
 	sentada = false
+	_t_hacia_puesto = 0.0
 	_timer_suelo = 0.0
 	velocidad = Vector3(randf_range(-1.0, 1.0), 3.0, randf_range(-1.0, 1.0))
 

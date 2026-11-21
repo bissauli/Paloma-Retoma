@@ -60,7 +60,8 @@ func _ready() -> void:
 	var cabildo := main.find_child("CabildoModelo", true, false) as MeshInstance3D
 	_check("el Cabildo es el modelo de Blender", cabildo != null and cabildo.mesh != null and cabildo.mesh.get_surface_count() >= 5)
 	var atras := espacio.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(-62, 5, 6), Vector3(-50, 5, 6)))
-	_check("el fondo del Cabildo es sólido", not atras.is_empty() and absf((atras["position"] as Vector3).x + 59.0) < 0.2)
+	# El fondo está al ras de las paredes de los costados (x = -57, ver tools/extraer_cabildo.gd)
+	_check("el fondo del Cabildo es sólido", not atras.is_empty() and absf((atras["position"] as Vector3).x + 57.0) < 0.2)
 	_check("cornisa del Cabildo a 9,3 m", absf(_altura_abajo(espacio, Vector3(-51, 12, 15.3)) - 9.3) < 0.05)
 
 	# ---- #4 Sin balcones dobles: ningún balcón del nivel medio cae sobre una losa del kit

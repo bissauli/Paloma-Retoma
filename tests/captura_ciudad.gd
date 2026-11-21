@@ -48,6 +48,16 @@ const VISTAS := {
 	"juegos_cerca": [Vector3(-102, 4.5, -82), Vector3(-104, 1.2, -95)],
 	"dueños": [Vector3(-147, 2.2, -30), Vector3(-154, 0.5, -36)],
 	"gatos": [Vector3(116, 9, 20), Vector3(124, 4, 30)],
+	# Revisión de bugs visuales: el fondo del Cabildo, el banco del arranque, el piso del parque y la avenida
+	"cabildo_so": [Vector3(-72, 18, 30), Vector3(-52, 4, 0)],
+	"cabildo_no": [Vector3(-72, 18, -30), Vector3(-52, 4, 0)],
+	"cabildo_fondo": [Vector3(-75, 6, 0), Vector3(-55, 5, 0)],
+	"cabildo_sur": [Vector3(-52, 9, 32), Vector3(-52, 5, 10)],
+	"cabildo_se": [Vector3(-36, 12, 30), Vector3(-50, 4, 8)],
+	"cabildo_jugador": [Vector3(-68, 13, 24), Vector3(-48, 4, 12)],
+	"banco_cabildo": [Vector3(-33.5, 2.2, 5.0), Vector3(-36, 0.3, 3)],
+	"parque_piso": [Vector3(-128, 2.5, -40), Vector3(-140, 0, -55)],
+	"avenida_cafes": [Vector3(-40, 1.5, 30), Vector3(10, 0.5, 30)],
 }
 
 var salida := "user://"

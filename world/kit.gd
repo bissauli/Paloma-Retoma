@@ -84,6 +84,19 @@ static var _mallas := {}
 static var _materiales := {}
 
 
+## Losetas de piso (pasto, caminos, plazas, pisos de goma, canchas): van sin contorno de tinta. Son
+## losas de 20 cm puestas una al lado de la otra y el contorno de cada una asomaba en las juntas
+## como una raya negra sobre el pasto (ver EstiloComic.lleva_contorno).
+const PREFIJOS_PISO := ["pasto", "camino_", "plaza_", "piso_", "cancha_"]
+
+
+static func es_piso(nombre: String) -> bool:
+	for p: String in PREFIJOS_PISO:
+		if nombre.begins_with(p):
+			return true
+	return false
+
+
 static func es_de_ciudad(nombre: String) -> bool:
 	return KitDatos.PIEZAS.has(nombre)
 
@@ -251,6 +264,8 @@ static func _instancia(padre: Node3D, nombre: String, t: Transform3D) -> MeshIns
 	mi.mesh = malla(nombre)
 	mi.material_override = material()
 	mi.set_meta(&"kit_pieza", nombre)   # Lo mira ColisionFaltante (ventanas, puertas...)
+	if es_piso(nombre):
+		mi.set_meta(&"sin_contorno", true)
 	padre.add_child(mi)
 	mi.transform = t
 	return mi

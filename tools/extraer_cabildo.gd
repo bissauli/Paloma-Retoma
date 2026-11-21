@@ -12,6 +12,14 @@ const AUMENTO := 8
 const COLUMNA_X := Vector2(-45.81, -44.99)
 const COLUMNA_ALTO := 4.81
 const COLUMNA_CORRIDA := 0.4
+## Fondo del Cabildo: en el modelo la fachada de atrás (ventanas, pilastras) está en x = -59, sobre una
+## caja lisa de 2 x 10 x 30 m (x -59..-57) que no tiene techo y asomaba 70 cm por arriba de la cornisa:
+## desde la avenida se veía como un muro pegado atrás. La fachada y la cara de afuera de la caja (que es
+## la pared) se corren 2 m hacia adentro, al ras del final de las paredes de los costados (x = -57), y
+## la caja queda toda por debajo de la cornisa.
+const FONDO_LIMITE := -58.0
+const FONDO_CORRIDA := 2.0
+const FONDO_TOPE := 9.3
 
 
 ## Corre hacia adentro los vértices de las dos columnas de las puntas (sólo las caras de la columna:
@@ -24,6 +32,35 @@ static func correr_columnas_esquina(v: PackedVector3Array) -> PackedVector3Array
 			continue
 		if absf(az - 14.62) < 0.04 or absf(az - 15.38) < 0.04:
 			v[i].z = signf(p.z) * (az - COLUMNA_CORRIDA)
+	return v
+
+
+## Corre la fachada de atrás al ras de las paredes (ver FONDO_CORRIDA).
+static func correr_fondo(v: PackedVector3Array) -> PackedVector3Array:
+	for i in v.size():
+		if v[i].x < FONDO_LIMITE:
+			v[i].x += FONDO_CORRIDA
+			v[i].y = minf(v[i].y, FONDO_TOPE)
+	return v
+
+
+## La caja lisa del fondo (24 vértices, de x = -59 hasta adentro del edificio).
+static func es_caja_fondo(v: PackedVector3Array) -> bool:
+	if v.size() != 24:
+		return false
+	var x_min := INF
+	for p in v:
+		x_min = minf(x_min, p.x)
+	return x_min < FONDO_LIMITE
+
+
+## Corre la fachada de atrás; si es la caja del fondo, además la baja entera hasta la cornisa.
+static func arreglar_fondo(v: PackedVector3Array) -> PackedVector3Array:
+	var caja := es_caja_fondo(v)
+	v = correr_fondo(v)
+	if caja:
+		for i in v.size():
+			v[i].y = minf(v[i].y, FONDO_TOPE)
 	return v
 
 
@@ -48,7 +85,7 @@ func _ready() -> void:
 			for i in v.size():
 				v[i] = t * v[i]
 				n[i] = (t.basis * n[i]).normalized()
-			a[Mesh.ARRAY_VERTEX] = correr_columnas_esquina(v)
+			a[Mesh.ARRAY_VERTEX] = arreglar_fondo(correr_columnas_esquina(v))
 			a[Mesh.ARRAY_NORMAL] = n
 			a[Mesh.ARRAY_TANGENT] = null
 			var std := mi.get_active_material(s) as BaseMaterial3D

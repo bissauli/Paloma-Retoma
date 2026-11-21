@@ -9,6 +9,11 @@ shader_type spatial;
 //   centro de la malla con w = 2 y se infla desde ahí (ver EstiloComic._suavizar()).
 // - Se empuja un poco hacia atrás (lejos de la cámara): así no asoma sobre el piso o la pared
 //   que está pegada (las rayas entre losas de pasto o de vereda vecinas), sólo contra lo de atrás.
+// - Se infla en el espacio de la cámara (no en el de recorte): antes se corría cada vértice en
+//   clip space proporcional a w, y en las mallas grandes que pasan por detrás de la cámara (la
+//   vereda fusionada de la avenida) los vértices con normales distintas a los dos lados del plano
+//   cercano hacían explotar el triángulo recortado: una cuña de tinta tapaba la calle al lado de
+//   la paloma. Un corrimiento en 3D siempre se proyecta bien.
 render_mode unshaded, cull_front, depth_draw_opaque, fog_disabled;
 
 uniform vec4 color_tinta : source_color = vec4(0.07, 0.05, 0.12, 1.0);
@@ -33,17 +38,19 @@ void vertex() {
 	}
 	vec3 pos_v = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	float dist = length(pos_v);
-	pos_v += pos_v / max(dist, 0.001) * dist * empuje;
-	vec4 clip = PROJECTION_MATRIX * vec4(pos_v, 1.0);
+	vec3 rayo = pos_v / max(dist, 0.001);
+	// Dirección de inflado: la normal sin la parte que va a lo largo del rayo de la cámara (esa no
+	// se ve en pantalla), así el grosor es el mismo mire para donde mire la cara
 	vec3 dir_v = mat3(MODELVIEW_MATRIX) * dir_obj;
-	vec2 dir_clip = (PROJECTION_MATRIX * vec4(dir_v, 0.0)).xy;
-	float largo = length(dir_clip);
-	vec2 dir = largo > 1e-5 ? dir_clip / largo : vec2(0.0);
+	vec3 dir = dir_v - dot(dir_v, rayo) * rayo;
+	float largo = length(dir);
+	dir = largo > 1e-5 ? dir / largo : vec3(0.0);
 	float lejos = smoothstep(afinar_desde, afinar_hasta, dist);
 	float px = grosor_px * VIEWPORT_SIZE.y / 1080.0 * mix(1.0, grosor_lejos, lejos) * comic_activo;
-	// px en pantalla -> en clip (x2 porque NDC va de -1 a 1), por w para que no dependa de la distancia
-	clip.xy += dir * px * 2.0 / VIEWPORT_SIZE * clip.w;
-	POSITION = clip;
+	// Metros que ocupa un píxel a esta profundidad (detrás de la cámara no se infla)
+	float m_por_px = 2.0 * max(-pos_v.z, 0.0) / (abs(PROJECTION_MATRIX[1][1]) * VIEWPORT_SIZE.y);
+	pos_v += dir * px * m_por_px + rayo * dist * empuje;
+	POSITION = PROJECTION_MATRIX * vec4(pos_v, 1.0);
 }
 
 void fragment() {

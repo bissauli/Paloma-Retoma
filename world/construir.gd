@@ -320,15 +320,17 @@ static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
 				# dibujar a esa distancia de la cámara
 				var rango := float(mi.get_meta(&"rango", 0.0))
 				var desde := float(mi.get_meta(&"rango_desde", 0.0))   # versiones "de lejos" (ver Kit)
-				var clave := "%d_%d_%s_%d_%d_%d" % [floori(centro.x / celda), floori(centro.z / celda), clave_mat,
-					mi.cast_shadow, roundi(rango), roundi(desde)]
+				# Los pisos sin contorno de tinta (ver Kit.es_piso) van aparte y siguen sin contorno
+				var sin_contorno := mi.has_meta(&"sin_contorno")
+				var clave := "%d_%d_%s_%d_%d_%d_%d" % [floori(centro.x / celda), floori(centro.z / celda), clave_mat,
+					mi.cast_shadow, roundi(rango), roundi(desde), int(sin_contorno)]
 				if not grupos.has(clave):
 					# La malla fusionada queda con su origen en el centro de la celda: así la distancia
 					# de dibujo (visibility_range) se mide desde ahí y no desde el origen del mundo
 					var origen := Vector3((floori(centro.x / celda) + 0.5) * celda, 0.0, (floori(centro.z / celda) + 0.5) * celda)
 					grupos[clave] = {"mat": material_vertices(rugosidad_de(mat)) if con_color else mat,
 						"color": con_color, "sombra": mi.cast_shadow, "rango": rango, "desde": desde, "origen": origen,
-						"piezas": []}
+						"sin_contorno": sin_contorno, "piezas": []}
 				var color: Color = mat.get_meta(&"color_plano") if con_color else Color.WHITE
 				var o: Vector3 = grupos[clave]["origen"]
 				(grupos[clave]["piezas"] as Array).append([mi.mesh, t.translated(-o), color])
@@ -344,6 +346,8 @@ static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
 		mi.mesh = combinar(g["piezas"], g["color"], not g["color"])
 		mi.material_override = g["mat"]
 		mi.cast_shadow = g["sombra"]
+		if g["sin_contorno"]:
+			mi.set_meta(&"sin_contorno", true)
 		if float(g["rango"]) > 0.0:
 			mi.visibility_range_end = float(g["rango"])
 			mi.visibility_range_end_margin = 4.0

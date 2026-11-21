@@ -210,16 +210,15 @@ static func cabildo(padre: Node3D) -> void:
 	Construir.colision(padre, Vector3(-46.5, 19.0, 0), linterna)
 	# El nombre va pintado en el frente de la torre, debajo del reloj (sobre una tablita del modelo)
 	_rot(Construir.cartel(padre, Vector3(-44.44, 11.2, 0), "CABILDO", Color("6b5a40"), 56), "y", PI / 2.0)
-	# Fondo cerrado (en el modelo, con sus ventanas)
-	_col_caja(padre, Vector3(-58.0, 5, 0), Vector3(2, 10, 30))
+	# El fondo (con sus ventanas) está en el modelo, al ras del cuerpo trasero (x = -57)
 	_cabildo_fondo(padre)
 
 
-## Lo que le faltaba al fondo del Cabildo (la pared del oeste, que está en x = -59): zócalo de piedra,
+## Lo que le faltaba al fondo del Cabildo (la pared del oeste, que está en x = -57): zócalo de piedra,
 ## pilastras entre las ventanas, una cinta entre los dos pisos, la cornisa de arriba y una puerta de
 ## servicio en el medio con su fronton y dos escalones. Todo decorativo (sin colisión).
 static func _cabildo_fondo(padre: Node3D) -> void:
-	const X := -59.0
+	const X := -57.0
 	var piedra := Color("c9bfa9")
 	var blanco := Color("f2ede2")
 	var sombra := Color("5a3b26")
