@@ -11,6 +11,7 @@ func _ready() -> void:
 	modelo.name = "Modelo"
 	modelo.personaje = "bandoneonista"
 	modelo.sentado = true
+	modelo.asiento_extra = ModeloHumano.EXTRA_BANCO
 	add_child(modelo)
 
 

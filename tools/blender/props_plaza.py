@@ -188,7 +188,6 @@ def fuente():
         P.add(mover(bollo((0.11, 0, 0.0), 0.035, (1, 1, 1), 1), M), "piedra_osc", 0.55, 0.7, True)
         arco = [Vector((math.cos(a) * (0.42 + 0.12 * t), math.sin(a) * (0.42 + 0.12 * t), 0.63 + 0.08 * math.sin(t * PI) - 0.2 * t * t))
                 for t in [i / 6 for i in range(7)]]
-        P.add(tubo_curva(arco, lambda t: 0.022 * (1 - 0.4 * t), 6), "agua", 0.4, 1.9, True)
     # taza grande festoneada (12 lóbulos) con borde y agua adentro
     P.add(torno([(0.18, 1.0), (0.45, 1.06), (0.68, 1.16), (0.74, 1.24), (0.7, 1.27), (0.62, 1.2), (0.2, 1.14)], seg=48,
                 ondas=(12, 0.045)), "piedra", 1.0, 1.27, True)
@@ -201,7 +200,6 @@ def fuente():
             t = i / 6
             r = 0.77 + 0.2 * t
             pts.append(Vector((math.cos(a) * r, math.sin(a) * r, 1.24 + 0.03 * math.sin(t * PI) - 0.8 * t * t)))
-        P.add(tubo_curva(pts, lambda t: 0.018 + 0.01 * t, 6), "agua", 0.4, 1.9, True)
         P.add(bollo((math.cos(a) * 0.97, math.sin(a) * 0.97, 0.45), 0.05, (1, 1, 0.35), 1), "agua", 0.4, 1.9, True)
     # fuste alto, taza chica y remate (piña) con chorro
     P.add(torno([(0.12, 1.2), (0.09, 1.3), (0.08, 1.5), (0.11, 1.55)], seg=16), "piedra", 1.2, 1.6, True)
@@ -220,7 +218,6 @@ def fuente():
             p = q0.lerp(q1, t)
             p.z += math.sin(t * PI) * 0.55
             pts.append(p)
-        P.add(tubo_curva(pts, lambda t: 0.012 + 0.008 * t, 6), "agua", 0.4, 1.9, True)
         P.add(bollo((q1.x, q1.y, 0.45), 0.045, (1, 1, 0.35), 1), "agua", 0.4, 1.9, True)
         P.add(cil((q0.x, q0.y, 0.6), (q0.x * 0.98, q0.y * 0.98, 0.665), 0.03, 0.025, 8), "metal", 0.6, 0.67, True)
     return P

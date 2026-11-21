@@ -49,7 +49,10 @@ func _crear_piso() -> void:
 	# ver world/ciudad.gd)
 	var baldosas := Construir.material_lajas("lajas_plaza", 5.0)
 	# Con el hueco de la escalera del subte (las lajas van en coordenadas del mundo: no se notan los cortes)
+	# Cada pedazo se agranda 2 cm para solaparse con el vecino: si no, en un ángulo bajo se cuela una línea
+	# negra (la rendija entre cajas) a lo largo de toda la plaza. Las lajas son iguales de los dos lados.
 	for r: Rect2 in Edificios.partir(Ciudad.PLAZA, Edificios.hueco_subte(true)):
+		r = r.grow(0.02)
 		Construir.caja_mat(piso, Vector3(r.get_center().x, -0.5, r.get_center().y), Vector3(r.size.x, 1.0, r.size.y), baldosas)
 	# La tira de piso donde sale la rampa de la escalera: sólo se ve
 	var h := Edificios.hueco_subte()

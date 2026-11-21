@@ -75,6 +75,9 @@ func _poblar() -> void:
 		var h := _humano("escolar", p_esc, 3.0, _generador("MigasCabildo"), 9.0)
 		h.velocidad = 1.4
 	_humano("turista", p_esc, 2.0, null, 99.0)
+	# Barrenderos con su escoba: uno por la plaza y otro por el Cabildo
+	for centro: Vector3 in [Vector3(-14, 0, 6), p_esc + Vector3(4, 0, -8)]:
+		_humano("barrendero", centro, 6.0, null, 99.0)
 	# Señoras en los bancos de la Catedral (de frente a la plaza)
 	var gen_cat := _generador("MigasCatedral")
 	for x in [-7.0, -3.0, 3.0]:
@@ -104,6 +107,15 @@ func _poblar() -> void:
 		s.rotation.y = float(p.get_meta("rumbo", 0.0))
 		s.position = p.global_position   # antes de add_child: en _ready toma su altura
 		add_child(s)
+	# Agentes de tránsito parados en las esquinas (los marca la ciudad), mirando hacia el cruce
+	for m in get_tree().get_nodes_in_group("puesto_agente"):
+		var p := m as Node3D
+		var a := ESC_HUMANO.instantiate() as Humano
+		a.tipo = "agente"
+		a.preparar_aspecto()
+		a.rotation.y = float(p.get_meta("rumbo", 0.0))
+		a.position = p.global_position   # antes de add_child: en _ready toma su altura
+		add_child(a)
 	for m in get_tree().get_nodes_in_group("zona_paseo"):
 		var p := m as Node3D
 		var tam: Vector2 = p.get_meta("tam", Vector2(10, 10))

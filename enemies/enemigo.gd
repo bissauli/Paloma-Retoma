@@ -14,6 +14,17 @@ var _ruta_hacia := Vector3.INF          ## Destino para el que se calculó la ru
 var _ruta_fin := Vector3.INF            ## Último punto de la ruta (hasta donde se puede llegar)
 var _ruta_timer := 0.0
 
+# Esquivar lo que tiene adelante cuando camina sin ruta de navegación (oficinistas que cruzan la plaza,
+# gente que huye, el mozo y el nene persiguiendo): un par de rayos contra el mundo a la altura de las
+# piernas, y si hay algo se desvía hacia el lado libre en vez de atravesarlo.
+const ESQUIVE_ALTURA := 0.6          ## Altura del rayo sobre los pies (cordones y losetas más bajos no cuentan)
+const ESQUIVE_RADIO := 0.4           ## Cuánto se separa de lo que esquiva
+const ESQUIVE_ANGULOS := [0.0, 0.6, -0.6, 1.1, -1.1, 1.6, -1.6, 2.2, -2.2]
+@export var esquivar_obstaculos := true
+var _lado_esquive := 1.0             ## Lado por el que viene rodeando (para no dudar de un lado al otro)
+var _t_trabado := 0.0                ## Cuánto lleva sin poder avanzar de frente
+var _t_sin_esquive := 0.0            ## Si se trabó demasiado, un rato camina derecho (mejor atravesar que quedar clavado)
+
 
 ## Acerca la velocidad actual a "objetivo". k = qué tan rápido responde (más alto, más brusco).
 func _acelerar(objetivo: Vector3, k: float, delta: float) -> void:
@@ -76,8 +87,52 @@ func _girar_hacia_velocidad(delta: float, k: float) -> void:
 
 ## Suma la velocidad a la posición dejándolo a la altura "y".
 func _avanzar(delta: float, y: float) -> void:
-	global_position += _vel * delta
+	global_position += _paso_libre(delta)
 	global_position.y = y
+
+
+## Lo que avanza este cuadro: la velocidad, desviada si hay una pared, un banco, un árbol o un puesto adelante.
+func _paso_libre(delta: float) -> Vector3:
+	var paso := _vel * delta
+	paso.y = 0.0
+	if not esquivar_obstaculos or not is_inside_tree() or paso.length_squared() < 0.000001:
+		return paso
+	if _t_sin_esquive > 0.0:
+		_t_sin_esquive -= delta
+		return paso
+	var espacio := get_world_3d().direct_space_state
+	var dir := paso.normalized()
+	var alcance := ESQUIVE_RADIO + maxf(paso.length(), 0.6)
+	if _libre(espacio, dir, alcance):
+		_t_trabado = maxf(_t_trabado - delta * 2.0, 0.0)
+		return paso
+	# Hay algo: prueba hacia los costados (primero del lado por el que ya venía rodeando)
+	for a: float in ESQUIVE_ANGULOS:
+		if a == 0.0:
+			continue
+		var ang := a * _lado_esquive
+		var d := dir.rotated(Vector3.UP, ang)
+		if _libre(espacio, d, alcance):
+			if a < 0.0:
+				_lado_esquive = -_lado_esquive
+			_t_trabado = maxf(_t_trabado - delta, 0.0)
+			return d * paso.length() * (1.0 if absf(ang) < 1.2 else 0.6)
+	_t_trabado += delta
+	if _t_trabado > 2.0:
+		_t_trabado = 0.0
+		_t_sin_esquive = 1.5
+	return Vector3.ZERO
+
+
+## ¿Se puede ir "alcance" metros hacia "dir" sin chocar con el mundo? Un rayo central y dos de costado.
+func _libre(espacio: PhysicsDirectSpaceState3D, dir: Vector3, alcance: float) -> bool:
+	var o := global_position + Vector3(0, ESQUIVE_ALTURA, 0)
+	var lado := dir.cross(Vector3.UP) * (ESQUIVE_RADIO * 0.7)
+	for desvio: Vector3 in [Vector3.ZERO, lado, -lado]:
+		var q := PhysicsRayQueryParameters3D.create(o + desvio, o + desvio + dir * alcance, Construir.CAPA_MUNDO)
+		if not espacio.intersect_ray(q).is_empty():
+			return false
+	return true
 
 
 ## ¿"hacia" (vector en el plano) cae dentro del cono de visión de "angulo" grados a cada lado?

@@ -59,7 +59,7 @@ func _ready() -> void:
 	for cosa: String in ["tanque", "pergola", "tendedero"]:
 		_check("terrazas: %s (%d >= 3)" % [cosa, n.get(cosa, 0)], n.get(cosa, 0) >= 3)
 	_check("antenas (%d >= 8)" % n.get("antena", 0), n.get("antena", 0) >= 8)
-	_check("banderas (%d >= 3)" % n.get("bandera", 0), n.get("bandera", 0) >= 3)
+	_check("banderas apagadas (%d == 0)" % n.get("bandera", 0), n.get("bandera", 0) == (3 if NivelAlto.BANDERAS else 0))
 	_check("postes (%d >= 15)" % n.get("poste", 0), n.get("poste", 0) >= 15)
 	_check("cables (%d >= 20)" % n.get("cable", 0), n.get("cable", 0) >= 20)
 	_check("miradores (%d, 4 o 5)" % NivelAlto.miradores.size(), NivelAlto.miradores.size() in [4, 5])

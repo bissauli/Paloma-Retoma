@@ -40,6 +40,7 @@ static func crear() -> Chico:
 
 func _ready() -> void:
 	add_to_group("chicos")
+	esquivar_obstaculos = false   # camina por su malla de navegación y se sube a los juegos
 	process_priority = 10
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_altura = global_position.y
