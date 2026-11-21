@@ -171,6 +171,7 @@ static func caja(padre: Node, pos: Vector3, tam: Vector3, color: Color, con_coli
 	var bm := BoxMesh.new()
 	bm.size = tam
 	var mi := _malla(padre, bm, pos, material(color), Vector3(0, rot_y, 0))
+	_sin_contorno_si_plano(mi, tam)
 	if con_colision:
 		var forma := BoxShape3D.new()
 		forma.size = tam
@@ -183,11 +184,20 @@ static func caja_mat(padre: Node, pos: Vector3, tam: Vector3, mat: Material, con
 	var bm := BoxMesh.new()
 	bm.size = tam
 	var mi := _malla(padre, bm, pos, mat)
+	_sin_contorno_si_plano(mi, tam)
 	if con_colision:
 		var forma := BoxShape3D.new()
 		forma.size = tam
 		colision(padre, pos, forma)
 	return mi
+
+
+## Las cajas finitas y anchas (marcas de la calle, sendas, cintas) son decoración pegada al piso: su
+## contorno de tinta asomaría alrededor como una raya negra. Van sin contorno (y por eso se fusionan
+## aparte de las piezas que sí lo llevan).
+static func _sin_contorno_si_plano(mi: MeshInstance3D, tam: Vector3) -> void:
+	if tam.y <= 0.06 and maxf(tam.x, tam.z) > 1.0:
+		mi.set_meta(&"sin_contorno", true)
 
 
 static func cilindro(padre: Node, pos: Vector3, radio: float, alto: float, color: Color,
