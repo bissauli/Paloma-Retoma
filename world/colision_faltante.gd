@@ -27,6 +27,9 @@ const CUBIERTO := 0.35            ## Fracción de la caja de la malla que ya tie
 const MIN_ESPESOR := 0.02
 const MIN_ALTO := 0.05
 const MARGEN_MAPA := 3.0
+const LOSA_ALTO := 0.3            ## Una losa de piso es así de baja...
+const LOSA_LADO := 0.8            ## ...y por lo menos así de ancha de cada lado
+const TAPA_TOLERANCIA := 0.015    ## Cuánto más abajo que la cara de arriba de una losa puede estar su colisión
 const ATRAVESABLES := ["ventana", "puerta", "cortina", "vidrio", "vidriera", "guirnalda"]
 const SCRIPTS_PERMITIDOS := ["casa_enterable.gd"]
 
@@ -169,7 +172,12 @@ static func _engordar(a: AABB) -> AABB:
 
 ## Si la caja "caja" (de una malla, en el mundo) ya está en buena parte dentro de colisiones del mundo.
 ## Cada forma se mira en su propio espacio (así una pared girada no "cubre" todo lo que está cerca).
+## Una losa de piso (baja y ancha: pasto, baldosas, tarimas) además tiene que tener la colisión a la altura
+## de su cara de arriba: el pasto de los canteros de la plaza (tapa a 10 cm) quedaba "cubierto" por la
+## colisión del borde de piedra (6 cm) y las palomas caminaban con las patas metidas en el pasto.
 static func _cubierta(caja: AABB, formas: Array, indice: Dictionary) -> bool:
+	if _es_losa(caja) and _tapa_colision(caja, formas, indice) < caja.end.y - TAPA_TOLERANCIA:
+		return false
 	var vistos := {}
 	var suma := 0.0
 	var piso := caja.position.y + caja.size.y * 0.4
@@ -193,6 +201,31 @@ static func _cubierta(caja: AABB, formas: Array, indice: Dictionary) -> bool:
 				if suma >= CUBIERTO:
 					return true
 	return false
+
+
+## ¿Es una losa de piso? Baja (hasta LOSA_ALTO) y ancha (LOSA_LADO o más de cada lado): ahí se camina
+## por arriba.
+static func _es_losa(caja: AABB) -> bool:
+	return caja.size.y <= LOSA_ALTO and minf(caja.size.x, caja.size.z) >= LOSA_LADO
+
+
+## Altura más alta de las colisiones que hay debajo del centro de la caja (de la base para arriba, sin
+## pasar la caja). -INF si no hay ninguna.
+static func _tapa_colision(caja: AABB, formas: Array, indice: Dictionary) -> float:
+	var c := caja.get_center()
+	var tapa := -INF
+	for i: int in indice.get(Vector2i(floori(c.x / CELDA), floori(c.z / CELDA)), []):
+		var f: Array = formas[i]
+		var mundo: AABB = f[2]
+		if mundo.end.y < caja.position.y - TAPA_TOLERANCIA or mundo.position.y > caja.end.y:
+			continue
+		# El centro de la losa tiene que caer adentro de la forma (mirada en su espacio)
+		var local: Vector3 = (f[0] as Transform3D) * Vector3(c.x, mundo.get_center().y, c.z)
+		var en_local: AABB = f[1]
+		if local.x < en_local.position.x or local.x > en_local.end.x or local.z < en_local.position.z or local.z > en_local.end.z:
+			continue
+		tapa = maxf(tapa, minf(mundo.end.y, caja.end.y))
+	return tapa
 
 
 ## La forma de colisión de una malla puesta con la transformación "gt": [forma, transformación].
