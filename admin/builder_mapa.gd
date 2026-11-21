@@ -597,6 +597,7 @@ func _confirmar(acciones: Array) -> void:
 		return
 	_hist.append(reales)
 	_rehacer.clear()
+	_refrescar_luces(reales.map(func(a: Dictionary) -> Node: return a["nodo"]))
 	if _hist.size() > 300:
 		_hist.pop_front()
 	_timer.start()
@@ -615,6 +616,17 @@ func _editar(cambio: Callable) -> void:
 		cambio.call(n)
 	_confirmar(acciones)
 	_estado_texto()
+
+
+## Si se tocó algún farol, rehace las luces de la noche para que no queden bolas de luz sin lámpara.
+func _refrescar_luces(nodos: Array) -> void:
+	for n in nodos:
+		if is_instance_valid(n) and (n as Node).has_meta(&"nombre_pieza") \
+				and LucesNoche.es_farol(String((n as Node).get_meta(&"nombre_pieza"))):
+			var ciudad := plaza.get_node_or_null("Ciudad") as Ciudad
+			if ciudad:
+				LucesNoche.reconstruir(ciudad)
+			return
 
 
 func _guardar() -> void:
@@ -643,6 +655,7 @@ func _deshacer_ultimo() -> void:
 		MapaOverrides.anotar(n)
 		if n.visible:
 			_sels.append(n)
+	_refrescar_luces(acc.map(func(a: Dictionary) -> Node: return a["nodo"]))
 	_timer.start()
 	_estado_texto()
 
@@ -661,6 +674,7 @@ func _rehacer_ultimo() -> void:
 		MapaOverrides.anotar(n)
 		if n.visible:
 			_sels.append(n)
+	_refrescar_luces(acc.map(func(a: Dictionary) -> Node: return a["nodo"]))
 	_timer.start()
 	_estado_texto()
 

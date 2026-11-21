@@ -767,9 +767,12 @@ func _golpear_adelante() -> int:
 	var sombreros := 0
 	for n in get_tree().get_nodes_in_group("humanos"):
 		var h := n as Humano
-		if h and _al_alcance(h.global_position, dir, ALCANCE_ALETAZO + 0.2) and h.sombrerazo(dir):
-			tiradas += 1
-			sombreros += 1
+		if h and _al_alcance(h.global_position, dir, ALCANCE_ALETAZO + 0.2):
+			if h.sombrerazo(dir):
+				tiradas += 1
+				sombreros += 1
+			else:
+				h.sobresaltar()   # Sin sombrero igual se sobresalta: deja de comer, de barrer, de dirigir el tránsito...
 	for n in get_tree().get_nodes_in_group("palomas_npc"):
 		var p := n as PalomaNPC
 		if p and p.modo == PalomaNPC.Modo.SUELTA and _al_alcance(p.global_position, dir):

@@ -176,9 +176,12 @@ static func cabildo(padre: Node3D) -> void:
 	# Cuerpo trasero y piso superior sobre la galería
 	_col_caja(padre, Vector3(-52.5, 4.5, 0), Vector3(9, 9, 30))
 	_col_caja(padre, Vector3(-46.5, 6.9, 0), Vector3(3, 4.2, 30))
-	# Columnas de la galería (planta baja)
+	# Columnas de la galería (planta baja). Las de las puntas van 0,4 m hacia adentro, al ras de las
+	# paredes de los costados (ver tools/extraer_cabildo.gd)
 	for i in 11:
-		_col_caja(padre, Vector3(x_frente - 0.4, 2.4, -15.0 + i * 3.0), Vector3(0.8, 4.8, 0.8))
+		var z := -15.0 + i * 3.0
+		z -= signf(z) * 0.4 if i == 0 or i == 10 else 0.0
+		_col_caja(padre, Vector3(x_frente - 0.4, 2.4, z), Vector3(0.8, 4.8, 0.8))
 	# Balconcitos del piso alto (para posarse)
 	for i in 10:
 		_col_caja(padre, Vector3(x_frente + 0.35, 5.5, -13.5 + i * 3.0), Vector3(0.7, 0.15, 1.5))
@@ -209,6 +212,37 @@ static func cabildo(padre: Node3D) -> void:
 	_rot(Construir.cartel(padre, Vector3(-44.44, 11.2, 0), "CABILDO", Color("6b5a40"), 56), "y", PI / 2.0)
 	# Fondo cerrado (en el modelo, con sus ventanas)
 	_col_caja(padre, Vector3(-58.0, 5, 0), Vector3(2, 10, 30))
+	_cabildo_fondo(padre)
+
+
+## Lo que le faltaba al fondo del Cabildo (la pared del oeste, que está en x = -59): zócalo de piedra,
+## pilastras entre las ventanas, una cinta entre los dos pisos, la cornisa de arriba y una puerta de
+## servicio en el medio con su fronton y dos escalones. Todo decorativo (sin colisión).
+static func _cabildo_fondo(padre: Node3D) -> void:
+	const X := -59.0
+	var piedra := Color("c9bfa9")
+	var blanco := Color("f2ede2")
+	var sombra := Color("5a3b26")
+	# Zócalo corrido y cinta entre pisos
+	Construir.caja(padre, Vector3(X - 0.14, 0.45, 0), Vector3(0.28, 0.9, 31.0), piedra, false)
+	Construir.caja(padre, Vector3(X - 0.1, 4.5, 0), Vector3(0.2, 0.3, 31.0), blanco, false)
+	# Pilastras entre ventanas (11, una cada 3 m, las de las puntas son las esquinas)
+	for i in 11:
+		var z := -15.0 + i * 3.0
+		Construir.caja(padre, Vector3(X - 0.1, 5.0, z), Vector3(0.2, 8.2, 0.55), blanco, false)
+		Construir.caja(padre, Vector3(X - 0.16, 0.95, z), Vector3(0.32, 0.12, 0.7), piedra, false)   # basa
+		Construir.caja(padre, Vector3(X - 0.16, 9.1, z), Vector3(0.32, 0.12, 0.7), piedra, false)    # capitel
+	# Cornisa con alero
+	Construir.caja(padre, Vector3(X - 0.3, 9.45, 0), Vector3(0.6, 0.22, 31.4), blanco, false)
+	Construir.caja(padre, Vector3(X - 0.2, 9.25, 0), Vector3(0.4, 0.18, 31.0), piedra, false)
+	# Puerta de servicio en el medio: marco, hoja, dintel, fronton y dos escalones
+	Construir.caja(padre, Vector3(X - 0.1, 1.55, 0), Vector3(0.2, 3.1, 2.0), blanco, false)
+	Construir.caja(padre, Vector3(X - 0.2, 1.4, 0), Vector3(0.2, 2.8, 1.5), sombra, false)
+	Construir.caja(padre, Vector3(X - 0.22, 3.35, 0), Vector3(0.4, 0.3, 2.6), piedra, false)
+	var fronton := Construir.prisma(padre, Vector3(X - 0.22, 3.95, 0), Vector3(2.6, 0.9, 0.4), blanco)
+	fronton.rotation = Vector3(0, PI / 2.0, 0)
+	Construir.caja(padre, Vector3(X - 0.5, 0.1, 0), Vector3(1.0, 0.2, 2.6), piedra, false)
+	Construir.caja(padre, Vector3(X - 0.9, 0.05, 0), Vector3(0.8, 0.1, 2.9), piedra, false)
 
 
 ## Sólo colisión (caja), sin malla: la parte visual la pone un modelo de Blender.
@@ -218,7 +252,7 @@ static func _col_caja(padre: Node3D, pos: Vector3, tam: Vector3) -> void:
 	Construir.colision(padre, pos, forma)
 
 
-## Norte: la Catedral, con columnas, frontón y escalinata.
+## Norte: la Catedral, con columnas, fronton y escalinata.
 static func catedral(padre: Node3D) -> void:
 	# Cuerpo
 	Construir.caja(padre, Vector3(0, 7.5, -35.5), Vector3(32, 15, 9), C_CREMA)
@@ -234,7 +268,7 @@ static func catedral(padre: Node3D) -> void:
 	for i in 12:
 		var x := -13.75 + i * 2.5
 		Construir.cilindro(padre, Vector3(x, 6.5, -27.0), 0.55, 9.0, Color("f2ead9"), true, 8)
-	# Entablamento y frontón triangular
+	# Entablamento y fronton triangular
 	Construir.caja(padre, Vector3(0, 11.8, -28.5), Vector3(32.4, 1.6, 5.2), C_BLANCO)
 	Construir.prisma(padre, Vector3(0, 14.1, -28.5), Vector3(32.4, 3.0, 5.0), C_CREMA, Vector3.ZERO, true)
 	# Puerta
@@ -256,6 +290,19 @@ static func catedral(padre: Node3D) -> void:
 		var forma_esc := BoxShape3D.new()
 		forma_esc.size = Vector3(30, alto_col, HUELLA)
 		Construir.colision(padre, Vector3(0, alto_col / 2.0, z), forma_esc)
+		# Borde (nariz) del escalón: una cinta clara apenas más alta y saliente, que marca cada peldaño
+		Construir.caja(padre, Vector3(0, alto - 0.03, z + HUELLA / 2.0 - 0.03), Vector3(30, 0.06, 0.08),
+			Color("f7f2e8"), false)
+		# Pretiles de piedra a los dos lados: siguen la pendiente (cada tramo 50 cm más alto que su escalón)
+		# y tienen colisión: la paloma se posa en ellos
+		for lado: float in [-1.0, 1.0]:
+			Construir.caja(padre, Vector3(15.5 * lado, (alto + 0.5) / 2.0, z), Vector3(1.0, alto + 0.5, HUELLA), C_BLANCO)
+	# Pilares de arranque al pie de los pretiles: pedestal, remate y una esfera de piedra
+	for lado: float in [-1.0, 1.0]:
+		var xp := 15.5 * lado
+		Construir.caja(padre, Vector3(xp, 0.55, Z_PIE + 0.35), Vector3(1.4, 1.1, 1.4), C_BLANCO)
+		Construir.caja(padre, Vector3(xp, 1.175, Z_PIE + 0.35), Vector3(1.7, 0.15, 1.7), Color("f7f2e8"), false)
+		Construir.esfera(padre, Vector3(xp, 1.62, Z_PIE + 0.35), 0.42, Color("f2ead9"), Vector3.ONE, 12)
 	# Rampa: de (z = pie + media huella, y = 0) hasta (z = arriba, y = 2.0)
 	var z0 := Z_PIE + HUELLA * 0.5
 	var z1 := z0 - HUELLA * PELDANOS
@@ -434,7 +481,7 @@ static func casa_rosada(padre: Node3D) -> Vector3:
 	# Cuerpo principal
 	Construir.caja(padre, Vector3(52.5, 6.5, 0), Vector3(17, 13, 40), C_ROSADA)
 	Construir.caja(padre, Vector3(52.0, 13.2, 0), Vector3(18, 0.4, 41), C_ROSADA_OSC)
-	# Cuerpo central que sobresale, más alto, con frontón
+	# Cuerpo central que sobresale, más alto, con fronton
 	Construir.caja(padre, Vector3(42.5, 7.5, 0), Vector3(3, 15, 12), C_ROSADA)
 	Construir.caja(padre, Vector3(42.3, 15.2, 0), Vector3(3.6, 0.4, 12.6), C_ROSADA_OSC)
 	Construir.prisma(padre, Vector3(42.5, 16.6, 0), Vector3(12, 2.4, 3), C_ROSADA, Vector3(0, PI / 2.0, 0), true)

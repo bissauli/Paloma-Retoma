@@ -238,16 +238,17 @@ static func _techo_chapa(n: Node3D, w: float, prof: float, h: float, pared: Colo
 		forma.points = pm.get_faces()
 		NivelMedio.colision(n, forma, mi.transform)
 	# La chapa: apoya en la parte de arriba del frente y del fondo, con alero en los cuatro lados
-	var ang := atan2(sube, prof)
+	# Gira alrededor de X con signo negativo: el lado de atrás (-Z) tiene que BAJAR, como el hastial
+	var ang := -atan2(sube, prof)
 	var largo := sqrt(prof * prof + sube * sube) + 0.6
 	var b := Basis.from_euler(Vector3(ang, 0, 0))
 	var centro := Vector3(0, h + sube / 2.0 + ESPESOR_CHAPA / 2.0 + 0.01, -prof / 2.0)
 	var color := c("chapa") if rng.randf() < 0.7 else c("oxido")
-	NivelMedio.caja(n, centro, Vector3(w + 0.5, ESPESOR_CHAPA, largo), color, true, Vector3(ang, 0, 0))
+	NivelMedio.caja(n, centro, Vector3(w + 0.06, ESPESOR_CHAPA, largo), color, true, Vector3(ang, 0, 0))
 	# Nervaduras de la chapa (sin colisión) y alguna chapa oxidada suelta
-	var nerv := maxi(int((w + 0.5) / 0.45), 2)
+	var nerv := maxi(int((w + 0.06) / 0.45), 2)
 	for i in nerv:
-		var x := -(w + 0.5) / 2.0 + (i + 0.5) * (w + 0.5) / nerv
+		var x := -(w + 0.06) / 2.0 + (i + 0.5) * (w + 0.06) / nerv
 		NivelMedio.caja(n, centro + b * Vector3(x, ESPESOR_CHAPA / 2.0 + 0.02, 0), Vector3(0.05, 0.04, largo), color.darkened(0.15),
 			false, Vector3(ang, 0, 0), true)
 	if rng.randf() < 0.5:
@@ -255,7 +256,7 @@ static func _techo_chapa(n: Node3D, w: float, prof: float, h: float, pared: Colo
 		NivelMedio.caja(n, centro + b * Vector3(x, ESPESOR_CHAPA / 2.0 + 0.045, rng.randf_range(-1.5, 1.5)),
 			Vector3(1.0, 0.012, 1.6), c("oxido"), false, Vector3(ang, 0, 0), true)
 	# Canaleta atrás y unos ladrillos encima para que no se vuele (clásico)
-	NivelMedio.caja(n, centro + b * Vector3(0, -0.02, -largo / 2.0 + 0.05), Vector3(w + 0.5, 0.12, 0.14), c("cano"), false,
+	NivelMedio.caja(n, centro + b * Vector3(0, -0.02, -largo / 2.0 + 0.05), Vector3(w + 0.06, 0.12, 0.14), c("cano"), false,
 		Vector3(ang, 0, 0), true)
 	for k in rng.randi_range(0, 3):
 		var q := Vector3(rng.randf_range(-w / 2.0 + 0.6, w / 2.0 - 0.6), ESPESOR_CHAPA / 2.0 + 0.08, rng.randf_range(-largo / 3.0, largo / 3.0))

@@ -105,6 +105,15 @@ static func farol_directo(padre: Node3D, cabeza: Vector3, suelo_y: float) -> voi
 	n.add_child(charco(Vector3(cabeza.x, suelo_y + 0.05, cabeza.z), Vector2(9.0, 9.0)))
 
 
+## Rehace las luces fijas (el builder lo llama cuando mueve o borra un farol).
+static func reconstruir(ciudad: Ciudad) -> void:
+	var viejo := ciudad.get_node_or_null("LucesNoche")
+	if viejo:
+		ciudad.remove_child(viejo)
+		viejo.queue_free()
+	construir(ciudad)
+
+
 ## Arma las luces fijas de la ciudad: faroles, postes y algunas ventanas. Lo llama Ciudad al final.
 static func construir(ciudad: Ciudad) -> void:
 	var nodo := LucesNoche.new()
@@ -120,6 +129,12 @@ static func construir(ciudad: Ciudad) -> void:
 	var lamparas: Array = []
 	for f: Array in ciudad.luces_fijas:
 		var t: Transform3D = f[1]
+		if f.size() > 2 and f[2] != null:
+			# Modo builder: la luz sigue a su farol (si lo borraron no queda una bola de luz flotando)
+			var w := f[2] as Node3D
+			if not is_instance_valid(w) or not w.visible:
+				continue
+			t = w.transform
 		var cab: Vector3 = t * cabeza_local(String(f[0]))
 		lamparas.append([cab, t.origin.y, 1.0 if String(f[0]).begins_with("farola") else 0.7])
 	lamparas.append_array(faroles_extra)

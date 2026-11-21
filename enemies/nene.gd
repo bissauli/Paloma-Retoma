@@ -67,7 +67,7 @@ func _physics_process(delta: float) -> void:
 			_acelerar(Vector3.ZERO, 3.0, delta)
 			if _t <= 0.0:
 				estado = Estado.PASEO
-	global_position += _vel * delta
+	global_position += _paso_libre(delta)
 	global_position.y = 0.0
 	_girar_hacia_velocidad(delta, 8.0)
 	modelo.rotation.y = _rumbo

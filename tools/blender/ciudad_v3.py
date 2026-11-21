@@ -738,12 +738,7 @@ def extra_comisaria(F, H, rng):
     e, d = letrero(F, W, 3.65, "policia", "escudo", "comisaria", ancho=8.0)
     est += e
     det += d
-    # Mástil con la bandera en la azotea, sobre el frente
-    x = W / 2 - 1.0
-    det.append(P(bm_cyl((x, 0.8, H), (x, 0.8, H + 5.0), 0.05, 0.04, 8), "cano"))
-    for k, c in enumerate(("fachada_cielo", "blanco", "fachada_cielo")):
-        det.append(P(bm_box(1.6, 0.03, 0.32, x - 0.82, 0.8, H + 4.55 - k * 0.32), c))
-    det.append(P(bm_cyl((x - 0.82, 0.78, H + 4.39), (x - 0.82, 0.76, H + 4.39), 0.08, 0.08, 8), "plastico_amarillo"))
+    # (el mástil con la bandera de la azotea está sacado por ahora: se vuelve a poner más adelante)
     # Baliza azul en el frente
     det.append(P(bm_box(1.2, 0.3, 0.2, 0, 0.3, H + PRETIL + TAPA), "policia"))
     det.append(P(bm_box(0.4, 0.32, 0.2, -0.4, 0.3, H + PRETIL + TAPA + 0.01), "luz_roja"))

@@ -6,6 +6,25 @@ extends Node
 
 const SALIDA := "res://modelos/cabildo/cabildo.res"
 const AUMENTO := 8
+## Columnas de las puntas de la galería del frente: en el modelo están centradas sobre la línea de las
+## paredes de los costados (z = ±15) y la mitad quedaba afuera del edificio. Se corren 0,4 m hacia
+## adentro para que la cara de afuera quede al ras de la pared.
+const COLUMNA_X := Vector2(-45.81, -44.99)
+const COLUMNA_ALTO := 4.81
+const COLUMNA_CORRIDA := 0.4
+
+
+## Corre hacia adentro los vértices de las dos columnas de las puntas (sólo las caras de la columna:
+## |z| ≈ 14,6 y ≈ 15,4; lo que está justo en z = ±15 es la pared y no se toca).
+static func correr_columnas_esquina(v: PackedVector3Array) -> PackedVector3Array:
+	for i in v.size():
+		var p := v[i]
+		var az := absf(p.z)
+		if p.x < COLUMNA_X.x or p.x > COLUMNA_X.y or p.y > COLUMNA_ALTO:
+			continue
+		if absf(az - 14.62) < 0.04 or absf(az - 15.38) < 0.04:
+			v[i].z = signf(p.z) * (az - COLUMNA_CORRIDA)
+	return v
 
 
 func _ready() -> void:
@@ -29,7 +48,7 @@ func _ready() -> void:
 			for i in v.size():
 				v[i] = t * v[i]
 				n[i] = (t.basis * n[i]).normalized()
-			a[Mesh.ARRAY_VERTEX] = v
+			a[Mesh.ARRAY_VERTEX] = correr_columnas_esquina(v)
 			a[Mesh.ARRAY_NORMAL] = n
 			a[Mesh.ARRAY_TANGENT] = null
 			var std := mi.get_active_material(s) as BaseMaterial3D

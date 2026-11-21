@@ -68,7 +68,7 @@ func _physics_process(delta: float) -> void:
 				estado = Estado.PATRULLA
 			else:
 				_ir_hacia(base, velocidad_patrulla * 1.5, 4.0, delta)
-	global_position += _vel * delta
+	global_position += _paso_libre(delta)
 	_girar_hacia_velocidad(delta, 8.0)
 	modelo.rotation.y = _rumbo
 	modelo.animar(delta, _vel.length(), estado == Estado.PERSIGUE)

@@ -15,11 +15,19 @@ extends Node3D
 
 ## Por capa: radio en X y en Z de la elipse, alto de las torres (mín, máx), cuánto sigue a la cámara y
 ## cuánto se lava con la bruma (0 = color propio, 1 = color de la niebla).
+## Los anillos son rectángulos redondeados (superelipses, "forma": 2 = elipse, más alto = más cuadrado),
+## no elipses: los edificios de fondo (Ciudad._fondo) llegan a x ±269 y z ±184, y una elipse se metía
+## entre ellos. El primer anillo no se mueve (sigue = 0) y va pegado a esos edificios, casi rectangular:
+## tapa el piso que quedaba entre la última fila y las siluetas. Los otros tres tienen paralaje y sus
+## radios están elegidos para no tocar los edificios: en Z nunca (la cámara llega a ±112) y en X sólo
+## del lado de enfrente cuando se vuela pegado al borde, a más de ~390 m (fuera del alcance de la
+## cámara, 400 m, o metido en la niebla). Entre ellos sí se pueden cruzar: son todas siluetas.
 const CAPAS := [
-	{"radio": Vector2(262, 196), "alto": Vector2(16, 46), "sigue": 0.35, "bruma": 0.30, "ancho": Vector2(12, 24)},
-	{"radio": Vector2(298, 238), "alto": Vector2(24, 64), "sigue": 0.55, "bruma": 0.50, "ancho": Vector2(14, 28)},
-	{"radio": Vector2(332, 280), "alto": Vector2(34, 86), "sigue": 0.72, "bruma": 0.68, "ancho": Vector2(16, 34)},
-	{"radio": Vector2(358, 318), "alto": Vector2(46, 118), "sigue": 0.86, "bruma": 0.82, "ancho": Vector2(20, 40)},
+	{"radio": Vector2(292, 207), "alto": Vector2(16, 46), "sigue": 0.0, "bruma": 0.30, "ancho": Vector2(12, 24), "forma": 40.0,
+		"fondo": Vector2(38, 44), "giro": 0.04},
+	{"radio": Vector2(328, 240), "alto": Vector2(24, 64), "sigue": 0.30, "bruma": 0.50, "ancho": Vector2(14, 28), "forma": 6.0},
+	{"radio": Vector2(359, 262), "alto": Vector2(34, 86), "sigue": 0.50, "bruma": 0.68, "ancho": Vector2(16, 34), "forma": 6.0},
+	{"radio": Vector2(386, 290), "alto": Vector2(46, 118), "sigue": 0.68, "bruma": 0.82, "ancho": Vector2(20, 40), "forma": 6.0},
 ]
 ## Colores propios de las siluetas (de adelante hacia atrás): grises lavanda y celestes de la paleta.
 const COLORES := [Color("8e8aa8"), Color("9a9cbc"), Color("a8b0cc"), Color("b4bed6")]
@@ -113,18 +121,47 @@ func _anillo(capa: Dictionary, rng: RandomNumberGenerator, ventanas: Variant) ->
 	var radio: Vector2 = capa["radio"]
 	var alto: Vector2 = capa["alto"]
 	var ancho: Vector2 = capa["ancho"]
-	var perimetro := PI * (3.0 * (radio.x + radio.y) - sqrt((3.0 * radio.x + radio.y) * (radio.x + 3.0 * radio.y)))
-	var n := int(perimetro / ((ancho.x + ancho.y) / 2.0 * 0.82))
+	var forma: float = capa["forma"]
+	# Contorno de la superelipse muestreado fino, para repartir las torres a distancias iguales
+	var contorno := PackedVector2Array()
+	var largos := PackedFloat32Array()
+	var total := 0.0
+	const MUESTRAS := 1440
+	for i in MUESTRAS + 1:
+		var t := TAU * i / MUESTRAS
+		var q := Vector2(signf(cos(t)) * pow(absf(cos(t)), 2.0 / forma) * radio.x,
+			signf(sin(t)) * pow(absf(sin(t)), 2.0 / forma) * radio.y)
+		if i > 0:
+			total += q.distance_to(contorno[i - 1])
+		contorno.append(q)
+		largos.append(total)
+	var n := int(total / ((ancho.x + ancho.y) / 2.0 * 0.82))
+	var j := 0
 	for i in n:
-		var a := TAU * (i + rng.randf_range(-0.3, 0.3)) / n
-		var c := Vector3(cos(a) * radio.x, 0.0, sin(a) * radio.y)
-		var w := rng.randf_range(ancho.x, ancho.y)
+		var objetivo := total * (i + rng.randf_range(-0.3, 0.3)) / n
+		objetivo = fposmod(objetivo, total)
+		while j > 0 and largos[j] > objetivo:
+			j -= 1
+		while j < MUESTRAS and largos[j + 1] < objetivo:
+			j += 1
+		var q2 := contorno[j]
+		var c := Vector3(q2.x, 0.0, q2.y)
+		var a := atan2(q2.y, q2.x)
+		# Hacia dónde mira el borde (la normal de la superelipse): en el anillo pegado a los edificios las
+		# torres van alineadas con el borde, así no quedan huecos con el piso a la vista
+		var nx := signf(q2.x) * pow(absf(q2.x) / radio.x, forma - 1.0) / radio.x
+		var nz := signf(q2.y) * pow(absf(q2.y) / radio.y, forma - 1.0) / radio.y
+		var a_borde := atan2(nz, nx)
+		# La caja gira -a_borde: su X local (w) va hacia afuera y su Z local (d) a lo largo del borde
+		var fondo: Vector2 = capa.get("fondo", ancho)
+		var w := rng.randf_range(fondo.x, fondo.y)
 		var d := rng.randf_range(ancho.x, ancho.y)
 		var h := rng.randf_range(alto.x, alto.y)
 		# De vez en cuando un rascacielos bien alto
 		if rng.randf() < 0.08:
 			h *= 1.6
-		var giro := -a + rng.randf_range(-0.3, 0.3)
+		var desvio: float = capa.get("giro", 0.3)
+		var giro := -a_borde + rng.randf_range(-desvio, desvio)
 		var b := Basis.from_euler(Vector3(0, giro, 0))
 		var tono := rng.randf_range(0.86, 1.08)
 		_caja(st, c + Vector3(0, h / 2.0, 0), Vector3(w, h, d), b, tono)
@@ -142,12 +179,12 @@ func _anillo(capa: Dictionary, rng: RandomNumberGenerator, ventanas: Variant) ->
 			_caja(st, c + Vector3(0, h + 2.0, 0), Vector3(w * 0.5, 4.0, d * 0.5), b * Basis(Vector3.UP, PI / 4.0), tono * 1.05)
 		if ventanas is PackedVector3Array and rng.randf() < 0.7:
 			# Ventanitas en la cara que mira al centro (para la noche)
-			var hacia := -Vector3(cos(a), 0, sin(a))
+			var hacia := -Vector3(cos(a_borde), 0, sin(a_borde))
 			for k in rng.randi_range(4, 12):
-				var u := rng.randf_range(-w * 0.4, w * 0.4)
+				var u := rng.randf_range(-d * 0.4, d * 0.4)
 				var y := rng.randf_range(3.0, h * 0.9)
 				var lado := hacia.cross(Vector3.UP).normalized()
-				(ventanas as PackedVector3Array).append(c + hacia * (d * 0.5 + 0.3) + lado * u + Vector3(0, y, 0))
+				(ventanas as PackedVector3Array).append(c + hacia * (w * 0.5 + 0.3) + lado * u + Vector3(0, y, 0))
 				(ventanas as PackedVector3Array).append(hacia)
 	st.generate_normals()
 	return st.commit()

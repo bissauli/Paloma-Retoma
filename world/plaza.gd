@@ -20,6 +20,8 @@ func _ready() -> void:
 	_crear_piso()
 	_crear_limites()
 	_crear_zonas()
+	# Todo lo de la plaza que se ve tiene colisión (ver ColisionFaltante; la ciudad hace lo suyo)
+	ColisionFaltante.completar(self)
 	# Miles de piezas fijas (edificios, árboles, bancos...) pasan a ser unas pocas mallas grandes
 	Construir.fusionar_estaticas(self)
 
@@ -47,13 +49,17 @@ func _crear_piso() -> void:
 	# ver world/ciudad.gd)
 	var baldosas := Construir.material_lajas("lajas_plaza", 5.0)
 	# Con el hueco de la escalera del subte (las lajas van en coordenadas del mundo: no se notan los cortes)
+	# Cada pedazo se agranda 2 cm para solaparse con el vecino: si no, en un ángulo bajo se cuela una línea
+	# negra (la rendija entre cajas) a lo largo de toda la plaza. Las lajas son iguales de los dos lados.
 	for r: Rect2 in Edificios.partir(Ciudad.PLAZA, Edificios.hueco_subte(true)):
+		r = r.grow(0.02)
 		Construir.caja_mat(piso, Vector3(r.get_center().x, -0.5, r.get_center().y), Vector3(r.size.x, 1.0, r.size.y), baldosas)
 	# La tira de piso donde sale la rampa de la escalera: sólo se ve
 	var h := Edificios.hueco_subte()
 	var tira := Rect2(h.position.x, h.end.y, h.size.x, Edificios.hueco_subte(true).end.y - h.end.y)
-	Construir.caja_mat(piso, Vector3(tira.get_center().x, -0.5, tira.get_center().y), Vector3(tira.size.x, 1.0, tira.size.y),
+	var mi_tira := Construir.caja_mat(piso, Vector3(tira.get_center().x, -0.5, tira.get_center().y), Vector3(tira.size.x, 1.0, tira.size.y),
 		baldosas, false)
+	mi_tira.set_meta(&"atravesable", true)   # Si tuviera colisión, al subir la escalera la rampa chocaría con el borde
 	var r := Ciudad.PLAZA
 	# Avenida al sur (asfalto con líneas): cruza la manzana y llega hasta Bolívar y Paseo Colón
 	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(128, 0.01, 8), C_ASFALTO, false)
@@ -102,7 +108,7 @@ func _crear_zonas() -> void:
 	Edificios.subte(edif, Edificios.SUBTE)
 	posicion_balcon = Edificios.casa_rosada(edif)
 	var mesas := Edificios.cafes(edif)
-	# Nivel inferior (Fase 1): pasajes entre los cafés, galería del Cabildo y mercado
+	# Nivel inferior (Fase 1): pasajes entre los cafés y mercado
 	NivelInferior.armar(self)
 	# La ciudad alrededor de la plaza (mapa V2): arma y fusiona sus propias piezas
 	add_child(Ciudad.new())

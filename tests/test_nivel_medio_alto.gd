@@ -44,8 +44,9 @@ func _ready() -> void:
 				print("    sin colisión: %s en %s (%.2f)" % [tipo, p, y])
 		_check("%s: colisión arriba (%d de %d)" % [tipo, ok, total], total > 0 and ok == total)
 	for p: Vector3 in NivelMedio.FAROLES_PLAZA:
-		var y := _altura_abajo(espacio, p + Vector3(0, 3.0, 0))
-		_check("farol en %s: base con colisión (%.2f m)" % [p, y], absf(y - 0.9) < 0.05)
+		# Al costado del fuste (que ahora también es sólido): el escalón de la base, donde se posa
+		var y := _altura_abajo(espacio, p + Vector3(0.3, 3.0, 0))
+		_check("farol en %s: base con colisión (%.2f m)" % [p, y], y > 0.85 and y < 1.0)
 	for p: Vector3 in NivelMedio.ARBOLES_ALTOS:
 		var y := _altura_abajo(espacio, p + Vector3(0, 14.0, 0))
 		_check("árbol alto en %s: copa con colisión entre 6 y 10 m (%.2f)" % [p, y], y > 6.0 and y < 10.5)
@@ -58,7 +59,7 @@ func _ready() -> void:
 	for cosa: String in ["tanque", "pergola", "tendedero"]:
 		_check("terrazas: %s (%d >= 3)" % [cosa, n.get(cosa, 0)], n.get(cosa, 0) >= 3)
 	_check("antenas (%d >= 8)" % n.get("antena", 0), n.get("antena", 0) >= 8)
-	_check("banderas (%d >= 3)" % n.get("bandera", 0), n.get("bandera", 0) >= 3)
+	_check("banderas apagadas (%d == 0)" % n.get("bandera", 0), n.get("bandera", 0) == (3 if NivelAlto.BANDERAS else 0))
 	_check("postes (%d >= 15)" % n.get("poste", 0), n.get("poste", 0) >= 15)
 	_check("cables (%d >= 20)" % n.get("cable", 0), n.get("cable", 0) >= 20)
 	_check("miradores (%d, 4 o 5)" % NivelAlto.miradores.size(), NivelAlto.miradores.size() in [4, 5])

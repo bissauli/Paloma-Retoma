@@ -250,6 +250,7 @@ static func _instancia(padre: Node3D, nombre: String, t: Transform3D) -> MeshIns
 	var mi := MeshInstance3D.new()
 	mi.mesh = malla(nombre)
 	mi.material_override = material()
+	mi.set_meta(&"kit_pieza", nombre)   # Lo mira ColisionFaltante (ventanas, puertas...)
 	padre.add_child(mi)
 	mi.transform = t
 	return mi
