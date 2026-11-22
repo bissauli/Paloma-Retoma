@@ -158,6 +158,8 @@ func _particulas(cantidad: int, vida: float, de_golpe: bool) -> CPUParticles3D:
 	p.scale_amount_max = 1.5
 	p.mesh = _gota(0.04, 0.9)
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Sólo importan de cerca (la paloma bañándose): de lejos no se dibujan
+	p.visibility_range_end = 45.0
 	add_child(p)
 	return p
 
@@ -175,7 +177,7 @@ func _armar_chorro(pos: Vector3) -> void:
 	_chorro.emission_shape = CPUParticles3D.EMISSION_SHAPE_POINT
 	_chorro.mesh = _gota(0.055, 0.9)
 	_chorro.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_chorro.visibility_range_end = 70.0
+	_chorro.visibility_range_end = 50.0
 	_chorro.position = pos
 	add_child(_chorro)
 

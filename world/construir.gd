@@ -261,6 +261,10 @@ static func cartel(padre: Node, pos: Vector3, texto: String, color_texto := Colo
 	l.pixel_size = 0.01
 	# De una sola cara: desde atrás no se ve el texto en espejo
 	l.double_sided = false
+	# Cada texto es un dibujo aparte y de lejos no se lee: se deja de dibujar pasados 70 m (quien lo necesite
+	# distinto lo pisa después, como Ciudad._texto)
+	l.visibility_range_end = 70.0
+	l.visibility_range_end_margin = 4.0
 	if mirar_camara:
 		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	padre.add_child(l)

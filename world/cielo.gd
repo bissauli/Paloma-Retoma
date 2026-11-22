@@ -546,6 +546,23 @@ func _actualizar_nubes(inmediato: bool) -> void:
 		_visible[tipo] = vis
 
 
+## Desde esta altura de la cámara las sombras se van achicando hasta casi nada a la segunda (de arriba el
+## suelo queda lejos y las sombras no se distinguen, pero cada pieza que las proyecta es un dibujo más).
+## No se apaga el sol: prender y apagar la sombra recompila shaders y da un tirón.
+const SOMBRA_ALTURA_DESDE := 28.0
+const SOMBRA_ALTURA_HASTA := 65.0
+const SOMBRA_MINIMA := 8.0
+
+
+func _sombra_por_altura(altura: float) -> void:
+	var base: float = Ajustes.preset_actual()["sombra_dist"]
+	var k := clampf(1.0 - (altura - SOMBRA_ALTURA_DESDE) / (SOMBRA_ALTURA_HASTA - SOMBRA_ALTURA_DESDE), 0.0, 1.0)
+	var d := maxf(base * k, SOMBRA_MINIMA)
+	# Sólo se escribe si cambió de verdad: cada cambio recalcula los cortes de la sombra
+	if absf(d - sol.directional_shadow_max_distance) > 0.75:
+		sol.directional_shadow_max_distance = d
+
+
 func _seguir_camara() -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
@@ -554,6 +571,7 @@ func _seguir_camara() -> void:
 	var adelante := -cam.global_basis.z
 	adelante.y = 0.0
 	_lluvia.global_position = cam.global_position + Vector3(0, 14, 0) + adelante.normalized() * 8.0
+	_sombra_por_altura(cam.global_position.y)
 	var piso := Vector3(cam.global_position.x, 0.0, cam.global_position.z)
 	_anillo.global_position = piso
 	_arcoiris.global_position = piso + _arcoiris_dir * 300.0 + Vector3(0, -45, 0)

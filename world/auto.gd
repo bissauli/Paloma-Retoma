@@ -139,7 +139,7 @@ func _armar() -> void:
 		mi.mesh = Kit.malla(rueda)
 		mi.material_override = Kit.material()
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.visibility_range_end = 100.0     # Las ruedas desaparecen antes que el auto: de lejos no se notan
+		mi.visibility_range_end = 55.0      # Las ruedas desaparecen antes que el auto: de lejos no se notan
 		mi.visibility_range_end_margin = 5.0
 		pivote.add_child(mi)
 		_ruedas.append(pivote)

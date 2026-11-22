@@ -14,7 +14,7 @@ extends Node
 const ZONAS := [
 	{
 		"id": "parque",
-		"archivo": "res://audio/park.mp3",
+		"archivo": "res://audio/park.ogg",
 		"rect": Ciudad.PARQUE,      # Oeste del mapa
 		"margen": 28.0,             # Empieza a oírse a 28 m del borde, a pleno adentro
 		"db": -15.0,
@@ -28,6 +28,7 @@ const ALTURA_LIBRE := 6.0     ## Hasta esta altura se oye completo
 const ALTURA_MUDA := 50.0     ## A esta altura ya casi no se oye
 const PISO_ALTURA := 0.15
 const BAJA_DIALOGO := 0.5
+const DESPLAZAMIENTO_MAX := 4.0   ## Segundos como mucho desde el inicio al empezar a sonar
 
 var _reproductores: Array[AudioStreamPlayer] = []
 var _nivel: Array[float] = []        ## Volumen lineal actual de cada zona (0..1)
@@ -47,6 +48,9 @@ func _ready() -> void:
 		p.name = "Ambiente_" + String(z["id"])
 		p.bus = &"Efectos"
 		p.volume_db = -80.0
+		# En la web el modo por defecto decodifica el archivo entero a un buffer (el ambiente del parque dura 5 minutos:
+		# 237 MB, el navegador lo rechaza); como stream se va leyendo de a poco
+		p.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 		if ResourceLoader.exists(z["archivo"]):
 			var s := load(z["archivo"]) as AudioStream
 			if s is AudioStreamMP3:
