@@ -22,6 +22,8 @@ const X_ENTRADAS := [-60.0, 58.0]
 
 var _timer_oleada := 6.0
 var _subte := Vector3(34, 0, -22)
+var _nav_plaza := {}                    ## Malla de navegación de toda la plaza (la de los oficinistas)
+var _salidas: Array[Vector3] = []       ## Las SALIDAS que se alcanzan desde el subte, ya sobre la malla
 var _asientos: Array[Dictionary] = []   ## {pos, lado, ocupado}
 var _timer_comensal := 2.0
 
@@ -172,6 +174,44 @@ func _poblar() -> void:
 		var idx := _asiento_libre()
 		if idx >= 0:
 			_comensal(idx, true)
+	_preparar_subte()
+
+
+## La malla de navegación de la plaza para los oficinistas (con el hueco de la escalera del subte como
+## obstáculo: sus paredes no llegan a la altura de los pies y las rejas no tienen colisión) y cuáles de
+## las SALIDAS se alcanzan desde la escalera. Espera un paso de física para que las colisiones estén.
+func _preparar_subte() -> void:
+	await get_tree().physics_frame
+	if not is_inside_tree():
+		return
+	var hueco := Edificios.hueco_subte(true)
+	var extra: Array[PackedVector2Array] = [PackedVector2Array([hueco.position, Vector2(hueco.end.x, hueco.position.y),
+		hueco.end, Vector2(hueco.position.x, hueco.end.y)])]
+	var r := Ciudad.PLAZA
+	_nav_plaza = Navegacion.zona(get_world_3d(), Vector3(r.get_center().x, _subte.y, r.get_center().y), r.size, 0.35, extra)
+	var arriba := _arriba_escalera()
+	var salidas: Array[Vector3] = []
+	# El mapa de navegación recién creado tarda unos pasos en sincronizarse (hasta ahí las rutas vienen vacías)
+	for intento in 30:
+		for s: Vector3 in SALIDAS:
+			var p := Navegacion.mas_cercano(_nav_plaza, s)
+			var ruta := Navegacion.ruta(_nav_plaza, arriba, p)
+			if not ruta.is_empty() and Enemigo.plano(ruta[ruta.size() - 1] - p).length() < 1.0:
+				salidas.append(p)
+		if not salidas.is_empty() or not is_inside_tree():
+			break
+		await get_tree().physics_frame
+	_salidas = salidas
+	if _salidas.is_empty():
+		push_warning("Ninguna salida de la plaza se alcanza desde el subte: los oficinistas van en línea recta")
+		for s: Vector3 in SALIDAS:
+			_salidas.append(s)
+
+
+## Donde termina la escalera del subte, ya en la plaza.
+func _arriba_escalera() -> Vector3:
+	var h := Edificios.hueco_subte(true)
+	return Vector3(h.get_center().x, _subte.y, h.end.y + 0.8)
 
 
 func _humano(tipo: String, centro: Vector3, radio: float, gen: GeneradorMigas, intervalo: float) -> Humano:
@@ -201,7 +241,7 @@ func _process(delta: float) -> void:
 		if ocupados < max_comensales and idx >= 0:
 			_comensal(idx, false)
 	_timer_oleada -= delta
-	if _timer_oleada > 0.0:
+	if _timer_oleada > 0.0 or _salidas.is_empty():
 		return
 	_timer_oleada = intervalo_oleada
 	var cant := randi_range(oficinistas_por_oleada.x, oficinistas_por_oleada.y)
@@ -209,14 +249,24 @@ func _process(delta: float) -> void:
 		get_tree().create_timer(i * 0.7, false).timeout.connect(_salir_oficinista)
 
 
+## Un oficinista sube por la escalera del subte (aparece abajo, en el descanso) y va a una salida de la
+## plaza por la malla de navegación, cada uno a un punto un poco distinto de la salida.
 func _salir_oficinista() -> void:
+	if not is_inside_tree():
+		return
 	var h := ESC_HUMANO.instantiate() as Humano
 	h.tipo = "oficinista"
 	h.preparar_aspecto()
-	h.destino_final = SALIDAS[randi() % SALIDAS.size()] + Vector3(randf_range(-4, 4), 0, 0)
+	var salida := _salidas[randi() % _salidas.size()]
+	h.destino_final = Navegacion.mas_cercano(_nav_plaza, salida + Vector3(randf_range(-3, 3), 0, randf_range(-1.5, 1.5)))
+	h.salidas = _salidas
+	h.nav_zona = _nav_plaza
+	var hueco := Edificios.hueco_subte()
+	var abajo := hueco.end.y - Edificios.SUBTE_HUELLA * (Edificios.SUBTE_PELDANOS - 0.4)
+	# La posición va antes de add_child: en _ready ve que está abajo y empieza subiendo
+	h.position = Vector3(hueco.get_center().x + randf_range(-0.5, 0.5),
+		_subte.y - Edificios.SUBTE_ALZADA * Edificios.SUBTE_PELDANOS, abajo)
 	add_child(h)
-	h.global_position = _subte + Vector3(randf_range(-0.8, 0.8), 0, 2.5)
-
 
 
 func _asiento_libre() -> int:

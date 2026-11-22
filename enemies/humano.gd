@@ -20,6 +20,7 @@ var zona_radio := 5.0
 var zona_tam := Vector2.ZERO        ## Si no es cero, la zona es un rectángulo de este tamaño (peatonal, parque)
 var generador: GeneradorMigas       ## A dónde van las migas que tira (lo asigna la escena)
 var destino_final := Vector3.ZERO   ## Para oficinistas: a dónde va antes de desaparecer
+var salidas: Array[Vector3] = []    ## Para oficinistas: otras salidas posibles si la suya no se puede alcanzar
 
 var _destino := Vector3.ZERO
 var _timer_paseo := 0.0
@@ -31,6 +32,17 @@ var _altura := 0.0
 var _por_sorpresa := false          ## Un aletazo le tiró el sombrero: se frena un rato con los brazos arriba
 var _sorpresa := 0.0
 var _rumbo_puesto := 0.0            ## Hacia dónde mira cuando está en su puesto (agente) o en su silla (comensal)
+
+# Oficinistas: suben la escalera del subte, cruzan la plaza por la malla de navegación y se van. Si no
+# avanzan un rato (algo les tapa el camino) prueban otra salida, y si nadie los mira desaparecen: antes
+# se quedaban trabados para siempre y se iban juntando de a decenas.
+const OFI_SIN_AVANCE := 6.0         ## Segundos sin moverse ni un metro = está trabado
+const OFI_VIDA_MAX := 120.0         ## Pasado esto, desaparece en cuanto la cámara no lo tenga cerca
+const OFI_CAMARA_CERCA := 22.0      ## A menos de esto de la cámara no se lo hace desaparecer de golpe
+var _subiendo := false
+var _t_vida := 0.0
+var _t_sin_avance := 0.0
+var _ancla := Vector3.INF           ## Dónde estaba la última vez que se movió un metro
 
 # Comensales
 var ruta: Array[Vector3] = []       ## Puntos por los que camina (el último es la silla o la salida)
@@ -46,6 +58,8 @@ var _timer_bocado := 2.0
 
 func _ready() -> void:
 	add_to_group("humanos")
+	_ocupar_lugar()   # Los demás no se le enciman (aunque esté quieto o sentado)
+	separarse = tipo in ["turista", "escolar", "oficinista", "barrendero"]
 	esquivar_obstaculos = tipo != "comensal"   # los comensales siguen su ruta hasta la silla, pegados a la mesa
 	_timer_migas = randf() * intervalo_migas
 	_destino = global_position
@@ -59,7 +73,12 @@ func _ready() -> void:
 		velocidad = randf_range(0.35, 0.5)   # barre andando despacito
 	if tipo == "oficinista":
 		_destino = destino_final
-		velocidad = randf_range(1.6, 2.1)
+		velocidad = randf_range(1.5, 1.9)
+		# Si aparece abajo, en el descanso de la escalera, primero sube (ver _subir_escalera)
+		_subiendo = global_position.y < Edificios.SUBTE.y - 0.5
+		if _subiendo:
+			esquivar_obstaculos = false
+			separarse = false
 		if randf() < 0.55:
 			_soltar_factura_en = randf_range(3.0, 9.0)
 
@@ -282,19 +301,76 @@ func asustar(desde: Vector3) -> void:
 	_enfriamiento_susto = 25.0
 	var lejos := global_position - desde
 	lejos.y = 0
-	_vel = lejos.normalized() * velocidad * 3.5
+	# Cada uno huye para un lado un poco distinto (si no, salían todos en fila y se apilaban contra la pared)
+	_vel = lejos.normalized().rotated(Vector3.UP, randf_range(-0.6, 0.6)) * velocidad * 3.5
 	AudioManager.reproducir_en("grito_nene", global_position, -8.0)
 
 
 func _paso_oficinista(delta: float) -> void:
-	if plano(destino_final - global_position).length() < 1.0:
+	_t_vida += delta
+	if _subiendo:
+		_subir_escalera(delta)
+		return
+	var dist := plano(destino_final - global_position).length()
+	if dist < 1.0:
 		queue_free()
 		return
-	_ir_hacia(destino_final, velocidad, 3.0, delta)
+	# ¿Avanza? Si en un rato no se movió ni un metro, algo le tapa el camino
+	if _ancla == Vector3.INF or plano(global_position - _ancla).length() > 1.0:
+		_ancla = global_position
+		_t_sin_avance = 0.0
+	else:
+		_t_sin_avance += delta
+	var cam := get_viewport().get_camera_3d()
+	var lejos_de_camara := cam == null or cam.global_position.distance_to(global_position) > OFI_CAMARA_CERCA
+	if (_t_sin_avance > OFI_SIN_AVANCE or _t_vida > OFI_VIDA_MAX) and lejos_de_camara:
+		queue_free()   # Nadie lo ve: mejor que se vaya a que quede trabado
+		return
+	if _t_sin_avance > OFI_SIN_AVANCE:
+		_otra_salida()
+	var hacia := plano(_proximo_punto(destino_final, delta, 1.5) - global_position)
+	_acelerar(Vector3.ZERO if hacia.length() < 0.05 else hacia.normalized() * velocidad, 3.0, delta)
 	if _soltar_factura_en > 0.0:
 		_soltar_factura_en -= delta
 		if _soltar_factura_en <= 0.0:
 			Comida.soltar(get_parent(), "factura", Vector3(global_position.x, 0.02, global_position.z), 40.0)
+
+
+## Sube por el medio de la escalera del subte siguiendo la rampa (sin esquivar: los escalones y las
+## paredes de azulejos están ahí al lado) hasta salir a la plaza.
+func _subir_escalera(delta: float) -> void:
+	var h := Edificios.hueco_subte()
+	var borde := h.end.y                                   # Borde sur: arriba de todo
+	var abajo := borde + Edificios.SUBTE_HUELLA * 0.5 - Edificios.SUBTE_HUELLA * Edificios.SUBTE_PELDANOS
+	var bajada := Edificios.SUBTE_ALZADA * Edificios.SUBTE_PELDANOS
+	var pendiente := bajada / (Edificios.SUBTE_HUELLA * Edificios.SUBTE_PELDANOS)
+	# Todos suben al mismo paso (así no se alcanzan en la escalera, donde todavía no se separan)
+	_vel = _vel.lerp(Vector3(0, 0, 1.15), minf(delta * 4.0, 1.0))
+	var cx := h.get_center().x
+	var margen := h.size.x / 2.0 - 0.6
+	global_position.x = clampf(global_position.x, cx - margen, cx + margen)
+	_altura = clampf(Edificios.SUBTE.y - bajada + (global_position.z - abajo) * pendiente, Edificios.SUBTE.y - bajada,
+		Edificios.SUBTE.y)
+	if global_position.z > borde + 0.6:
+		_subiendo = false
+		_altura = Edificios.SUBTE.y
+		esquivar_obstaculos = true
+		separarse = true
+
+
+## La salida a la que iba no se alcanza (o está tapada): va a la más cercana de las otras.
+func _otra_salida() -> void:
+	_t_sin_avance = 0.0
+	_ancla = Vector3.INF
+	_ruta_timer = 0.0
+	var mejor := destino_final
+	var mejor_d := INF
+	for s in salidas:
+		var d := plano(s - global_position).length()
+		if d < mejor_d and plano(s - destino_final).length() > 2.0:
+			mejor_d = d
+			mejor = s
+	destino_final = mejor
 
 
 # ---------------------------------------------------------------- Comensales

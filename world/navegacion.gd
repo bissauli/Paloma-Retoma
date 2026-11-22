@@ -22,12 +22,15 @@ static var _zonas := {}      ## "clave" -> {mapa, region, centro, tam}
 
 ## La zona rectangular de "tam" (X, Z) metros con el piso a la altura de "centro". La arma (y la
 ## guarda) la primera vez. "radio": cuánto se agrandan los obstáculos (el radio de quien camina).
-static func zona(mundo: World3D, centro: Vector3, tam: Vector2, radio := 0.35) -> Dictionary:
-	var clave := "%.1f,%.2f,%.1f|%.1fx%.1f|%.2f" % [centro.x, centro.y, centro.z, tam.x, tam.y, radio]
+## "extra": huellas (polígonos en XZ) que también son obstáculos aunque no tengan colisión a la altura
+## de los pies (el hueco de la escalera del subte, por ejemplo).
+static func zona(mundo: World3D, centro: Vector3, tam: Vector2, radio := 0.35,
+		extra: Array[PackedVector2Array] = []) -> Dictionary:
+	var clave := "%.1f,%.2f,%.1f|%.1fx%.1f|%.2f|%d" % [centro.x, centro.y, centro.z, tam.x, tam.y, radio, extra.size()]
 	if _zonas.has(clave):
 		return _zonas[clave]
 	PantallaCarga.refrescar()
-	var nm := hornear(mundo.direct_space_state, centro, tam, radio)
+	var nm := hornear(mundo.direct_space_state, centro, tam, radio, extra)
 	var mapa := NavigationServer3D.map_create()
 	NavigationServer3D.map_set_cell_size(mapa, CELDA)
 	NavigationServer3D.map_set_cell_height(mapa, CELDA)
@@ -43,7 +46,8 @@ static func zona(mundo: World3D, centro: Vector3, tam: Vector2, radio := 0.35) -
 
 
 ## Malla de navegación de la zona: el piso menos las huellas de los obstáculos.
-static func hornear(espacio: PhysicsDirectSpaceState3D, centro: Vector3, tam: Vector2, radio: float) -> NavigationMesh:
+static func hornear(espacio: PhysicsDirectSpaceState3D, centro: Vector3, tam: Vector2, radio: float,
+		extra: Array[PackedVector2Array] = []) -> NavigationMesh:
 	var nm := NavigationMesh.new()
 	nm.cell_size = CELDA
 	nm.cell_height = CELDA
@@ -57,7 +61,12 @@ static func hornear(espacio: PhysicsDirectSpaceState3D, centro: Vector3, tam: Ve
 	var a := Vector3(centro.x - tam.x / 2.0, y, centro.z - tam.y / 2.0)
 	var b := Vector3(centro.x + tam.x / 2.0, y, centro.z + tam.y / 2.0)
 	src.add_faces(PackedVector3Array([a, Vector3(b.x, y, a.z), b, a, b, Vector3(a.x, y, b.z)]), Transform3D.IDENTITY)
-	for huella: PackedVector2Array in obstaculos(espacio, centro, tam, radio):
+	var huellas := obstaculos(espacio, centro, tam, radio)
+	for e: PackedVector2Array in extra:
+		var grande := Geometry2D.offset_polygon(e, radio, Geometry2D.JOIN_MITER)
+		if not grande.is_empty():
+			huellas.append(Geometry2D.convex_hull(grande[0]))
+	for huella: PackedVector2Array in huellas:
 		var pts := PackedVector3Array()
 		for p in huella:
 			pts.append(Vector3(p.x, y, p.y))

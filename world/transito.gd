@@ -652,6 +652,8 @@ func _conducir(a: Auto, delta: float, gente: Array[Node3D]) -> void:
 			deseada = minf(deseada, maxf(dist_linea - 0.3, 0.0) * 1.2)
 	# Gente cruzando delante
 	for h: Node3D in gente:
+		if not is_instance_valid(h):
+			continue   # Desapareció en este paso (la lista se rearma cada 0,16 s)
 		var rel := h.global_position - a.global_position
 		var delante := rel.dot(fw) - a.largo / 2.0
 		if delante > -0.5 and delante < 9.0 and absf(rel.dot(lado)) < a.ancho / 2.0 + 0.5:

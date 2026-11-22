@@ -25,6 +25,63 @@ var _lado_esquive := 1.0             ## Lado por el que viene rodeando (para no 
 var _t_trabado := 0.0                ## Cuánto lleva sin poder avanzar de frente
 var _t_sin_esquive := 0.0            ## Si se trabó demasiado, un rato camina derecho (mejor atravesar que quedar clavado)
 
+# Separación entre la gente que camina: nadie se encima con nadie (antes los oficinistas de una misma
+# oleada caminaban todos en el mismo lugar, como uno solo, y los que huían se apilaban contra la pared).
+# Una grilla de celdas de 1 m con todos los que están en el grupo "gente_que_ocupa" (se arma una sola vez
+# por paso de física); cada uno mira sólo las 9 celdas que lo rodean.
+const SEPARACION := 0.75             ## A menos de esto, dos personas se empujan para separarse
+const SEPARACION_FUERZA := 2.2       ## m/s de empuje cuando están una encima de la otra
+@export var separarse := false       ## Si lo empujan los demás (los que están quietos sólo ocupan lugar)
+static var _grilla := {}             ## Vector2i -> Array[Enemigo]
+static var _grilla_paso := -1
+
+
+func _ocupar_lugar() -> void:
+	add_to_group(&"gente_que_ocupa")
+
+
+static func _armar_grilla(arbol: SceneTree) -> void:
+	var paso := Engine.get_physics_frames()
+	if paso == _grilla_paso:
+		return
+	_grilla_paso = paso
+	_grilla.clear()
+	for n in arbol.get_nodes_in_group(&"gente_que_ocupa"):
+		var e := n as Node3D
+		var p := e.global_position
+		var k := Vector2i(floori(p.x), floori(p.z))
+		if _grilla.has(k):
+			(_grilla[k] as Array).append(e)
+		else:
+			_grilla[k] = [e]
+
+
+## Velocidad de empuje para separarse de los que tiene encima (cero si no hay nadie cerca).
+func _empuje_vecinos() -> Vector3:
+	_armar_grilla(get_tree())
+	var p := global_position
+	var k := Vector2i(floori(p.x), floori(p.z))
+	var total := Vector3.ZERO
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			var celda: Array = _grilla.get(k + Vector2i(dx, dz), [])
+			for o: Node3D in celda:
+				if o == self:
+					continue
+				var d := Vector3(p.x - o.global_position.x, 0.0, p.z - o.global_position.z)
+				var l := d.length()
+				if l >= SEPARACION or absf(p.y - o.global_position.y) > 1.0:
+					continue
+				if l < 0.01:
+					# Exactamente en el mismo lugar: cada uno sale para un lado distinto
+					var a := float(get_instance_id() % 628) / 100.0
+					d = Vector3(cos(a), 0.0, sin(a))
+					l = 0.01
+				total += d / l * (1.0 - l / SEPARACION)
+	if total.length() > 1.0:
+		total = total.normalized()
+	return total * SEPARACION_FUERZA
+
 
 ## Acerca la velocidad actual a "objetivo". k = qué tan rápido responde (más alto, más brusco).
 func _acelerar(objetivo: Vector3, k: float, delta: float) -> void:
@@ -87,6 +144,12 @@ func _girar_hacia_velocidad(delta: float, k: float) -> void:
 
 ## Suma la velocidad a la posición dejándolo a la altura "y".
 func _avanzar(delta: float, y: float) -> void:
+	if separarse:
+		# El empuje se suma a la velocidad (que después vuelve sola hacia donde quiere ir): se abren
+		# paso de costado en vez de atravesarse
+		var e := _empuje_vecinos()
+		if e != Vector3.ZERO:
+			_vel += e * minf(delta * 6.0, 1.0)
 	global_position += _paso_libre(delta)
 	global_position.y = y
 
