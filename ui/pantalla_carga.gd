@@ -409,6 +409,13 @@ static func refrescar() -> void:
 	RenderingServer.force_draw(false)
 
 
+## En la web: vuelve a poner la pantalla de carga de la página (window.mostrarCarga). Hace falta al volver
+## al menú o reiniciar: la página la borró al terminar la primera carga y sin esto queda la pantalla negra.
+static func mostrar_web() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("if(window.mostrarCarga){window.mostrarCarga();}")
+
+
 ## En la web: le avisa a la página que se saque su pantalla de carga (window.ocultarCarga).
 static func ocultar_web() -> void:
 	if OS.has_feature("web"):

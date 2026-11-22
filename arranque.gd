@@ -22,6 +22,8 @@ func _ready() -> void:
 	# que sigue animada sola. Acá sólo se le avisa cuándo irse.
 	if not OS.has_feature("web"):
 		_carga = PantallaCarga.crear(get_tree())
+	else:
+		PantallaCarga.mostrar_web()     # La primera vez ya está puesta; al volver al menú o reiniciar hay que ponerla de nuevo
 	# Dos cuadros para que la pantalla se vea antes de empezar el trabajo pesado
 	await get_tree().process_frame
 	await get_tree().process_frame
