@@ -4,7 +4,7 @@ extends RefCounted
 ## builds exportadas, donde no hay git. Se regenera antes de exportar:
 ##   godot --headless --path . --script tools/generar_version.gd
 
-const COMMITS := 23
+const COMMITS := 102
 const AUTOR := "bissauli"
 const CORREO := "bissauli@users.noreply.github.com"
-const HASH := "01a6da7"
+const HASH := "siguiente de e4d9ab2"
