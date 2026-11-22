@@ -14,9 +14,8 @@ config/name="Paloma Retoma"
 run/main_scene="res://arranque.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/bg_color=Color(0, 0, 0, 1)
-boot_splash/image="res://assets/loading/splash.png"
+boot_splash/show_image=false
 config/icon="res://icon.svg"
-boot_splash/fullsize=true
 
 [autoload]
 
@@ -25,6 +24,7 @@ GameState="*res://autoload/game_state.gd"
 AudioManager="*res://autoload/audio_manager.gd"
 Ajustes="*uid://c5a2qcktrxadx"
 EstiloComic="*res://autoload/estilo_comic.gd"
+Filtros="*res://autoload/filtros.gd"
 Misiones="*res://autoload/misiones.gd"
 Dialogos="*res://autoload/dialogos.gd"
 Emotes="*res://ui/rueda_emotes.gd"
@@ -35,6 +35,23 @@ ContadorFps="*res://ui/contador_fps.gd"
 
 effort_schema=2
 dock_revealed=true
+
+[debug]
+
+gdscript/warnings/unused_variable=0.0
+gdscript/warnings/unused_private_class_variable=0.0
+gdscript/warnings/unused_parameter=0.0
+gdscript/warnings/unused_signal=0.0
+gdscript/warnings/shadowed_variable=0.0
+gdscript/warnings/shadowed_variable_base_class=0.0
+gdscript/warnings/shadowed_global_identifier=0.0
+gdscript/warnings/incompatible_ternary=0.0
+gdscript/warnings/redundant_await=0.0
+gdscript/warnings/integer_division=0.0
+gdscript/warnings/confusable_local_declaration=0.0
+gdscript/warnings/confusable_local_usage=0.0
+gdscript/warnings/inference_on_variant=0.0
+gdscript/warnings/native_method_override=0.0
 
 [display]
 

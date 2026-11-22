@@ -86,7 +86,42 @@ static func crear(slot: int, opcion: int) -> Node3D:
 				1: _bigote(raiz)
 				2: _pipa(raiz)
 				3: _anteojos(raiz)
+	fusionar(raiz)
 	return raiz
+
+
+## Junta las piezas sueltas de "raiz" que comparten material en una sola malla: cada una era una llamada de
+## dibujo (un accesorio tiene de 3 a 15 piezas, en cada paloma); así queda una por color. Sólo toca las
+## MeshInstance3D hijas directas, sin hijos propios ni sombra; el resto (Label3D, nodos anidados) queda igual.
+static func fusionar(raiz: Node3D) -> void:
+	var grupos := {}
+	var orden: Array[Material] = []
+	var viejas: Array[MeshInstance3D] = []
+	for h in raiz.get_children():
+		var mi := h as MeshInstance3D
+		if mi == null or mi.mesh == null or mi.material_override == null or mi.get_child_count() > 0 				or mi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF or not mi.visible:
+			continue
+		# Sólo las primitivas (Construir.combinar cachea las demás por id de instancia, que se puede reusar)
+		if not (mi.mesh is BoxMesh or mi.mesh is SphereMesh or mi.mesh is CylinderMesh or mi.mesh is PrismMesh):
+			continue
+		var mat := mi.material_override
+		if not grupos.has(mat):
+			grupos[mat] = []
+			orden.append(mat)
+		(grupos[mat] as Array).append([mi.mesh, mi.transform, Color.WHITE])
+		viejas.append(mi)
+	if viejas.size() < 2:
+		return
+	for mi in viejas:
+		raiz.remove_child(mi)
+		mi.queue_free()
+	for mat in orden:
+		var nueva := MeshInstance3D.new()
+		nueva.name = "Fusion"
+		nueva.mesh = Construir.combinar(grupos[mat], false, true)
+		nueva.material_override = mat
+		nueva.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		raiz.add_child(nueva)
 
 
 # ---------------------------------------------------------------- Cabeza

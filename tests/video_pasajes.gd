@@ -7,7 +7,7 @@ extends Node
 ## 2) Entra volando a un departamento SIN apretar nada (entrada libre).
 ## 3) En cada departamento: se acerca a la ventana, aparece el aviso "E · ATRAVESAR VOLANDO", lo
 ##    aprieta y pasa la cinemática.
-## 4) Termina bailando el Gangnam Style.
+## 4) Termina bailando disco.
 
 var paloma: PalomaJugador
 
@@ -36,7 +36,7 @@ func _ready() -> void:
 		await _entrar_libre(deptos[0])
 	for casa in deptos:
 		await _pasada(casa)
-	# Al final, de vuelta en el piso, baila el Gangnam Style (con la cámara más cerca)
+	# Al final, de vuelta en el piso, baila disco (con la cámara más cerca)
 	paloma.global_position = inicio
 	paloma.reset_physics_interpolation()
 	paloma.velocity = Vector3.ZERO
@@ -46,8 +46,8 @@ func _ready() -> void:
 	var largo: float = paloma.camara.distancia_suelo
 	paloma.camara.distancia_suelo = largo * 0.5
 	await _cuadros(30)
-	paloma.bailar(&"gangnam")
-	await _cuadros(int(Coreografia.duracion(&"gangnam") * 30.0) + 10)
+	paloma.bailar(&"disco")
+	await _cuadros(int(Coreografia.duracion(&"disco") * 30.0) + 10)
 	paloma.camara.distancia_suelo = largo
 	for i in antes.size():
 		perfil.set_accesorio(i, antes[i])

@@ -19,7 +19,7 @@ const RUTA := "res://modelos/animales/%s.glb"
 const CICLOS := ["quieto", "caminar", "trotar", "olfatear", "sentado", "echado", "dormido", "rascarse", "lamerse"]
 const VEL_CAMINAR := 0.86     ## Velocidad de la animación "caminar" a escala 1 (m/s)
 const VEL_TROTAR := 2.05      ## Ídem "trotar"
-const LEJOS := 90.0           ## Más lejos de la cámara no se anima (pero sigue con lo suyo)
+const LEJOS := 50.0           ## Más lejos de la cámara no se anima (pero sigue con lo suyo)
 
 var variante := "perro_marron"
 var conducta := "pasear"

@@ -330,7 +330,7 @@ static func objetos(sala: Node3D, ce: CasaEnterable, tema: String) -> int:
 				break
 			var tipo: String = tipos[rng.randi_range(0, tipos.size() - 1)]
 			var color := Color.WHITE if colores.is_empty() else Color(colores[rng.randi_range(0, colores.size() - 1)])
-			var g := Golpeable.crear(sala, tipo, sala.to_global(t * p) + Vector3.UP * 0.003, color, 1.0, false, null,
+			var g := Golpeable.crear(sala, tipo, Construir.global_de(sala) * (t * p) + Vector3.UP * 0.003, color, 1.0, false, null,
 				RANGO_OBJETOS)
 			g.rotation.y = rng.randf() * TAU
 			g.fijar_origen()

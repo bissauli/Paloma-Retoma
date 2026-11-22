@@ -17,7 +17,9 @@ var _resolucion: OptionButton
 var _resoluciones: Array[Vector2i] = []
 var _fps: OptionButton
 var _pantalla: CheckBox
-var _comic: CheckBox
+var _estilo: OptionButton
+var _filtro: OptionButton
+var _secreto: Button
 var _sensibilidad: HSlider
 var _sensibilidad_txt: Label
 var _invertir: CheckBox
@@ -75,10 +77,23 @@ func _init() -> void:
 		_fps.add_item(Ajustes.nombre_limite_fps(f).to_upper())
 	_fps.tooltip_text = "Con un número fijo se desactiva el VSync"
 	_fps.item_selected.connect(func(i: int) -> void: Ajustes.set_limite_fps(Ajustes.LIMITES_FPS[i]))
-	_comic = CheckBox.new()
-	fila("Estilo cómic", _comic)
-	_comic.tooltip_text = "Sombras con trama de puntos y contorno de tinta"
-	_comic.toggled.connect(Ajustes.set_estilo_comic)
+	_estilo = desplegable()
+	fila("Estilo", _estilo)
+	for e: String in ["Cozy", "Cómic", "Pixel"]:
+		_estilo.add_item(e.to_upper())
+	_estilo.tooltip_text = "Cómic: sombras con trama de puntos y contorno de tinta. Pixel: pixeles grandes y colores pintados"
+	_estilo.item_selected.connect(Ajustes.set_estilo)
+	_filtro = desplegable()
+	fila("Filtro", _filtro)
+	_filtro.add_item("NINGUNO")
+	for f: Array in Filtros.LISTA:
+		_filtro.add_item(String(f[0]).to_upper())
+	_filtro.item_selected.connect(func(i: int) -> void: Ajustes.set_filtro(i - 1))
+	# Como el botón de Minecraft: un filtro al azar y un ruido cualquiera.
+	_secreto = Button.new()
+	_secreto.text = "AJUSTES SÚPER SECRETOS..."
+	fila("", _secreto)
+	_secreto.pressed.connect(func() -> void: _filtro.select(Filtros.super_secreto() + 1))
 	_pantalla = CheckBox.new()
 	fila("Pantalla completa", _pantalla)
 	_pantalla.toggled.connect(func(on: bool) -> void:
@@ -96,7 +111,7 @@ func _init() -> void:
 	_invertir = CheckBox.new()
 	fila("Invertir eje Y", _invertir)
 	_invertir.toggled.connect(Ajustes.set_invertir_y)
-	for casilla: BaseButton in [_silencio, _comic, _pantalla, _invertir]:
+	for casilla: BaseButton in [_silencio, _pantalla, _invertir]:
 		casilla.toggled.connect(func(on: bool) -> void: AudioManager.ui("click_in" if on else "click_out", -8.0))
 
 
@@ -120,7 +135,8 @@ func _refrescar() -> void:
 	_sensibilidad.set_value_no_signal(Ajustes.sensibilidad * 100.0)
 	_sensibilidad_txt.text = _porcentaje(Ajustes.sensibilidad * 100.0)
 	_invertir.set_pressed_no_signal(Ajustes.invertir_y)
-	_comic.set_pressed_no_signal(Ajustes.estilo_comic)
+	_estilo.select(Ajustes.estilo())
+	_filtro.select(Ajustes.filtro + 1)
 	_calidad.select(Ajustes.calidad)
 	_fps.select(maxi(Ajustes.LIMITES_FPS.find(Ajustes.limite_fps), 0))
 	_refrescar_resoluciones()

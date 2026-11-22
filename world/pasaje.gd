@@ -25,7 +25,6 @@ const C_BLANCO := Color("f4f1e8")
 const C_VENTANA := Color("3b4250")
 const C_MADERA := Color("8a5a35")
 const C_METAL := Color("3f4a45")
-const C_ORO := Color("d8b04a")
 const PLANTA_BAJA := 6.0   ## Alto de cada sala (ocupa casi dos pisos)
 const ALTO_PISO := 3.2     ## Alto de cada piso del edificio (como Edificios.ventanas)
 const PISO_MIN := 2        ## El departamento va arriba del local (que ocupa la planta baja y el 1.º)...
@@ -228,37 +227,130 @@ const GRUPO_EDIFICIOS := &"edificio_con_locales"
 ## Llamarlo después de ColisionFaltante.completar (que necesita ver las piezas sueltas).
 static func fusionar_edificios(raiz: Node) -> int:
 	var cuantos := 0
-	for e in raiz.get_tree().get_nodes_in_group(GRUPO_EDIFICIOS):
-		if not raiz.is_ancestor_of(e) or e.has_meta(&"no_fusionar"):
+	for e in edificios_de(raiz):
+		if e.has_meta(&"no_fusionar"):
 			continue
 		cuantos += Construir.fusionar_estaticas(e as Node3D, 0.0)
 		e.set_meta(&"no_fusionar", true)   # La fusión de la plaza ya no lo toca
 	return cuantos
 
 
+## Los edificios con locales que cuelgan de "raiz". Busca por las ramas (no con get_tree(): el mundo se
+## arma fuera de la escena, ver Arranque).
+static func edificios_de(raiz: Node) -> Array[Node3D]:
+	var lista: Array[Node3D] = []
+	var pendientes: Array[Node] = [raiz]
+	while not pendientes.is_empty():
+		var n: Node = pendientes.pop_back()
+		if n != raiz and n.is_in_group(GRUPO_EDIFICIOS):
+			lista.append(n as Node3D)
+			continue   # (no hay edificios adentro de otro)
+		pendientes.append_array(n.get_children())
+	return lista
+
+
 ## La bici y el macetón de la vereda (meta "apoyar") se arman a la altura de la base del edificio,
 ## pero la vereda de adelante está más alta (16 cm en casi toda la plaza; en algunas, al ras): la bici
 ## quedaba con las ruedas hundidas en las baldosas. Acá se bajan o suben hasta el piso que tienen
-## debajo. Llamarlo con el piso ya en el árbol y antes de ColisionFaltante.completar y de fusionar.
+## debajo. Llamarlo con el piso ya armado y antes de ColisionFaltante.completar y de fusionar.
+## El mundo se arma fuera de la escena (ver Arranque), sin física: el "rayo" se tira a mano contra las
+## formas de colisión del mundo que hay cerca (cajas, mallas y, aproximadas por su caja, las convexas).
+## Deja en la meta "apoyados" de la raíz dónde quedó cada uno (lo mira tests/test_apoyar_vereda).
 static func apoyar_en_vereda(raiz: Node3D) -> int:
-	var esp := raiz.get_world_3d().direct_space_state
-	var cuantos := 0
-	for e in raiz.get_tree().get_nodes_in_group(GRUPO_EDIFICIOS):
-		if not raiz.is_ancestor_of(e):
-			continue
-		for h in (e as Node).get_children():
+	var piezas: Array[MeshInstance3D] = []
+	var zona := AABB()
+	for e in edificios_de(raiz):
+		for h in e.get_children():
 			var mi := h as MeshInstance3D
 			if mi == null or not mi.has_meta(&"apoyar"):
 				continue
-			var g := mi.global_position
 			mi.remove_meta(&"apoyar")
-			var q := PhysicsRayQueryParameters3D.create(g + Vector3(0, 0.6, 0), g + Vector3(0, -0.6, 0), Construir.CAPA_MUNDO)
-			var r := esp.intersect_ray(q)
-			# Sólo un piso (vereda o calle): lo que esté más alto es otra cosa (un cantero, un banco)
-			if r and absf((r["position"] as Vector3).y - g.y) < 0.3:
-				mi.global_position.y = (r["position"] as Vector3).y
-				cuantos += 1
-	return cuantos
+			var g := Construir.global_de(mi).origin
+			zona = AABB(g, Vector3.ZERO) if piezas.is_empty() else zona.expand(g)
+			piezas.append(mi)
+	var apoyados: Array[Vector3] = []
+	var sin_piso: Array[Vector3] = []   # (con el piso muy lejos: se quedan como estaban)
+	if piezas.is_empty():
+		raiz.set_meta(&"apoyados", apoyados)
+		return 0
+	var formas := _formas_mundo(raiz, zona.grow(1.0))
+	for mi in piezas:
+		var g := Construir.global_de(mi).origin
+		var y := _piso_debajo(formas, g + Vector3(0, 0.6, 0), g + Vector3(0, -0.6, 0))
+		# Sólo un piso (vereda o calle): lo que esté más alto es otra cosa (un cantero, un banco)
+		if not is_nan(y) and absf(y - g.y) < 0.3:
+			g.y = y
+			Construir.poner_global_pos(mi, g)
+			apoyados.append(g)
+		else:
+			sin_piso.append(g)
+	raiz.set_meta(&"apoyados", apoyados)
+	raiz.set_meta(&"sin_piso", sin_piso)
+	return apoyados.size()
+
+
+## Las formas de colisión del mundo (capa 1) que cuelgan de "raiz" y tocan "zona": [transformación global,
+## forma, caras locales (sólo las mallas)].
+static func _formas_mundo(raiz: Node, zona: AABB) -> Array:
+	var formas := []
+	for n in raiz.find_children("*", "CollisionShape3D", true, false):
+		var cs := n as CollisionShape3D
+		var co := cs.get_parent() as CollisionObject3D
+		if cs.disabled or cs.shape == null or co == null or not (co.collision_layer & Construir.CAPA_MUNDO):
+			continue
+		var t := Construir.global_de(cs)
+		var caras := PackedVector3Array()
+		var caja: AABB
+		if cs.shape is BoxShape3D:
+			var tam := (cs.shape as BoxShape3D).size
+			caja = AABB(-tam / 2.0, tam)
+		elif cs.shape is ConcavePolygonShape3D:
+			caras = (cs.shape as ConcavePolygonShape3D).get_faces()
+			if caras.is_empty():
+				continue
+			caja = AABB(caras[0], Vector3.ZERO)
+			for v in caras:
+				caja = caja.expand(v)
+		elif cs.shape is ConvexPolygonShape3D:
+			var pts := (cs.shape as ConvexPolygonShape3D).points
+			if pts.is_empty():
+				continue
+			caja = AABB(pts[0], Vector3.ZERO)
+			for v in pts:
+				caja = caja.expand(v)
+		else:
+			continue
+		if not (t * caja).intersects(zona):
+			continue
+		formas.append([t, caja, caras])
+	return formas
+
+
+## La altura del primer piso que cruza el segmento de "desde" a "hasta" (de arriba abajo), o NAN.
+static func _piso_debajo(formas: Array, desde: Vector3, hasta: Vector3) -> float:
+	var mejor := NAN
+	for f: Array in formas:
+		var t: Transform3D = f[0]
+		var inv := t.affine_inverse()
+		var a := inv * desde
+		var b := inv * hasta
+		var caras: PackedVector3Array = f[2]
+		var choque: Variant = null
+		if caras.is_empty():
+			choque = (f[1] as AABB).intersects_segment(a, b)
+		elif (f[1] as AABB).intersects_segment(a, b) != null:
+			var cerca := INF
+			for i in range(0, caras.size(), 3):
+				var c: Variant = Geometry3D.segment_intersects_triangle(a, b, caras[i], caras[i + 1], caras[i + 2])
+				if c != null and a.distance_to(c) < cerca:
+					cerca = a.distance_to(c)
+					choque = c
+		if choque == null:
+			continue
+		var y := (t * (choque as Vector3)).y
+		if is_nan(mejor) or y > mejor:
+			mejor = y
+	return mejor
 
 
 ## Arma los edificios de alrededor de la plaza: cada uno con un local en la planta baja y un ambiente
@@ -400,6 +492,7 @@ static func _sala(padre: Node3D, casa: Node3D, w_edificio: float, d: float, colo
 	ce.nombre = nombre
 	ce.tema = tema
 	ce.piso = piso
+	ce.sala_nodo = sala
 	ce.con_cinematica = not local
 	ce.ruta = ruta_zigzag(w, d, ce.x_frente, ce.x_fondo, esc["alturas"], esc["amp"])
 	if local:   # El local se recorre a pie: la ruta de prueba es recta (vidriera, el medio, ventana de atrás)

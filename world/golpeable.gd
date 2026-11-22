@@ -81,7 +81,7 @@ static func crear(padre: Node, tipo_objeto: String, pos: Vector3, color_objeto :
 	g.escala = escala_objeto
 	g.desechable = es_desechable
 	padre.add_child(g)
-	g.global_position = pos
+	Construir.poner_global_pos(g, pos)   # (se arma fuera del árbol, ver Arranque)
 	g.fijar_origen()
 	return g
 
@@ -110,7 +110,7 @@ func _ready() -> void:
 
 ## Guarda dónde está (para volver ahí).
 func fijar_origen() -> void:
-	_origen = global_transform
+	_origen = Construir.global_de(self)
 
 
 func _physics_process(delta: float) -> void:
