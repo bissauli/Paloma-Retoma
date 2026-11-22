@@ -4,6 +4,9 @@ extends RefCounted
 ## Los materiales y mallas se cachean para que muchas piezas iguales compartan recursos.
 
 const CAPA_MUNDO := 1
+## Capa 8: lo que sólo frena a las palomas (la jugadora y las de la bandada), no a la gente ni a la
+## cámara. Por ejemplo, el colchón delante de las vidrieras de la ciudad (ver Vidrieras.poner).
+const CAPA_PALOMAS := 128
 
 static var _materiales := {}
 static var _texturas := {}

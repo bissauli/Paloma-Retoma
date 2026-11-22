@@ -4,7 +4,9 @@ extends RigidBody3D
 ## mesas de los cafés, y los sombreros y gorras que se le caen a la gente (ver Humano.sombrerazo).
 ## Quieto no cuesta nada: está congelado como un objeto estático hasta que lo golpean. Después se
 ## comporta como un cuerpo físico (rueda, rebota, choca con el piso y con los demás), suena al caer y,
-## pasado un rato, vuelve a su lugar (o, si es un sombrero, se desvanece). No bloquea a la paloma:
+## pasado un rato, vuelve a su lugar (o, si es un sombrero, se desvanece). Lo de vidrio y loza (tazas,
+## vasos, platos, floreros, botellas, frascos, macetas) se rompe si choca fuerte: se hace añicos (unos
+## pedacitos con física que se desvanecen) y vuelve a aparecer entero en su lugar al rato. No bloquea a la paloma:
 ## vive en la capa "objetos" (5), que la paloma no mira.
 
 const CAPA_OBJETOS := 16
@@ -29,9 +31,16 @@ const TIPOS := {
 	"pan": {"color": Color("c98a4a"), "masa": 0.1},
 	"frasco": {"color": Color("f4f4f4"), "masa": 0.12},
 	"queso": {"color": Color("f2d070"), "masa": 0.2},
+	# Lo de los departamentos (ver PlanoLocal.objetos)
+	"plato": {"color": Color("f4f1ea"), "masa": 0.2},
 }
 ## Los que suenan a vidrio o loza al caer (los demás, un golpe sordo).
-const DE_VIDRIO := ["taza", "vaso", "azucarera", "florero", "maceta", "botella", "frasco"]
+const DE_VIDRIO := ["taza", "vaso", "azucarera", "florero", "maceta", "botella", "frasco", "plato"]
+## Los de vidrio y loza se rompen si chocan a más de esto (m/s): al caer de una mesa (75 cm) llegan a
+## unos 3,8; empujados por la mesa sin caerse, a menos de 1,5.
+const VEL_ROMPE := 2.4
+const PEDAZOS := 9
+const VIDA_PEDAZOS := 2.2
 
 ## Sólo para la "maceta": color de las hojas y de las flores ("" = sin flores).
 var color_hojas := Color("4a8a3a")
@@ -46,6 +55,9 @@ var color_flor := Color.TRANSPARENT
 ## forma del tipo: los sombreros que se le vuelan a la gente son el mismo que tenían puesto.
 var malla_propia: Mesh = null
 var golpeado := false
+var roto := false
+var _vel_previa := Vector3.ZERO   ## La velocidad del paso anterior (al chocar ya la frenó el choque)
+var _en_vuelo := 0.0              ## Segundos desde el último golpe (recién golpeado todavía toca la mesa)
 var _origen := Transform3D.IDENTITY
 var _t_vuelta := 0.0
 var _t_sonido := 0.0
@@ -93,11 +105,17 @@ func _ready() -> void:
 	if color == Color.WHITE:
 		color = TIPOS.get(tipo, TIPOS["taza"])["color"]
 	_armar()
+	set_physics_process(false)
 
 
 ## Guarda dónde está (para volver ahí).
 func fijar_origen() -> void:
 	_origen = global_transform
+
+
+func _physics_process(delta: float) -> void:
+	_vel_previa = linear_velocity
+	_en_vuelo += delta
 
 
 func _process(delta: float) -> void:
@@ -129,16 +147,26 @@ func golpear(dir: Vector3, fuerza := 1.0) -> bool:
 		d *= 0.15
 	apply_central_impulse((d * randf_range(2.4, 3.6) + Vector3.UP * randf_range(1.4, 2.2)) * mass * fuerza)
 	apply_torque_impulse(Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * mass * 0.35)
+	_vel_previa = Vector3.ZERO
+	_en_vuelo = 0.0
 	if not golpeado:
 		golpeado = true
 		contact_monitor = true
 		max_contacts_reported = 3
 		body_entered.connect(_al_chocar)
+	set_physics_process(true)
 	_t_vuelta = VIDA_SOMBRERO if desechable else TIEMPO_VUELTA
 	return true
 
 
 func _al_chocar(_cuerpo: Node) -> void:
+	if roto:
+		return
+	# Con la velocidad que traía antes del choque, y no recién golpeado (el primer aviso es la mesa donde
+	# estaba apoyado, con la velocidad del golpe ya puesta)
+	if tipo in DE_VIDRIO and not desechable and _en_vuelo > 0.12 and _vel_previa.length() > VEL_ROMPE:
+		romper()
+		return
 	if _t_sonido > 0.0 or linear_velocity.length() < 0.8:
 		return
 	_t_sonido = 0.25
@@ -146,8 +174,70 @@ func _al_chocar(_cuerpo: Node) -> void:
 	AudioManager.reproducir_en(nombre, global_position, -6.0 if nombre == "tintineo" else -14.0)
 
 
+## Se hace añicos: suena, desaparece y deja unos pedacitos de su color que rebotan en el piso y se
+## desvanecen. Vuelve entero a su lugar cuando se cumple su tiempo (como si alguien lo hubiera repuesto).
+func romper() -> void:
+	if roto:
+		return
+	roto = true
+	golpeado = true
+	_t_vuelta = TIEMPO_VUELTA
+	AudioManager.reproducir_en("romper", global_position, -3.0)
+	Logros.sumar("rotos")
+	var donde := global_position + Vector3.UP * 0.05
+	var vel := _vel_previa
+	# (Se llama desde el aviso de choque, en medio del paso de física: los cambios del cuerpo, diferidos)
+	set_deferred(&"freeze", true)
+	set_deferred(&"collision_layer", 0)
+	set_deferred(&"collision_mask", 0)
+	_visual.visible = false
+	set_physics_process(false)
+	_pedazos.call_deferred(donde, vel)
+
+
+func _pedazos(donde: Vector3, vel: Vector3) -> void:
+	var padre := get_parent()
+	if padre == null or not is_inside_tree():
+		return
+	var mat := Construir.material_vertices(0.7)
+	for i in PEDAZOS:
+		var p := RigidBody3D.new()
+		p.collision_layer = 0
+		p.collision_mask = 1
+		p.mass = 0.02
+		var tam := Vector3(randf_range(0.02, 0.05), randf_range(0.008, 0.02), randf_range(0.02, 0.045)) * escala
+		var cs := CollisionShape3D.new()
+		var b := BoxShape3D.new()
+		b.size = tam
+		cs.shape = b
+		p.add_child(cs)
+		var mi := MeshInstance3D.new()
+		var caja := BoxMesh.new()
+		caja.size = tam
+		mi.mesh = Construir.combinar([[caja, Transform3D.IDENTITY, color.lightened(randf_range(-0.1, 0.25))]], true)
+		mi.material_override = mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		p.add_child(mi)
+		padre.add_child(p)
+		p.global_position = donde + Vector3(randf_range(-0.05, 0.05), randf_range(0.0, 0.06), randf_range(-0.05, 0.05))
+		p.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
+		var a := randf() * TAU
+		p.linear_velocity = vel * 0.25 + Vector3(cos(a), 0.0, sin(a)) * randf_range(0.6, 1.8) + Vector3.UP * randf_range(1.0, 2.4)
+		p.angular_velocity = Vector3(randf_range(-12, 12), randf_range(-12, 12), randf_range(-12, 12))
+		var tw := p.create_tween()
+		tw.tween_interval(VIDA_PEDAZOS * randf_range(0.7, 1.0))
+		tw.tween_property(mi, "scale", Vector3.ONE * 0.01, 0.35)
+		tw.tween_callback(p.queue_free)
+
+
 func _volver() -> void:
 	golpeado = false
+	if roto:
+		roto = false
+		collision_layer = CAPA_OBJETOS
+		collision_mask = 1 | CAPA_OBJETOS
+		_visual.visible = true
+	set_physics_process(false)
 	freeze = true
 	linear_velocity = Vector3.ZERO
 	angular_velocity = Vector3.ZERO
@@ -183,6 +273,11 @@ func _armar() -> void:
 			_malla(_cilindro(0.045 * k, 0.04 * k, 0.08 * k), color, Vector3(0, 0.04 * k, 0))
 			_malla(_caja(Vector3(0.025, 0.04, 0.012) * k), color, Vector3(0.055 * k, 0.045 * k, 0))   # Oreja
 			_malla(_cilindro(0.04 * k, 0.04 * k, 0.005 * k), Color("5a3a24"), Vector3(0, 0.078 * k, 0))   # Café
+		"plato":
+			forma.shape = _cilindro_forma(0.1 * k, 0.025 * k)
+			forma.position.y = 0.0125 * k
+			_malla(_cilindro(0.1 * k, 0.06 * k, 0.018 * k), color, Vector3(0, 0.009 * k, 0))
+			_malla(_cilindro(0.075 * k, 0.075 * k, 0.004 * k), color.darkened(0.08), Vector3(0, 0.019 * k, 0))   # El fondo
 		"vaso":
 			forma.shape = _cilindro_forma(0.035 * k, 0.12 * k)
 			forma.position.y = 0.06 * k

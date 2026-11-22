@@ -10,7 +10,7 @@ extends Node
 
 const MEZCLA := 22050
 const NOMBRES := ["arrullo", "aleteo", "picoteo", "grito_nene", "silbato",
-	"chillido_halcon", "ambiente", "recoger", "victoria", "bocina", "salpicadura", "aletazo", "tintineo",
+	"chillido_halcon", "ambiente", "recoger", "victoria", "bocina", "salpicadura", "aletazo", "tintineo", "romper",
 	"aplastar", "boing", "ladrido", "trueno", "lluvia", "crashWall", "crashMetal", "landing"]
 const CANALES := 10
 const BUS_VOCES := ["arrullo", "grito_nene", "chillido_halcon"]
@@ -191,6 +191,7 @@ func _cargar_o_generar(nombre: String) -> AudioStream:
 		"salpicadura": return _gen_salpicadura()
 		"aletazo": return _gen_aletazo()
 		"tintineo": return _gen_tintineo()
+		"romper": return _gen_romper()
 		"aplastar": return _gen_aplastar()
 		"boing": return _gen_boing()
 		"ladrido": return _gen_ladrido()
@@ -344,6 +345,27 @@ func _gen_tintineo() -> AudioStreamWAV:
 			+ 0.3 * sin(TAU * 5100.0 * t) * exp(-t * 26.0)
 		s += _rng.randf_range(-1.0, 1.0) * exp(-t * 220.0) * 0.5
 		m[i] = s * 0.32 * _env(t, dur, 0.001)
+	return _a_wav(m)
+
+
+func _gen_romper() -> AudioStreamWAV:
+	# "¡Crash!": vidrio o loza que se hace añicos. Un golpe de ruido y muchos "tin" agudos que caen
+	# desparramados en el primer cuarto de segundo (los pedazos), cada uno de otro tono.
+	var dur := 0.75
+	var m := _muestras(dur)
+	var pedazos: Array = []
+	for k in 14:
+		pedazos.append([_rng.randf_range(0.0, 0.28) * (0.3 if k < 4 else 1.0), _rng.randf_range(2600.0, 7200.0),
+			_rng.randf_range(0.35, 1.0)])
+	for i in m.size():
+		var t := float(i) / MEZCLA
+		var s := _rng.randf_range(-1.0, 1.0) * exp(-t * 38.0) * 0.9   # El golpe
+		s += sin(TAU * 1900.0 * t) * exp(-t * 20.0) * 0.4
+		for p: Array in pedazos:
+			var tt: float = t - float(p[0])
+			if tt > 0.0:
+				s += sin(TAU * float(p[1]) * tt) * exp(-tt * 34.0) * float(p[2]) * 0.35
+		m[i] = s * 0.3 * _env(t, dur, 0.001)
 	return _a_wav(m)
 
 

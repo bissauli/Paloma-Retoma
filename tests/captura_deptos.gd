@@ -25,6 +25,11 @@ func _ready() -> void:
 			continue
 		if casa.luz:
 			casa.luz.visible = true
+		# La paloma en la vereda de enfrente (cerca: si no, los vecinos no se mueven), fuera del cuadro
+		var paloma := main.get_node_or_null("Paloma") as Node3D
+		if paloma:
+			var abajo := casa.to_global(Vector3(0, 0, casa.fondo / 2.0 + 8.0))
+			paloma.global_position = Vector3(abajo.x, 0.5, abajo.z)
 		var hx := casa.ancho / 2.0 - 0.6
 		var hz := casa.fondo / 2.0 - 0.6
 		for vista: Array in [["arriba", Vector3(0, 5.3, hz), Vector3(0, 0, -hz * 0.3)],

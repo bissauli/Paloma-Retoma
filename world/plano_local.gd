@@ -230,6 +230,15 @@ const OBJETOS := {
 	"oficina": [["taza", "libro", "florero"], ["2f5a8a", "f4f1e8"]],
 	"mecanico": [["lata"], ["c8423a", "2f3036", "d8a03a"]],
 	"peluqueria": [["frasco", "botella"], ["e06a9a", "f4f4f4", "6aa8e0"]],
+	# Ambientes de los departamentos (PlanoCasa.APOYOS): casi todo de vidrio o loza, que se rompe
+	"living": [["taza", "vaso", "florero", "libro"], []],
+	"comedor": [["plato", "plato", "vaso", "florero", "botella"], []],
+	"cocina": [["plato", "taza", "frasco", "botella", "fruta"], []],
+	"dormitorio": [["florero", "vaso", "libro"], []],
+	"bano": [["frasco", "botella"], ["f4f4f4", "bfe4f4", "e06a9a"]],
+	"cuarto_chicos": [["vaso", "libro", "caja"], ["3a7fd0", "e0403a", "f2c23a", "4fa060"]],
+	"estudio": [["taza", "libro", "florero"], []],
+	"conventillo": [["taza", "florero", "frasco"], []],
 }
 const MAX_OBJETOS := 10    ## Cuántas cosas para tirar, como mucho, por local
 const POR_MUEBLE := 2      ## Y por mueble
