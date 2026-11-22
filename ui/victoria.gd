@@ -5,7 +5,6 @@ extends CanvasLayer
 ## con el botón de volver al menú abajo a la derecha. Usa el mismo tema y las mismas cajas que
 ## el menú y el HUD (ver EstiloUI).
 
-const ESCENA_MENU := "res://main.tscn"
 const NOMBRES_FIJOS := ["Carlos", "La Tana", "El Ruso", "Coqui"]
 ## Cada paloma de los créditos tiene su baile (ver Coreografia.ORDEN): el primero es el break dance de
 ## Carlos y la paloma flaca cierra con el suyo.
@@ -27,7 +26,7 @@ func _ready() -> void:
 	layer = 15
 	visible = false
 	GameState.victoria.connect(_al_ganar)
-	%VolverTitulo.pressed.connect(func() -> void: get_tree().change_scene_to_file(ESCENA_MENU))
+	%VolverTitulo.pressed.connect(func() -> void: get_tree().change_scene_to_file(Arranque.ESCENA))
 
 
 func _al_ganar() -> void:

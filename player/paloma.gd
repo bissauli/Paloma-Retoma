@@ -182,7 +182,6 @@ func bailar(baile: StringName) -> void:
 	var b := get_tree().get_first_node_in_group("bandada") as Bandada
 	if b:
 		b.imitar_baile(baile)
-	AudioManager.musica_baile(baile == &"gangnam")   # El caballito tiene su música (en fase: arranca con el baile)
 
 
 ## Se mete a bañarse (lo llama una fuente o un charco): hace el baño en el lugar, sin darse vuelta
@@ -217,8 +216,6 @@ func _al_cortejar() -> void:
 
 
 func _revisar_baile() -> void:
-	if AudioManager.sonando_baile() and modelo.baile_actual() != &"gangnam":
-		AudioManager.musica_baile(false)   # Dejó de bailar (o se puso a bañarse): se corta la música
 	if not modelo.bailando():
 		return
 	var corta := estado == Estado.AIRE or not GameState.en_partida

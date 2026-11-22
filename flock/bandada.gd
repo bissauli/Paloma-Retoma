@@ -426,6 +426,9 @@ func _zona_al_azar() -> Marker3D:
 
 # ---------------------------------------------------------------- Boids
 
+var _obstaculos_fijos: Array = []    ## Gente y autos, releídos cada 3 pasos (ver _resolver_choques)
+
+
 func _physics_process(delta: float) -> void:
 	_frame += 1
 	_aviso_sin_comida = maxf(_aviso_sin_comida - delta, 0.0)
@@ -435,7 +438,9 @@ func _physics_process(delta: float) -> void:
 		_actualizar_subibaja(delta)
 		_mover_seguidoras(delta)
 		_llegadas(delta)
-	_resolver_choques()
+	# Un paso de física sí y otro no (las palomas se mueven despacio): reparte el costo entre los cuadros
+	if _frame % 2 == 0:
+		_resolver_choques()
 
 
 # ---------------------------------------------------------------- Choques
@@ -497,14 +502,18 @@ func _resolver_choques() -> void:
 
 	# Obstáculos fijos para las palomas: la jugadora y cada humano (cilindros)
 	var obstaculos: Array = [[_jugador.global_position, radio_jugadora, 0.45]]
-	for n in get_tree().get_nodes_in_group("cuerpos_humanos"):
-		var m := n as ModeloHumano
-		if m and m.is_visible_in_tree():
-			obstaculos.append([m.global_position, m.radio_colision(), m.alto_colision()])
-	# Los autos: dos círculos cada uno (adelante y atrás)
-	for n in get_tree().get_nodes_in_group("autos"):
-		if n is Auto:
-			obstaculos.append_array((n as Auto).circulos())
+	# La gente y los autos se releen cada 3 pasos de física (se mueven poco entre paso y paso)
+	if _frame % 3 == 0 or _obstaculos_fijos.is_empty():
+		_obstaculos_fijos.clear()
+		for n in get_tree().get_nodes_in_group("cuerpos_humanos"):
+			var m := n as ModeloHumano
+			if m and m.is_visible_in_tree():
+				_obstaculos_fijos.append([m.global_position, m.radio_colision(), m.alto_colision()])
+		# Los autos: dos círculos cada uno (adelante y atrás)
+		for n in get_tree().get_nodes_in_group("autos"):
+			if n is Auto:
+				_obstaculos_fijos.append_array((n as Auto).circulos())
+	obstaculos.append_array(_obstaculos_fijos)
 	for o: Array in obstaculos:
 		var centro: Vector3 = o[0]
 		var radio: float = o[1] + radio_cuerpo

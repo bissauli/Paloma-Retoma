@@ -2,7 +2,6 @@ extends CanvasLayer
 ## Menú de pausa (Esc): Continuar, Reiniciar, Opciones (las mismas del menú principal) y
 ## Salir al menú (guarda la partida para poder continuarla).
 
-const ESCENA_MENU := "res://main.tscn"
 const TEMA := preload("res://ui/tema/tema_paloma.tres")
 
 var _opciones: OpcionesMenu
@@ -103,7 +102,12 @@ func _teclas(acciones: Array) -> String:
 			var texto := ""
 			if ev is InputEventKey:
 				var k := ev as InputEventKey
-				var kc := DisplayServer.keyboard_get_keycode_from_physical(k.physical_keycode) if k.physical_keycode != 0 else k.keycode
+				var kc := k.keycode
+				if k.physical_keycode != 0:
+					# En la web y sin pantalla (headless) esa conversión no existe (tira error): el código físico
+					# sirve igual, salvo en teclados que no son QWERTY
+					kc = k.physical_keycode if OS.has_feature("web") or DisplayServer.get_name() == "headless" \
+						else DisplayServer.keyboard_get_keycode_from_physical(k.physical_keycode)
 				texto = OS.get_keycode_string(kc).to_upper()
 				if texto == "SPACE":
 					texto = tr("ESPACIO")
@@ -153,7 +157,7 @@ func continuar() -> void:
 func _reiniciar() -> void:
 	get_tree().paused = false
 	GameState.saltar_menu = true   # Reiniciar arranca directo a jugar, sin el menú principal
-	get_tree().reload_current_scene()
+	get_tree().change_scene_to_file(Arranque.ESCENA)   # Con la pantalla de carga (ver Arranque)
 
 
 func _salir() -> void:
@@ -161,7 +165,7 @@ func _salir() -> void:
 	get_tree().paused = false
 	GameState.en_partida = false
 	AvisoAccion.limpiar()
-	get_tree().change_scene_to_file(ESCENA_MENU)
+	get_tree().change_scene_to_file(Arranque.ESCENA)   # Con la pantalla de carga (ver Arranque)
 
 
 func _abrir_opciones() -> void:

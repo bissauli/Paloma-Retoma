@@ -14,7 +14,7 @@ extends Node
 const ZONAS := [
 	{
 		"id": "parque",
-		"archivo": "res://audio/park.mp3",
+		"archivo": "res://audio/park.ogg",
 		"rect": Ciudad.PARQUE,      # Oeste del mapa
 		"margen": 28.0,             # Empieza a oírse a 28 m del borde, a pleno adentro
 		"db": -15.0,
@@ -47,6 +47,9 @@ func _ready() -> void:
 		p.name = "Ambiente_" + String(z["id"])
 		p.bus = &"Efectos"
 		p.volume_db = -80.0
+		# En la web el modo por defecto decodifica el archivo entero a un buffer (el ambiente del parque dura 5 minutos:
+		# 237 MB, el navegador lo rechaza); como stream se va leyendo de a poco
+		p.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 		if ResourceLoader.exists(z["archivo"]):
 			var s := load(z["archivo"]) as AudioStream
 			if s is AudioStreamMP3:

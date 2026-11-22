@@ -8,7 +8,7 @@ extends RefCounted
 ## con la paloma flaca. Para sumar uno: escribir su función, agregarlo a DURACION y a pose().
 
 const ORDEN: Array[StringName] = [&"breakdance", &"moonwalk", &"disco", &"robot", &"twist",
-	&"salto", &"pirueta", &"cabeceo", &"salsa", &"cortejo", &"gangnam"]
+	&"salto", &"pirueta", &"cabeceo", &"salsa", &"cortejo"]
 ## El baño de la fuente (ver world/fuente.gd) usa esta misma maquinaria pero no está en la rueda ni en
 ## los créditos: la paloma lo baila sola al meterse al agua.
 const BANO := &"bano"
@@ -18,13 +18,12 @@ const FINAL := &"voltereta"
 const DURACION := {
 	&"breakdance": 6.5, &"moonwalk": 5.0, &"disco": 5.0, &"robot": 5.0, &"twist": 5.0,
 	&"salto": 5.0, &"pirueta": 5.5, &"cabeceo": 5.0, &"salsa": 5.0, &"voltereta": 7.0,
-	&"cortejo": 8.0, &"bano": 4.8, &"gangnam": 8.0,
+	&"cortejo": 8.0, &"bano": 4.8,
 }
 const NOMBRES := {
 	&"breakdance": "Break dance", &"moonwalk": "Moonwalk", &"disco": "Disco", &"robot": "Robot",
 	&"twist": "Twist", &"salto": "Salto", &"pirueta": "Pirueta", &"cabeceo": "Cabeceo",
 	&"salsa": "Salsa", &"voltereta": "Voltereta", &"cortejo": "Cortejo", &"bano": "Baño",
-	&"gangnam": "Gangnam Style",
 }
 const YAW := 20.0       ## Cada paloma se ve de tres cuartos, no justo de frente
 
@@ -50,7 +49,6 @@ static func pose(baile: StringName, t: float) -> PoseBaile:
 		&"cabeceo": return _cabeceo(t)
 		&"salsa": return _salsa(t)
 		&"cortejo": return _cortejo(t)
-		&"gangnam": return _gangnam(t)
 		&"bano": return _bano(t)
 		&"voltereta": return _voltereta(t)
 	return PoseBaile.new()
@@ -354,115 +352,6 @@ static func _salsa(t: float) -> PoseBaile:
 	p.pata_der = _x(-30.0 * maxf(-sin(beat * 2.0), 0.0))
 	p.cabeza = _y(30.0 * sin(beat + PI / 2.0)) * _z(10.0 * sin(beat))
 	p.cola = _y(20.0 * sin(beat * 2.0))
-	return p
-
-
-# ---------------------------------------------------------------- Gangnam Style
-
-## Variantes del baile del caballito (para elegir la mejor: ver tests/video_gangnam.gd). Cada una
-## cambia cuánto salta, cuánto se agacha, qué tan grande revolea el lazo, etc.:
-##   salto: metros que sube en cada saltito · rodilla: grados que levanta la pata de turno
-##   agache: grados que se inclina hacia adelante · cabeceo: grados del cabeceo con cada saltito
-##   lazo: radio (grados) de la vuelta del ala en el lazo · lazo_alto: cuánto sube esa ala
-##   lateral: metros que va y vuelve de costado · balanceo: grados que gira el cuerpo de lado a lado
-##   bombeo: grados que bombean las alas cruzadas · galope: 0 saltitos parejos, 1 uno grande y uno chico
-const VARIANTES_GANGNAM := [
-	{"nombre": "A · Clásico", "salto": 0.11, "rodilla": 52.0, "agache": -12.0, "cabeceo": 16.0, "lazo": 16.0,
-		"lazo_alto": 120.0, "lateral": 0.2, "balanceo": 10.0, "bombeo": 9.0, "galope": 0.0},
-	{"nombre": "B · Saltarín", "salto": 0.17, "rodilla": 68.0, "agache": -16.0, "cabeceo": 20.0, "lazo": 16.0,
-		"lazo_alto": 120.0, "lateral": 0.2, "balanceo": 10.0, "bombeo": 12.0, "galope": 0.0},
-	{"nombre": "C · Galope", "salto": 0.14, "rodilla": 58.0, "agache": -14.0, "cabeceo": 18.0, "lazo": 18.0,
-		"lazo_alto": 122.0, "lateral": 0.22, "balanceo": 12.0, "bombeo": 10.0, "galope": 1.0},
-	{"nombre": "D · Lazo grande", "salto": 0.11, "rodilla": 52.0, "agache": -12.0, "cabeceo": 16.0, "lazo": 30.0,
-		"lazo_alto": 135.0, "lateral": 0.2, "balanceo": 16.0, "bombeo": 9.0, "galope": 0.0},
-	{"nombre": "E · De costado", "salto": 0.12, "rodilla": 55.0, "agache": -12.0, "cabeceo": 16.0, "lazo": 18.0,
-		"lazo_alto": 120.0, "lateral": 0.38, "balanceo": 22.0, "bombeo": 9.0, "galope": 0.0},
-	{"nombre": "F · Con onda", "salto": 0.13, "rodilla": 58.0, "agache": -10.0, "cabeceo": 26.0, "lazo": 22.0,
-		"lazo_alto": 128.0, "lateral": 0.25, "balanceo": 14.0, "bombeo": 18.0, "galope": 0.5, "onda": 1.0},
-]
-## Qué variante baila la paloma (índice de VARIANTES_GANGNAM). La elegida es la F, "con onda": además de
-## lo de las otras ("onda" = 1) mueve la cadera al ritmo, abre la cola en abanico con cada saltito, saca
-## pecho al aterrizar, aletea la rienda durante el lazo y remata cada frase con una sacudida de plumas.
-static var variante_gangnam := 5
-
-## El baile del caballito (Gangnam Style), como el emote de Roblox: 8 s en bucle (arranca y termina
-## igual) y siempre galopando, a 150 pulsos por minuto (un saltito por pulso, justo con la música de
-## AudioManager.musica_baile). Sólo dos movimientos que se alternan, fundidos en ~0,3 s:
-##   0 - 2,4 s    Caballito: alas cruzadas adelante del pecho como riendas, agachada, patas abiertas y
-##                saltitos levantando la rodilla de a una (dos saltitos por pata).
-##   2,4 - 4 s    El lazo: el ala derecha sube al costado de la cabeza y revolea arriba; la izquierda
-##                sigue con las riendas.
-##   4 - 5,6 s    Caballito yendo de costado (va y vuelve).
-##   5,6 - 7,2 s  Otra vez el lazo.
-##   7,2 - 8 s    Caballito, igual que al principio.
-## Cada saltito sube rápido y cae un poco más lento, y al aterrizar se aplasta apenas (le da peso).
-static func _gangnam(t: float) -> PoseBaile:
-	var v: Dictionary = VARIANTES_GANGNAM[clampi(variante_gangnam, 0, VARIANTES_GANGNAM.size() - 1)]
-	var pulso := t * 2.5                               # 2,5 saltitos por segundo (150 por minuto)
-	var fase := fmod(pulso, 1.0)
-	var n_salto := int(floor(pulso))
-	# El saltito: sube rápido, cae más lento; en el galope, uno grande y uno chico
-	var salto := pow(sin(PI * pow(fase, 0.8)), 0.8)
-	salto *= lerpf(1.0, 0.45 if n_salto % 2 == 1 else 1.15, float(v["galope"]))
-	var aplaste := 1.0 - smoothstep(0.0, 0.12, fase)   # Justo al tocar el piso
-	# La pata que se levanta cambia cada dos saltitos, justo cuando está apoyada
-	var lado := 1.0 if (n_salto / 2) % 2 == 0 else -1.0
-	var costado := sin(t * PI * 1.25)                  # El cuerpo va de un lado al otro, suave
-	var w_lazo := smoothstep(2.3, 2.7, t) * (1.0 - smoothstep(3.8, 4.2, t)) \
-		+ smoothstep(5.5, 5.9, t) * (1.0 - smoothstep(7.0, 7.4, t))
-	var w_lateral := smoothstep(4.0, 4.3, t) * (1.0 - smoothstep(5.3, 5.6, t))
-
-	var p := PoseBaile.new()
-	var ir := sin((t - 4.0) / 1.6 * TAU)               # De costado: va y vuelve
-	var x_lateral := float(v["lateral"]) * ir
-	var balanceo := float(v["balanceo"])
-	p.pos = Vector3(lerpf(0.04 * costado, x_lateral, w_lateral),
-		float(v["salto"]) * salto - 0.05 - 0.03 * aplaste, 0.0)
-	# Agachada y cabeceando; de costado mira un poco hacia donde va
-	p.rot = _y(YAW + balanceo * costado + w_lateral * balanceo * 0.8 * cos((t - 4.0) / 1.6 * TAU)) \
-		* _x(float(v["agache"]) + 8.0 * sin(pulso * TAU) - 5.0 * aplaste)
-	# Patas abiertas (como las piernas separadas del emote) y la rodilla de turno bien arriba
-	var rodilla := float(v["rodilla"])
-	p.pata_izq = _x(-rodilla * salto if lado > 0.0 else -6.0 * salto) * _z(-10.0)
-	p.pata_der = _x(-rodilla * salto if lado < 0.0 else -6.0 * salto) * _z(10.0)
-	p.cabeza = _x(float(v["cabeceo"]) * salto - 6.0) * _y(10.0 * costado)
-	p.cola = _x(24.0 * salto) * _y(-14.0 * costado)
-	# Alas CRUZADAS adelante del pecho (las riendas): cada una pasa la línea del medio hacia el otro
-	# lado (más de 180°) y una va inclinada hacia arriba y la otra hacia abajo, así forman una X.
-	# Atraviesan un poco el cuerpo; está bien, lo que importa es que la cruz se lea.
-	# Las alas se arman al final con su apertura y altura ([abrir, subir]): de la cruz a cualquier otra
-	# pose se pasa interpolando esos dos números, no mezclando giros. La cruz está casi del lado
-	# opuesto a las otras poses y la mezcla de giros tomaría el atajo de golpe (un tirón de 80°).
-	var bombeo := float(v["bombeo"]) * salto
-	var izq := Vector2(228.0, 30.0 + bombeo)
-	var der := Vector2(228.0, -30.0 + bombeo)
-	# --- El lazo: el ala derecha arriba, al costado de la cabeza, dando vueltas (una cada dos saltitos)
-	var giro := t * TAU * 1.25
-	var r := float(v["lazo"])
-	der = der.lerp(Vector2(80.0 + r * sin(giro), float(v["lazo_alto"]) + r * cos(giro)), w_lazo)
-	izq = izq.lerp(Vector2(214.0, 22.0 + bombeo), w_lazo)   # Sola con las riendas, un poco más al medio
-	p.cabeza = PoseBaile._mezclar_giro(p.cabeza, _x(-12.0) * _y(-12.0 + 10.0 * sin(giro)) * _z(-8.0), w_lazo)
-	# --- La onda (variante F): todo lo que le da más estilo, siempre en fase con los saltitos
-	var onda := float(v.get("onda", 0.0))
-	if onda > 0.0:
-		# Cadera: el cuerpo se inclina de un lado al otro cada dos saltitos (como un meneo)
-		p.rot = p.rot * _z(7.0 * onda * sin(pulso * PI))
-		# Saca pecho al aterrizar: la cabeza sube de golpe y vuelve
-		p.cabeza = p.cabeza * _x(-10.0 * onda * aplaste)
-		# La cola se abre en abanico arriba de cada saltito y se menea más
-		p.escala_cola = Vector3(1.0 + 0.3 * onda * salto, 1.0, 1.0 + 0.12 * onda * salto)
-		p.cola = p.cola * _y(-10.0 * onda * sin(pulso * PI))
-		# Durante el lazo, la rienda (ala izquierda) aletea rapidito
-		izq.y += 7.0 * onda * w_lazo * sin(t * TAU * 5.0)
-		# Remate de cada frase (justo antes de cada lazo y al final): sacudida de plumas, el cuerpo
-		# tiembla y las alas cruzadas se abren un poco. Vuelve a cero antes de que termine el bucle.
-		var sacudida := _campana(2.0, 2.4, t) + _campana(5.2, 5.6, t) + _campana(7.45, 7.9, t)
-		p.rot = p.rot * _y(5.0 * onda * sacudida * sin(t * TAU * 9.0))
-		p.escala_cabeza = Vector3.ONE * (1.0 + 0.08 * onda * sacudida)
-		izq.x -= 14.0 * onda * sacudida
-		der.x -= 14.0 * onda * sacudida * (1.0 - w_lazo)
-	p.ala_izq = _ala_izq(izq.x, izq.y)
-	p.ala_der = _ala_der(der.x, der.y)
 	return p
 
 

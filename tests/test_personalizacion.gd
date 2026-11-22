@@ -116,7 +116,9 @@ func _aplicar_cambia_colores_y_accesorios() -> void:
 	var origen_glb := m._glb.global_position
 	_check("accesorios: la gorra queda sobre la cabeza (%s)" % str(gorra.global_position - origen_glb),
 			(gorra.global_position - origen_glb).length() < 0.1)
-	var gorra_y := ((gorra.get_child(0) as Node3D).global_position - origen_glb).y
+	# Las piezas están fusionadas por color: se mide el centro de la malla de la gorra (la caja roja)
+	var gmi := gorra.get_child(0) as MeshInstance3D
+	var gorra_y := ((gmi.global_transform * gmi.mesh.get_aabb()).get_center() - origen_glb).y
 	_check("accesorios: la gorra está arriba de la cabeza (y=%.2f)" % gorra_y, gorra_y > 0.45 and gorra_y < 0.6)
 	# No interfieren con las animaciones: la animación sigue moviendo los huesos
 	var cab_ini := m._skel.get_bone_pose_rotation(m._skel.find_bone("head"))

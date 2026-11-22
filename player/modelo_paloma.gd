@@ -154,6 +154,7 @@ func poner_sombrero(tipo_sombrero: String, color_sombrero: Color) -> void:
 	else:
 		AccesoriosPaloma._caja(raiz, Vector3(0.215, 0.05, 0.215), Vector3(0.0, 0.525, 0.1), color_sombrero)
 		AccesoriosPaloma._caja(raiz, Vector3(0.17, 0.014, 0.1), Vector3(0.0, 0.512, 0.255), color_sombrero.darkened(0.25))
+	AccesoriosPaloma.fusionar(raiz)
 	sombrero_visual.add_child(raiz)
 
 

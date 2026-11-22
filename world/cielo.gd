@@ -83,6 +83,7 @@ var _arcoiris_dir := Vector3.FORWARD   ## Hacia dónde está (del lado opuesto a
 var _llovia := false
 var _t_nubes := 0.0
 var _t_aplicar := 0.0
+var _luz_aplicada := Vector3.ZERO     ## Dirección con la que está girado el sol ahora
 var _tiempo := 0.0
 
 
@@ -291,7 +292,8 @@ func _crear_nubes() -> void:
 func _crear_lluvia() -> void:
 	_lluvia = CPUParticles3D.new()
 	_lluvia.name = "Lluvia"
-	_lluvia.amount = 900 if not OS.has_feature("mobile") and not OS.has_feature("web") else 450
+	# (CPUParticles3D: cada gota se calcula en el procesador en cada cuadro; 450 se ven igual de tupidas)
+	_lluvia.amount = 450 if not OS.has_feature("mobile") and not OS.has_feature("web") else 260
 	_lluvia.lifetime = 0.9
 	_lluvia.local_coords = false
 	_lluvia.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
@@ -453,7 +455,11 @@ func _aplicar(forzado: bool) -> void:
 	var luz_plana := Vector3(luz_dir.x, 0, luz_dir.z).normalized()
 	if luz_dir.y < 0.105:
 		luz_dir = (luz_plana * cos(0.105) + Vector3.UP * sin(0.105)).normalized()
-	sol.look_at_from_position(Vector3.ZERO, -luz_dir, Vector3.UP if absf(luz_dir.y) < 0.99 else Vector3.FORWARD)
+	# La luz con sombras sólo se gira cuando el sol se movió de verdad (más de ~0,2 grados, o sea cada
+	# medio minuto): si se rotara en cada cuadro, las sombras temblarían y "nadarían" sobre el piso
+	if forzado or _luz_aplicada.dot(luz_dir) < 0.999995:
+		_luz_aplicada = luz_dir
+		sol.look_at_from_position(Vector3.ZERO, -luz_dir, Vector3.UP if absf(luz_dir.y) < 0.99 else Vector3.FORWARD)
 	sol.light_color = sol_color
 	sol.light_energy = sol_energia + _relampago * 0.6
 	# 0 de día, 1 de noche cerrada: según qué tan abajo del horizonte está el sol
@@ -540,6 +546,23 @@ func _actualizar_nubes(inmediato: bool) -> void:
 		_visible[tipo] = vis
 
 
+## Desde esta altura de la cámara las sombras se van achicando hasta casi nada a la segunda (de arriba el
+## suelo queda lejos y las sombras no se distinguen, pero cada pieza que las proyecta es un dibujo más).
+## No se apaga el sol: prender y apagar la sombra recompila shaders y da un tirón.
+const SOMBRA_ALTURA_DESDE := 28.0
+const SOMBRA_ALTURA_HASTA := 65.0
+const SOMBRA_MINIMA := 8.0
+
+
+func _sombra_por_altura(altura: float) -> void:
+	var base: float = Ajustes.preset_actual()["sombra_dist"]
+	var k := clampf(1.0 - (altura - SOMBRA_ALTURA_DESDE) / (SOMBRA_ALTURA_HASTA - SOMBRA_ALTURA_DESDE), 0.0, 1.0)
+	var d := maxf(base * k, SOMBRA_MINIMA)
+	# Sólo se escribe si cambió de verdad: cada cambio recalcula los cortes de la sombra
+	if absf(d - sol.directional_shadow_max_distance) > 0.75:
+		sol.directional_shadow_max_distance = d
+
+
 func _seguir_camara() -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
@@ -548,6 +571,7 @@ func _seguir_camara() -> void:
 	var adelante := -cam.global_basis.z
 	adelante.y = 0.0
 	_lluvia.global_position = cam.global_position + Vector3(0, 14, 0) + adelante.normalized() * 8.0
+	_sombra_por_altura(cam.global_position.y)
 	var piso := Vector3(cam.global_position.x, 0.0, cam.global_position.z)
 	_anillo.global_position = piso
 	_arcoiris.global_position = piso + _arcoiris_dir * 300.0 + Vector3(0, -45, 0)

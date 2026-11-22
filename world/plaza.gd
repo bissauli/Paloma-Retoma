@@ -4,7 +4,6 @@ extends Node3D
 ## ciudad entera unos 394 x 222 m (ver Ciudad.X_MIN...).
 
 const ANCHO := 120.0
-const LARGO := 80.0
 
 # Paleta
 const C_ASFALTO := Color("76787a")
@@ -14,7 +13,18 @@ var entorno: Environment
 var cielo: Cielo
 
 
+var armada := false   ## Ya se construyó (Arranque la arma en otro hilo, antes de entrar a la escena)
+
+
 func _ready() -> void:
+	if not armada:
+		construir()
+
+
+## Arma toda la plaza y la ciudad. Puede correr fuera del árbol y en otro hilo (ver Arranque): todo lo
+## que hace sólo toca nodos que todavía no están en la escena.
+func construir() -> void:
+	armada = true
 	MapaOverrides.reiniciar()   # IDs de las piezas editables (ver MapaOverrides)
 	_crear_ambiente()
 	_crear_piso()
@@ -23,11 +33,14 @@ func _ready() -> void:
 	# La bici y el macetón de cada edificio con locales, sobre la vereda (no hundidos en ella)
 	Pasaje.apoyar_en_vereda(self)
 	# Todo lo de la plaza que se ve tiene colisión (ver ColisionFaltante; la ciudad hace lo suyo)
+	PantallaCarga.informar_armado(0.9)
 	ColisionFaltante.completar(self)
 	# Cada edificio con locales, en sus propias mallas (una sola pieza: ver Pasaje.fusionar_edificios)
 	Pasaje.fusionar_edificios(self)
 	# Miles de piezas fijas (edificios, árboles, bancos...) pasan a ser unas pocas mallas grandes
+	PantallaCarga.informar_armado(0.95)
 	Construir.fusionar_estaticas(self)
+	PantallaCarga.informar_armado(1.0)
 
 
 # ---------------------------------------------------------------- Luz y cielo
@@ -66,11 +79,11 @@ func _crear_piso() -> void:
 	mi_tira.set_meta(&"atravesable", true)   # Si tuviera colisión, al subir la escalera la rampa chocaría con el borde
 	var r := Ciudad.PLAZA
 	# Avenida al sur (asfalto con líneas): cruza la manzana y llega hasta Bolívar y Paseo Colón
-	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(128, 0.01, 8), C_ASFALTO, false)
+	Construir.caja(piso, Vector3(0, 0.005, 30), Vector3(128, 0.01, 8), C_ASFALTO, false).set_meta(&"sin_contorno", true)
 	for i in range(-6, 7):
 		Construir.caja(piso, Vector3(i * 9.0, 0.012, 30), Vector3(4.0, 0.01, 0.25), Color("f4f3ee"), false)
 	# Vereda del lado de los cafés (las mismas lajas que el resto de las veredas)
-	Construir.caja_mat(piso, Vector3(0, 0.08, 37), Vector3(r.size.x, 0.16, 6), Construir.material_lajas("lajas_vereda", 4.0))
+	Construir.caja_mat(piso, Vector3(0, 0.08, 37), Vector3(r.size.x, 0.16, 6), Construir.material_lajas("lajas_vereda", 4.0)) 		.set_meta(&"sin_contorno", true)
 
 
 ## Paredes invisibles en el borde de la ciudad (y un techo para no irse al espacio).
@@ -112,14 +125,21 @@ func _crear_zonas() -> void:
 	Edificios.subte(edif, Edificios.SUBTE)
 	posicion_balcon = Edificios.casa_rosada(edif)
 	var mesas := Edificios.cafes(edif)
+	PantallaCarga.informar_armado(0.08)
 	# Nivel inferior (Fase 1): pasajes entre los cafés y mercado
 	NivelInferior.armar(self)
 	# La ciudad alrededor de la plaza (mapa V2): arma y fusiona sus propias piezas
-	add_child(Ciudad.new())
+	var ciudad := Ciudad.new()
+	add_child(ciudad)
+	if not ciudad.armada:
+		ciudad.construir()
 	# Nivel medio (Fase 2): toldos de los cafés, balcones alrededor, columnas de farol y árboles altos
 	# (después de la ciudad: al armarse, la ciudad pone en cero las cuentas que miran las pruebas)
 	NivelMedio.plaza(self)
-	add_child(Transito.new())
+	var transito := Transito.new()
+	add_child(transito)
+	if not transito.armado:
+		transito.construir()
 
 	_crear_jardines()
 	_crear_fuentes()

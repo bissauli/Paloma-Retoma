@@ -67,7 +67,7 @@ static func poblar(raiz: Node) -> int:
 			p.set_meta("look", GUARDIAS[k_guardia % GUARDIAS.size()])
 			k_guardia += 1
 		raiz.add_child(p)
-		p.global_transform = marca.global_transform
+		Construir.poner_global(p, Construir.global_de(marca))   # (se arma fuera del árbol, ver Arranque)
 		cuantas += 1
 	return cuantas
 
@@ -256,6 +256,10 @@ func _vestir(cabeza: String, cuerpo: Array) -> void:
 				"bolsa": _bolsa(en_cuerpo)
 				"bate": _bate(en_cuerpo)
 				"rinonera": _rinonera(en_cuerpo)
+	# Una llamada de dibujo por color en vez de una por pieza
+	for e in [en_cabeza, en_cuerpo]:
+		if e:
+			AccesoriosPaloma.fusionar(e)
 
 
 ## Nodo que sigue al hueso "hueso" y cuyos hijos van en el espacio del GLB de la paloma.
