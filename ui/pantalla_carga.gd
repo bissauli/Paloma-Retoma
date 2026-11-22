@@ -409,6 +409,11 @@ static func refrescar() -> void:
 	RenderingServer.force_draw(false)
 
 
+## En la web: ¿la página trae su propia pantalla de carga (window.ocultarCarga, ver html/head_include)?
+static func hay_pantalla_web() -> bool:
+	return OS.has_feature("web") and str(JavaScriptBridge.eval("typeof window.ocultarCarga")) == "function"
+
+
 ## En la web: le avisa a la página que se saque su pantalla de carga (window.ocultarCarga).
 static func ocultar_web() -> void:
 	if OS.has_feature("web"):

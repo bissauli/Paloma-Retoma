@@ -18,7 +18,7 @@ botones DESPEGAR/ALETEAR (mantener), PICADA (mantener), PICOTEAR y ARRULLAR · I
 ## Proyecto
 
 - Código fuente Godot en la raíz (`project.godot`).
-- Build web en `docs/` (exportado con el preset "Web", sin threads para que funcione en GitHub Pages).
+- Build web: el preset "Web" exporta CON hilos (y la extensión vacía `hilos.gdextension`, compilada desde `extension/`) para que Ziva (Share Web build) la suba con hilos. GitHub Pages no sirve las cabeceras que piden los hilos: `docs/` quedó con la build anterior sin hilos; para volver a exportar ahí hay que poner `thread_support=false` y `extensions_support=false` en el preset.
 - Para regenerarla: Godot → Proyecto → Exportar → Web, o
   `godot --headless --export-release "Web" docs/index.html`.
 - Antes de exportar, y después del último commit, actualizar la versión que muestra el menú (`v0.<commits> (autor del último commit)`):

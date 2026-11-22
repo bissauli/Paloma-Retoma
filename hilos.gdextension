@@ -1,0 +1,10 @@
+[configuration]
+
+entry_symbol = "hilos_init"
+compatibility_minimum = "4.2"
+
+; Solo hay librerías web CON hilos (sin la variante ".nothreads"): por eso Ziva exporta el juego con hilos.
+[libraries]
+
+web.debug.threads.wasm32 = "res://bin/hilos/libhilos.web.template_debug.wasm32.wasm"
+web.release.threads.wasm32 = "res://bin/hilos/libhilos.web.template_release.wasm32.wasm"
