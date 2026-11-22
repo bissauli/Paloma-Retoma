@@ -386,7 +386,7 @@ func _poner(nombre: String, pos: Vector3, rot := 0.0, escala := Vector3.ONE, col
 		elif texto == "" and tipo == "kiosco":
 			texto = "DIARIOS Y REVISTAS"
 		if texto != "":
-			var rango := 40.0 if tipo == "kiosco" else (90.0 if tipo == "hospital" or tipo == "comisaria" else 55.0)
+			var rango := 40.0 if tipo == "kiosco" else (90.0 if tipo == "hospital" or tipo == "comisaria" else 40.0)
 			var rotulo := _texto(c[0], c[1], texto, c[2], c[3], color, rango)
 			if cuelga:
 				_colgar(rotulo, cuelga)   # si el builder borra la pieza, se va con sus letras

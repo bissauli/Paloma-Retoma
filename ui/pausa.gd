@@ -103,7 +103,12 @@ func _teclas(acciones: Array) -> String:
 			var texto := ""
 			if ev is InputEventKey:
 				var k := ev as InputEventKey
-				var kc := DisplayServer.keyboard_get_keycode_from_physical(k.physical_keycode) if k.physical_keycode != 0 else k.keycode
+				var kc := k.keycode
+				if k.physical_keycode != 0:
+					# En la web esa conversión no existe (tira error): el código físico sirve igual, salvo
+					# en teclados que no son QWERTY
+					kc = k.physical_keycode if OS.has_feature("web") \
+						else DisplayServer.keyboard_get_keycode_from_physical(k.physical_keycode)
 				texto = OS.get_keycode_string(kc).to_upper()
 				if texto == "SPACE":
 					texto = tr("ESPACIO")

@@ -196,12 +196,19 @@ func _animar_destello(delta: float) -> void:
 	_destello.scale = Vector3(esc, esc, esc)
 
 
+## Distancia máxima a la que se dibuja la comida (m); los premios grandes llevan brillo y se ven de lejos.
+const RANGO_VISIBLE := 55.0
+
+
 func _armar() -> void:
 	var mi := MeshInstance3D.new()
 	mi.mesh = _malla_visual()
 	mi.material_override = Construir.material_vertices(0.9)
 	if not Construir.proyecta_sombra(mi.mesh):
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# De lejos no se ve (las migas son chicas): no se dibuja ni proyecta sombra pasados RANGO_VISIBLE
+	mi.visibility_range_end = RANGO_VISIBLE * (0.7 if Ajustes.movil else 1.0)
+	mi.visibility_range_end_margin = 4.0
 	_visual.add_child(mi)
 	_armar_brillo()
 
