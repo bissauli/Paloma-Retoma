@@ -62,6 +62,8 @@ var resolucion := Vector2i.ZERO ## (0, 0) = nativa
 var limite_fps := 0             ## Ver LIMITES_FPS
 var idioma := ""                ## "es" o "en" (ver Idioma). Vacío = el del sistema hasta que elija
 var estilo_comic := true        ## Modo cómic: cel duro, semitono y contorno de tinta (ver EstiloComic)
+var estilo_pixel := false       ## Estilo pixel cozy (ver Filtros). Va sin el cómic
+var filtro := -1                ## Filtro de los ajustes súper secretos (índice en Filtros.LISTA, -1 = ninguno)
 
 ## Versión para teléfonos: controles táctiles, sin captura del mouse y gráficos livianos.
 ## Una sola build web sirve para PC y teléfono: se activa sola al abrirla desde Android o iOS
@@ -249,6 +251,22 @@ func set_calidad(c: int) -> void:
 
 func set_estilo_comic(e: bool) -> void:
 	estilo_comic = e
+	_guardar()
+
+
+## Estilo de la imagen: 0 cozy, 1 cómic, 2 pixel (el pixel va con el sombreado cozy debajo).
+func estilo() -> int:
+	return 2 if estilo_pixel else (1 if estilo_comic else 0)
+
+
+func set_estilo(e: int) -> void:
+	estilo_comic = e == 1
+	estilo_pixel = e == 2
+	_guardar()
+
+
+func set_filtro(f: int) -> void:
+	filtro = f
 	_guardar()
 
 
@@ -487,6 +505,8 @@ func _cargar() -> void:
 	resolucion = cfg.get_value("video", "resolucion", resolucion)
 	limite_fps = cfg.get_value("video", "limite_fps", limite_fps)
 	estilo_comic = cfg.get_value("video", "estilo_comic", estilo_comic)
+	estilo_pixel = cfg.get_value("video", "estilo_pixel", estilo_pixel)
+	filtro = cfg.get_value("video", "filtro", filtro)
 	if not LIMITES_FPS.has(limite_fps):
 		limite_fps = 0
 	sensibilidad = cfg.get_value("control", "sensibilidad", sensibilidad)
@@ -508,6 +528,8 @@ func _guardar() -> void:
 	cfg.set_value("video", "resolucion", resolucion)
 	cfg.set_value("video", "limite_fps", limite_fps)
 	cfg.set_value("video", "estilo_comic", estilo_comic)
+	cfg.set_value("video", "estilo_pixel", estilo_pixel)
+	cfg.set_value("video", "filtro", filtro)
 	cfg.set_value("control", "sensibilidad", sensibilidad)
 	cfg.set_value("control", "invertir_y", invertir_y)
 	cfg.set_value("general", "idioma", idioma)
