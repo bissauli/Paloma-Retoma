@@ -29,6 +29,8 @@ botones DESPEGAR/ALETEAR (mantener), PICADA (mantener), PICOTEAR y ARRULLAR · I
   (`index.wasm`, lo que más pesa) se descarga y se cachea una sola vez.
 - Pruebas automáticas en `tests/` (headless): `godot --headless --path . res://tests/test_vuelo.tscn`
   (también `test_bandada`, `test_enemigos` y `test_mapa_v31`; con `-- movil` corren con la física del teléfono).
+  Locales y autos: `test_locales_dentro`, `test_clientes_locales`, `test_casas` y `test_auto_colision`; capturas desde la
+  calle con `godot --path . res://tests/captura_locales_afuera.tscn -- <carpeta>`.
 - Modelos 3D (Blender, sin abrir Blender): `F:/blender.exe -b --factory-startup -P tools/blender/generar_ciudad.py`
   regenera el kit de la ciudad (`modelos/ciudad/`, con vistas previas en `previas/`; las piezas del mapa V3 están en
   `tools/blender/ciudad_v3.py`, que el generador ejecuta adentro) y `... -P tools/blender/generar_parque.py` el del parque

@@ -15,6 +15,7 @@ const PASILLO := 1.3        ## Ancho de los pasillos entre filas
 const BANDA_PARED := 1.0    ## Lo que queda para los muebles de las paredes
 const ENTRADA := 2.2        ## Hondo libre detrás de la vidriera
 const COLGANTE_Y := 4.3     ## A qué altura queda la parte de abajo de las lámparas
+const SEPARACION_MOSTRADORES := 0.15   ## Aire entre dos mostradores puestos uno al lado del otro
 
 ## Por rubro: [mostrador, cuántos, pieza del medio, modo ("filas", "grilla" o ""), alto máximo de esa
 ## pieza, giro de la pieza del medio, lámpara].
@@ -54,11 +55,14 @@ static func armar(sala: Node3D, ce: CasaEnterable, tema: String) -> int:
 	var nombre_m: String = p[0]
 	var tam_m: Vector3 = MueblesDatos.PIEZAS[nombre_m]["tam"]
 	var cuantos: int = p[1]
-	var largo := tam_m.x * cuantos
+	# Con aire entre mostrador y mostrador: pegados, el segundo "chocaba" con el primero (_cruzan deja
+	# 0,1 m de margen) y no se ponía nunca
+	var paso_m := tam_m.x + SEPARACION_MOSTRADORES
+	var largo := tam_m.x * cuantos + SEPARACION_MOSTRADORES * (cuantos - 1)
 	var zm := -hz + 1.4 + tam_m.z / 2.0
 	var xm := clampf(ce.x_fondo, -hx + BANDA_PARED + largo / 2.0, hx - BANDA_PARED - largo / 2.0)
 	for k in cuantos:
-		var x := xm - largo / 2.0 + tam_m.x * (k + 0.5)
+		var x := xm - largo / 2.0 + tam_m.x / 2.0 + paso_m * k
 		if _pieza(sala, ce, nombre_m, Vector3(x, 0.02, zm), 0.0, 1.0):
 			cant += 1
 	ce.mesas.append(Vector3(xm, tam_m.y, zm))
@@ -141,7 +145,7 @@ static func armar(sala: Node3D, ce: CasaEnterable, tema: String) -> int:
 	var y_l := COLGANTE_Y - float(dl["y0"])
 	if lampara == "salames":
 		for k in cuantos:
-			Kit.colocar(sala, "salames", Vector3(xm - largo / 2.0 + tam_m.x * (k + 0.5), 3.4, zm), 0.0)
+			Kit.colocar(sala, "salames", Vector3(xm - largo / 2.0 + tam_m.x / 2.0 + paso_m * k, 3.4, zm), 0.0)
 			cant += 1
 		lampara = "lampara_colgante"
 		dl = MueblesDatos.PIEZAS[lampara]
@@ -179,12 +183,151 @@ static func _pieza(sala: Node3D, ce: CasaEnterable, nombre: String, pos: Vector3
 			continue
 		if _cruzan(c, e, giro, c2, e2, float(caja[2])):
 			return false
-	Kit.colocar(sala, nombre, pos - Vector3(0, float(d["y0"]) * s * sy, 0), giro, Vector3(s, s * sy, s))
+	var origen := pos - Vector3(0, float(d["y0"]) * s * sy, 0)
+	Kit.colocar(sala, nombre, origen, giro, Vector3(s, s * sy, s))
 	var forma := BoxShape3D.new()
 	forma.size = tam
-	Construir.colision(sala, c, forma, Vector3(0, giro, 0))
+	var c_col := c
+	# Si es un mueble donde se apoyan cosas (mesa, mostrador...), la colisión llega hasta su tapa y no
+	# hasta lo más alto del mueble (las sillas, una caja registradora): así lo que se apoya no queda
+	# metido adentro de la colisión, y la paloma se posa sobre la tapa de verdad
+	var t_mueble := Transform3D(Basis.from_euler(Vector3(0, giro, 0)) * Basis.from_scale(Vector3(s, s * sy, s)), origen)
+	if nombre in APOYOS:
+		var ap := apoyos_de(nombre)
+		if not (ap["puntos"] as Array).is_empty():
+			var tapa := (t_mueble * Vector3(0, float(ap["altura"]), 0)).y
+			if tapa < c.y + e.y - 0.03:
+				forma.size.y = tapa - pos.y
+				c_col = Vector3(c.x, pos.y + forma.size.y / 2.0, c.z)
+			var lista: Array = ce.get_meta(&"apoyos", [])
+			lista.append([nombre, t_mueble])
+			ce.set_meta(&"apoyos", lista)
+	Construir.colision(sala, c_col, forma, Vector3(0, giro, 0))
 	ce.cajas.append([c, e, giro])
 	return true
+
+
+# ---------------------------------------------------------------- Cosas para tirar de un aletazo
+
+## Muebles de los locales donde se apoyan cosas (ver objetos()).
+const APOYOS := ["mesa_cafe", "mesa_mantel", "mesa_lectura", "puesto_frutas", "mostrador_quesos", "mostrador_torta",
+	"vitrina_tortas", "vitrina_helados", "caja_super", "banco_trabajo", "escritorio_pc", "mesada", "barril"]
+## Qué cosas hay sobre los mostradores y las mesas de cada rubro (Golpeable.TIPOS) y de qué colores.
+const OBJETOS := {
+	"supermercado": [["lata", "botella", "caja"], ["c8423a", "f2c23a", "3a7fd0", "4fa060", "e8823a"]],
+	"kiosco": [["caja", "lata", "botella"], ["e0403a", "f2c23a", "3a7fd0", "e86aa0", "8ad08a"]],
+	"farmacia": [["frasco", "caja"], ["f4f4f4", "bfe4f4", "f2d6e2", "3f9a5a"]],
+	"ferreteria": [["lata", "caja"], ["c0c4c8", "d8a03a", "c8423a", "3a6fc0"]],
+	"verduleria": [["fruta"], ["d8402e", "f0a030", "f2d23a", "6fae3a"]],
+	"floreria": [["florero"], ["4a6fd0", "e06a9a", "f4f1e8"]],
+	"fiambreria": [["queso", "botella"], ["f2d070", "e8c060", "7a2a3a"]],
+	"panaderia": [["pan"], ["c98a4a", "b8743a", "d8a060"]],
+	"libreria": [["libro"], ["2f5a8a", "8a2f3a", "4f7a3a", "d8b04a", "6b4a8a"]],
+	"cafe": [["taza", "vaso", "azucarera"], []],
+	"heladeria": [["vaso", "taza"], ["f6d6e2", "b8e0c8", "f4e4a8"]],
+	"restaurante": [["vaso", "botella", "florero"], ["7a2a3a", "2f4a2a"]],
+	"consultorio": [["frasco", "florero"], ["f4f4f4", "bfe4f4"]],
+	"oficina": [["taza", "libro", "florero"], ["2f5a8a", "f4f1e8"]],
+	"mecanico": [["lata"], ["c8423a", "2f3036", "d8a03a"]],
+	"peluqueria": [["frasco", "botella"], ["e06a9a", "f4f4f4", "6aa8e0"]],
+}
+const MAX_OBJETOS := 10    ## Cuántas cosas para tirar, como mucho, por local
+const POR_MUEBLE := 2      ## Y por mueble
+const RANGO_OBJETOS := 26.0   ## Desde más lejos no se distinguen (y adentro de un local casi no se ven desde la calle)
+
+static var _apoyos := {}
+
+
+## Dónde se puede apoyar algo sobre un mueble: los puntos planos y mirando para arriba que se ven desde
+## arriba (la tapa de la mesa, el mostrador), medidos con rayos sobre la malla del mueble. En
+## coordenadas de la malla: {"altura": la de la tapa, "puntos": [Vector3...]} (vacío si no tiene).
+static func apoyos_de(nombre: String) -> Dictionary:
+	if _apoyos.has(nombre):
+		return _apoyos[nombre]
+	var res := {"altura": 0.0, "puntos": []}
+	_apoyos[nombre] = res
+	var malla := Kit.malla(nombre)
+	if malla == null:
+		return res
+	var tm := malla.generate_triangle_mesh()
+	var d: Dictionary = MueblesDatos.PIEZAS[nombre]
+	var tam: Vector3 = d["tam"]
+	var arriba := float(d["y1"]) + 0.5
+	var hits: Array[Vector3] = []
+	var n := 9
+	for i in n:
+		for j in n:
+			var x := (float(i) / (n - 1) - 0.5) * tam.x * 0.8
+			var z := (float(j) / (n - 1) - 0.5) * tam.z * 0.8
+			var r := tm.intersect_ray(Vector3(x, arriba, z), Vector3.DOWN)
+			if r.is_empty():
+				continue
+			var p: Vector3 = r["position"]
+			var nor: Vector3 = r["normal"]
+			if absf(nor.y) > 0.95 and p.y > 0.45 and p.y < 1.3:
+				hits.append(p)
+	if hits.is_empty():
+		return res
+	# La tapa: la altura (de a 2 cm) donde más rayos pegan; se apoya ahí y en nada más
+	var votos := {}
+	for p in hits:
+		var k := roundi(p.y / 0.02)
+		votos[k] = int(votos.get(k, 0)) + 1
+	var mejor := 0
+	var mejor_votos := 0
+	for k: int in votos:
+		if int(votos[k]) > mejor_votos:
+			mejor_votos = votos[k]
+			mejor = k
+	var altura := mejor * 0.02
+	var puntos: Array = []
+	for p in hits:
+		if absf(p.y - altura) < 0.025:
+			puntos.append(p)
+	res["altura"] = altura
+	res["puntos"] = puntos
+	return res
+
+
+## Pone cosas que la paloma puede tirar de un aletazo (Golpeable) sobre los mostradores y las mesas del
+## local, de lo que vende cada rubro: latas y botellas en el súper, fruta en la verdulería, libros en la
+## librería, tazas en el café... Vuelven a su lugar a los 40 s (Golpeable).
+static func objetos(sala: Node3D, ce: CasaEnterable, tema: String) -> int:
+	var o: Array = OBJETOS.get(tema, [["caja"], []])
+	var tipos: Array = o[0]
+	var colores: Array = o[1]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(ce.nombre) + 17
+	var puestos := 0
+	var apoyos: Array = ce.get_meta(&"apoyos", [])
+	# Con pocos muebles (un solo mostrador) van más cosas en cada uno
+	var por_mueble := clampi(ceili(6.0 / maxf(apoyos.size(), 1.0)), POR_MUEBLE, 4)
+	for a: Array in apoyos:
+		if puestos >= MAX_OBJETOS:
+			break
+		var puntos: Array = (apoyos_de(a[0])["puntos"] as Array).duplicate()
+		var t: Transform3D = a[1]
+		var elegidos: Array[Vector3] = []
+		while not puntos.is_empty() and elegidos.size() < por_mueble:
+			var p: Vector3 = puntos.pop_at(rng.randi_range(0, puntos.size() - 1))
+			var lejos := true
+			for q in elegidos:
+				if Vector2(p.x - q.x, p.z - q.z).length() < 0.3:
+					lejos = false
+			if lejos:
+				elegidos.append(p)
+		for p in elegidos:
+			if puestos >= MAX_OBJETOS:
+				break
+			var tipo: String = tipos[rng.randi_range(0, tipos.size() - 1)]
+			var color := Color.WHITE if colores.is_empty() else Color(colores[rng.randi_range(0, colores.size() - 1)])
+			var g := Golpeable.crear(sala, tipo, sala.to_global(t * p) + Vector3.UP * 0.003, color, 1.0, false, null,
+				RANGO_OBJETOS)
+			g.rotation.y = rng.randf() * TAU
+			g.fijar_origen()
+			puestos += 1
+	ce.set_meta(&"objetos", puestos)
+	return puestos
 
 
 ## ¿Se tocan dos cajas giradas en Y? (con sus rectángulos de planta, aproximados por los que las

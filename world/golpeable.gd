@@ -20,7 +20,18 @@ const TIPOS := {
 	"sombrero": {"color": Color("f2e6c9"), "masa": 0.25},
 	"gorra": {"color": Color("c43c3c"), "masa": 0.2},
 	"maceta": {"color": Color("b86a4a"), "masa": 0.6},
+	# Lo de los locales de la planta baja (ver PlanoLocal.objetos): mercadería sobre mostradores y mesas
+	"lata": {"color": Color("c8423a"), "masa": 0.15},
+	"botella": {"color": Color("3f8a4a"), "masa": 0.25},
+	"caja": {"color": Color("f2c23a"), "masa": 0.12},
+	"fruta": {"color": Color("d8402e"), "masa": 0.12},
+	"libro": {"color": Color("2f5a8a"), "masa": 0.2},
+	"pan": {"color": Color("c98a4a"), "masa": 0.1},
+	"frasco": {"color": Color("f4f4f4"), "masa": 0.12},
+	"queso": {"color": Color("f2d070"), "masa": 0.2},
 }
+## Los que suenan a vidrio o loza al caer (los demás, un golpe sordo).
+const DE_VIDRIO := ["taza", "vaso", "azucarera", "florero", "maceta", "botella", "frasco"]
 
 ## Sólo para la "maceta": color de las hojas y de las flores ("" = sin flores).
 var color_hojas := Color("4a8a3a")
@@ -43,12 +54,15 @@ var _piezas: Array = []   ## [malla, transformación, color] de cada pieza: se f
 
 ## Desde esta distancia (m) no se dibuja: son cosas de unos centímetros y hay cientos en los cafés y locales
 const RANGO_VISIBLE := 45.0
+## Hasta dónde se dibuja este (adentro de un local, desde la calle casi no se ve: más cerca)
+var rango_visible := RANGO_VISIBLE
 
 
 ## Un objeto de mesa en "pos" (global).
 static func crear(padre: Node, tipo_objeto: String, pos: Vector3, color_objeto := Color.WHITE,
-		escala_objeto := 1.0, es_desechable := false, malla: Mesh = null) -> Golpeable:
+		escala_objeto := 1.0, es_desechable := false, malla: Mesh = null, rango := RANGO_VISIBLE) -> Golpeable:
 	var g := Golpeable.new()
+	g.rango_visible = rango
 	g.malla_propia = malla
 	g.tipo = tipo_objeto
 	g.color = color_objeto
@@ -128,7 +142,7 @@ func _al_chocar(_cuerpo: Node) -> void:
 	if _t_sonido > 0.0 or linear_velocity.length() < 0.8:
 		return
 	_t_sonido = 0.25
-	var nombre := "tintineo" if tipo in ["taza", "vaso", "azucarera", "florero", "maceta"] else "picoteo"
+	var nombre := "tintineo" if tipo in DE_VIDRIO else "picoteo"
 	AudioManager.reproducir_en(nombre, global_position, -6.0 if nombre == "tintineo" else -14.0)
 
 
@@ -211,6 +225,55 @@ func _armar() -> void:
 			var cupula := _esfera(0.15 * k)
 			_malla(cupula, color, Vector3(0, 0.11 * k, 0), Vector3(1, 0.8, 1))
 			_malla(_caja(Vector3(0.22, 0.03, 0.18) * k), color.darkened(0.2), Vector3(0, 0.03 * k, -0.17 * k))   # Visera
+		"lata":
+			forma.shape = _cilindro_forma(0.035 * k, 0.11 * k)
+			forma.position.y = 0.055 * k
+			_malla(_cilindro(0.035 * k, 0.035 * k, 0.11 * k), color, Vector3(0, 0.055 * k, 0))
+			_malla(_cilindro(0.03 * k, 0.03 * k, 0.012 * k), Color("c8ccd0"), Vector3(0, 0.112 * k, 0))   # Tapa
+			_malla(_cilindro(0.036 * k, 0.036 * k, 0.03 * k), Color.WHITE, Vector3(0, 0.06 * k, 0))   # Etiqueta
+		"botella":
+			forma.shape = _cilindro_forma(0.035 * k, 0.26 * k)
+			forma.position.y = 0.13 * k
+			_malla(_cilindro(0.035 * k, 0.035 * k, 0.18 * k), color, Vector3(0, 0.09 * k, 0))
+			_malla(_cilindro(0.014 * k, 0.034 * k, 0.06 * k), color, Vector3(0, 0.21 * k, 0))   # Cuello
+			_malla(_cilindro(0.016 * k, 0.016 * k, 0.025 * k), Color("e8c040"), Vector3(0, 0.25 * k, 0))   # Tapita
+			_malla(_cilindro(0.036 * k, 0.036 * k, 0.06 * k), Color("f4f1e8"), Vector3(0, 0.08 * k, 0))   # Etiqueta
+		"caja":
+			forma.shape = BoxShape3D.new()
+			(forma.shape as BoxShape3D).size = Vector3(0.12, 0.16, 0.06) * k
+			forma.position.y = 0.08 * k
+			_malla(_caja(Vector3(0.12, 0.16, 0.06) * k), color, Vector3(0, 0.08 * k, 0))
+			_malla(_caja(Vector3(0.08, 0.05, 0.062) * k), Color.WHITE, Vector3(0, 0.1 * k, 0))   # Etiqueta
+		"fruta":
+			forma.shape = SphereShape3D.new()
+			(forma.shape as SphereShape3D).radius = 0.045 * k
+			forma.position.y = 0.045 * k
+			_malla(_esfera(0.045 * k), color, Vector3(0, 0.045 * k, 0))
+			_malla(_caja(Vector3(0.008, 0.025, 0.008) * k), Color("5a3a24"), Vector3(0, 0.095 * k, 0))   # Cabito
+		"libro":
+			forma.shape = BoxShape3D.new()
+			(forma.shape as BoxShape3D).size = Vector3(0.15, 0.04, 0.21) * k
+			forma.position.y = 0.02 * k
+			_malla(_caja(Vector3(0.15, 0.04, 0.21) * k), color, Vector3(0, 0.02 * k, 0))
+			_malla(_caja(Vector3(0.14, 0.03, 0.005) * k), Color("f4f1e8"), Vector3(0.004 * k, 0.02 * k, 0.104 * k))   # Hojas
+		"pan":
+			forma.shape = _cilindro_forma(0.05 * k, 0.07 * k)
+			forma.position.y = 0.035 * k
+			_malla(_esfera(0.06 * k), color, Vector3(0, 0.035 * k, 0), Vector3(1.8, 0.65, 1.0))
+			for i in 3:   # Cortes de arriba
+				_malla(_caja(Vector3(0.012, 0.01, 0.07) * k), color.lightened(0.35), Vector3((i - 1) * 0.04 * k, 0.07 * k, 0))
+		"frasco":
+			forma.shape = _cilindro_forma(0.03 * k, 0.1 * k)
+			forma.position.y = 0.05 * k
+			_malla(_cilindro(0.03 * k, 0.03 * k, 0.08 * k), color, Vector3(0, 0.04 * k, 0))
+			_malla(_cilindro(0.022 * k, 0.022 * k, 0.025 * k), Color("3f9a5a"), Vector3(0, 0.09 * k, 0))   # Tapa
+		"queso":
+			forma.shape = BoxShape3D.new()
+			(forma.shape as BoxShape3D).size = Vector3(0.14, 0.08, 0.1) * k
+			forma.position.y = 0.04 * k
+			_malla(_caja(Vector3(0.14, 0.08, 0.1) * k), color, Vector3(0, 0.04 * k, 0))
+			for i in 2:   # Agujeros
+				_malla(_esfera(0.012 * k), color.darkened(0.25), Vector3((i - 0.5) * 0.06 * k, 0.05 * k, 0.05 * k))
 	add_child(forma)
 	_fusionar()
 
@@ -257,7 +320,7 @@ func _fusionar() -> void:
 	mi.mesh = Construir.combinar(_piezas, true)
 	mi.material_override = Construir.material_vertices(0.7)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mi.visibility_range_end = RANGO_VISIBLE * (0.7 if Ajustes.movil else 1.0)
+	mi.visibility_range_end = rango_visible * (0.7 if Ajustes.movil else 1.0)
 	mi.visibility_range_end_margin = 3.0
 	_visual.add_child(mi)
 	_piezas.clear()

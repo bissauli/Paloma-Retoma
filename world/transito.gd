@@ -556,6 +556,27 @@ func _conducir(a: Auto, delta: float, gente: Array[Node3D]) -> void:
 					hueco_lider = hueco
 		elif not forzar and paralelo > -0.5 and lat < 2.4 and hueco < 4.5:
 			deseada = minf(deseada, maxf(hueco - 1.0, 0.0) * 1.2)
+	# La carrocería entera del que va adelante, no sólo su centro: un colectivo que dobla despacio tiene el
+	# centro ya fuera del carril (y girado), pero la cola de 11 m sigue en el medio, y el que lo seguía se le
+	# metía adentro (la prueba larga encontró varios). Sólo cuenta si "a" viene detrás de "b" (así dos que
+	# se cruzan no se frenan uno al otro: eso lo resuelven los turnos de los cruces; probado, frenar
+	# también ahí dejaba autos parados en el medio del cruce), y nunca cuando ya esperó demasiado (forzar)
+	if not forzar:
+		for b in _autos:
+			if b == a or not is_instance_valid(b):
+				continue
+			var rel_b := b.global_position - a.global_position
+			if rel_b.length() > (a.largo + b.largo) / 2.0 + 10.0:
+				continue
+			if b.ruta == a.ruta and b.s > a.s:
+				# Misma ruta: la distancia sobre la ruta (en una curva cerrada el de adelante ya dobló y su
+				# carrocería queda de costado, fuera de la línea del que lo sigue)
+				deseada = minf(deseada, maxf((b.s - a.s - (a.largo + b.largo) / 2.0 - 2.0) * 1.4, 0.0))
+			if rel_b.dot(b.adelante()) < 0.0:
+				continue
+			var hueco := _hueco_hasta(a, b)
+			if hueco < INF:
+				deseada = minf(deseada, maxf((hueco - 2.0) * 1.4, 0.0))
 	# Esquinas: doblan más despacio
 	var c: Curve3D = r["curva"]
 	var largo: float = r["largo"]
@@ -632,6 +653,24 @@ func _conducir(a: Auto, delta: float, gente: Array[Node3D]) -> void:
 	a.s += a.velocidad * delta
 	_ubicar(a)
 	a.bocina_enfriamiento = maxf(a.bocina_enfriamiento - delta, 0.0)
+
+
+## Cuánto le falta a la trompa de "a" para tocar la carrocería de "b" (cinco puntos a lo largo de "b"),
+## si alguno está en su camino; INF si ninguno. Va parejo: es el mismo hueco que con el de adelante.
+func _hueco_hasta(a: Auto, b: Auto) -> float:
+	var fw := a.adelante()
+	var lado := Vector3(-fw.z, 0, fw.x)
+	var bf := b.adelante()
+	var rel_b := b.global_position - a.global_position
+	var de_costado := absf(bf.dot(lado))   # 0 si va parejo, 1 si va de través
+	var res := INF
+	for k in 5:
+		var p := rel_b + bf * lerpf(-b.largo / 2.0, b.largo / 2.0, k / 4.0)
+		var d := p.dot(fw)
+		if d <= 0.0 or absf(p.dot(lado)) > (a.ancho + b.ancho) / 2.0:
+			continue
+		res = minf(res, d - a.largo / 2.0 - b.ancho / 2.0 * de_costado)
+	return res
 
 
 ## Turno en el cruce: no puede haber adentro nadie de una ruta que lo choque, ni (salvo que ya esperó

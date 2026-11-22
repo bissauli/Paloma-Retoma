@@ -296,7 +296,12 @@ static var _suaves := {}      ## Forma de primitiva -> normales suavizadas de la
 ## los vértices); las demás, por material. Además se separan por celdas de "celda" metros (así la
 ## cámara sigue descartando lo que no ve) y por si proyectan sombra o no.
 ## Las colisiones no se tocan. Devuelve cuántas piezas se fusionaron.
+## Con "celda" <= 0 no se parte en celdas: todo queda en mallas con el origen en la raíz (un objeto
+## entero, como un edificio con sus locales: ver Pasaje.fusionar_edificios).
 static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
+	var sin_celdas := celda <= 0.0
+	if sin_celdas:
+		celda = 1.0e9
 	var grupos := {}
 	var fusionadas: Array[MeshInstance3D] = []
 	var inv := raiz.global_transform.affine_inverse()
@@ -324,12 +329,15 @@ static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
 				var desde := float(mi.get_meta(&"rango_desde", 0.0))   # versiones "de lejos" (ver Kit)
 				# Los pisos sin contorno de tinta (ver Kit.es_piso) van aparte y siguen sin contorno
 				var sin_contorno := mi.has_meta(&"sin_contorno")
-				var clave := "%d_%d_%s_%d_%d_%d_%d" % [floori(centro.x / celda), floori(centro.z / celda), clave_mat,
+				var clave := "%d_%d_%s_%d_%d_%d_%d" % [0 if sin_celdas else floori(centro.x / celda),
+					0 if sin_celdas else floori(centro.z / celda), clave_mat,
 					mi.cast_shadow, roundi(rango), roundi(desde), int(sin_contorno)]
 				if not grupos.has(clave):
 					# La malla fusionada queda con su origen en el centro de la celda: así la distancia
 					# de dibujo (visibility_range) se mide desde ahí y no desde el origen del mundo
 					var origen := Vector3((floori(centro.x / celda) + 0.5) * celda, 0.0, (floori(centro.z / celda) + 0.5) * celda)
+					if sin_celdas:
+						origen = Vector3.ZERO
 					grupos[clave] = {"mat": material_vertices(rugosidad_de(mat)) if con_color else mat,
 						"color": con_color, "sombra": mi.cast_shadow, "rango": rango, "desde": desde, "origen": origen,
 						"sin_contorno": sin_contorno, "piezas": []}

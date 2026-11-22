@@ -94,6 +94,15 @@ func _cuerpo_fisico() -> void:
 	cuerpo.collision_layer = CAPA_GENTE
 	cuerpo.collision_mask = 0
 	var superficies := Kit.superficies_auto(modelo)
+	var casco := Kit.casco_vehiculo(modelo) if superficies.is_empty() else []
+	if not casco.is_empty():
+		# Colectivo: la carrocería medida sobre el modelo, tramo por tramo (ver Kit.casco_vehiculo)
+		for f: ConvexPolygonShape3D in casco:
+			var cs_c := CollisionShape3D.new()
+			cs_c.shape = f
+			cuerpo.add_child(cs_c)
+		add_child(cuerpo)
+		return
 	var cs := CollisionShape3D.new()
 	var forma := BoxShape3D.new()
 	if superficies.is_empty():
@@ -112,6 +121,12 @@ func _cuerpo_fisico() -> void:
 			cuerpo.add_child(cs2)
 	cs.shape = forma
 	cuerpo.add_child(cs)
+	# La cabina con su forma de verdad: el parabrisas y la luneta inclinados (ver Kit.cabina_auto)
+	var cabina := Kit.cabina_auto(modelo)
+	if cabina:
+		var cs3 := CollisionShape3D.new()
+		cs3.shape = cabina
+		cuerpo.add_child(cs3)
 	add_child(cuerpo)
 
 

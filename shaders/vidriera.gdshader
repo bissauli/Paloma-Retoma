@@ -16,11 +16,13 @@ uniform vec3 c2 : source_color = vec3(0.95, 0.8, 0.25);
 uniform vec3 c3 : source_color = vec3(0.25, 0.5, 0.85);
 uniform vec3 c4 : source_color = vec3(0.3, 0.7, 0.35);
 // Las paredes: 0 cajas, 1 redondos, 2 ropa colgada, 3 botellas, 4 libros, 5 lavarropas, 6 cuadros,
-// 7 espejos de peluquería, 8 boiserie con carteles (banco)
+// 7 espejos de peluquería, 8 boiserie con carteles (banco), 9 pizarrón (escuela), 10 anteojos,
+// 11 local de comida (menú en el pizarrón y mostrador vidriado con bandejas al fondo; a los costados,
+// estantes con bandejas de comida), 12 bicis colgadas, 13 heladería (vitrina con baldes de helado)
 uniform int forma = 0;
 // Lo del medio: 0 mostrador a un costado, 1 nada, 2 banco para sentarse (galería), 3 sillones de
 // peluquería frente a los espejos, 4 línea de cajas con vidrio y fila con cordones (banco),
-// 5 escritorios con computadora
+// 5 escritorios con computadora, 6 la parrilla con brasas y su campana (y el mostrador)
 uniform int muebles = 0;
 uniform float damero = 0.0;     // 0 baldosas parejas, 1 blancas y negras
 uniform float filas = 4.0;      // Cuántos estantes
@@ -58,12 +60,153 @@ float marco(vec2 p, vec2 lo, vec2 hi, float borde) {
 	return (p.x < lo.x + borde || p.x > hi.x - borde || p.y < lo.y + borde || p.y > hi.y - borde) ? 1.0 : 2.0;
 }
 
+// Distancia de "p" al segmento a-b
+float segmento(vec2 p, vec2 a, vec2 b) {
+	vec2 ab = b - a;
+	float k = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0);
+	return length(p - a - ab * k);
+}
+
+// El menú escrito en tiza (renglones con el plato a la izquierda y el precio a la derecha)
+vec3 menu(vec2 q, vec2 lo, vec2 hi, float sem) {
+	float m = marco(q, lo, hi, 0.05);
+	if (m == 1.0) {
+		return mueble * 1.2;
+	}
+	float renglon = floor((q.y - lo.y - 0.08) / 0.13);
+	float fr = fract((q.y - lo.y - 0.08) / 0.13);
+	float x = (q.x - lo.x) / (hi.x - lo.x);
+	bool letra = fr > 0.45 && fr < 0.62 && renglon >= 0.0 && renglon < 5.0
+		&& ((x > 0.08 && x < 0.35 + 0.3 * azar(vec3(renglon, sem, 3.0))) || (x > 0.8 && x < 0.92));
+	return letra ? (x > 0.78 ? c2 * 1.2 : vec3(0.9)) : vec3(0.14, 0.16, 0.15);
+}
+
+// Una cosa de comer sobre una bandeja, de perfil: media luna (empanada), redonda o alargada según "h"
+bool comida(vec2 q, float ancho, float h) {
+	vec2 d = vec2(q.x / (ancho * 0.45), q.y / (ancho * (h < 0.5 ? 0.28 : 0.38)));
+	return q.y >= 0.0 && length(d) < 1.0;
+}
+
 // Una pared: "u" a lo largo de la pared, "v" la altura sobre el piso, "lado" -1/1 los costados y 0 el
 // fondo, "f" lo que tiene (ver "forma")
 vec3 estantes(float u, float v, float lado, float sem, int f) {
 	vec3 col = pared;
 	if (v < 0.12) {
 		return mueble * 0.6;   // Zócalo
+	}
+	if (f == 11 || f == 13) {   // Comida o helados: al fondo, el menú arriba y el mostrador vidriado abajo
+		if (lado == 0.0) {
+			if (v > 1.3 && v < 2.15) {
+				float cw = 2.2;
+				float fu = fract(u / cw) * cw;
+				if (fu > 0.3 && fu < 1.9) {
+					return menu(vec2(fu, v), vec2(0.3, 1.3), vec2(1.9, 2.15), sem + floor(u / cw));
+				}
+				return col;
+			}
+			if (v < 0.4) {
+				return mueble * (fract(u / 0.9) < 0.02 ? 0.7 : 0.9);
+			}
+			if (v < 1.02) {   // El vidrio del mostrador, con lo que hay adentro
+				if (v > 0.97 || fract(u / 1.8) < 0.015) {
+					return vec3(0.72, 0.74, 0.76);   // Marco de aluminio
+				}
+				vec3 adentro = vec3(0.9, 0.92, 0.9);
+				if (f == 13) {   // Baldes de helado en fila, cada uno de un gusto
+					float bw = 0.34;
+					float fb = fract(u / bw);
+					float gusto = azar(vec3(floor(u / bw), sem, 5.0));
+					if (fb > 0.08 && fb < 0.92 && v > 0.5 && v < 0.84) {
+						float copete = 0.78 + 0.05 * sin(fb * 9.0 + gusto * 6.0);
+						adentro = v < 0.62 ? vec3(0.75, 0.77, 0.8) : (v < copete ? mix(color_de(gusto), vec3(1.0), 0.35) : adentro);
+					}
+				} else {         // Dos bandejas, una arriba de la otra, con la comida
+					for (int k = 0; k < 2; k++) {
+						float base = 0.5 + float(k) * 0.24;
+						if (v > base - 0.02 && v < base) {
+							return mueble * 1.3;
+						}
+						float iw = celda;
+						float fi = fract(u / iw);
+						float h = azar(vec3(floor(u / TRAMO), float(k), sem));
+						if (comida(vec2((fi - 0.5) * iw, v - base), iw, h)) {
+							adentro = color_de(h) * (0.85 + 0.25 * (v - base) / 0.12);
+						}
+					}
+				}
+				return mix(adentro, vec3(0.75, 0.85, 0.9), 0.15);
+			}
+			return col;
+		}
+		if (f == 13) {   // A los costados de la heladería: cuadros de cucuruchos y un mueble bajo
+			f = 6;
+		} else {         // A los costados: estantes con bandejas de comida
+			float rh = 0.42;
+			float r = floor((v - 0.5) / rh);
+			if (v < 0.5) {
+				return mueble * 0.85;
+			}
+			if (r >= 3.0) {
+				return col;
+			}
+			float fv = fract((v - 0.5) / rh) * rh;
+			if (fv < 0.03) {
+				return mueble * 0.9;
+			}
+			if (fv < 0.05) {
+				return vec3(0.78, 0.8, 0.82);   // La bandeja
+			}
+			float h = azar(vec3(floor(u / TRAMO), r + lado * 7.0, sem));
+			float fi = fract(u / celda);
+			if (comida(vec2((fi - 0.5) * celda, fv - 0.05), celda, h)) {
+				return color_de(h) * (0.85 + 0.6 * (fv - 0.05));
+			}
+			return col;
+		}
+	}
+	if (f == 12) {   // Bicicletería: bicis colgadas en las paredes, cada una de un color; abajo, cascos
+		if (v < 0.75) {
+			if (v > 0.68) {
+				return mueble * 1.1;
+			}
+			float fu = fract(u / 0.45);
+			vec2 d = vec2((fu - 0.5) * 0.45, v - 0.42);
+			if (length(d * vec2(1.0, 1.4)) < 0.15 && v > 0.42) {
+				return color_de(azar(vec3(floor(u / 0.45), lado, sem)));   // Un casco
+			}
+			return mueble * 0.85;
+		}
+		float cw = 1.4;
+		float fu = fract(u / cw) * cw;
+		vec2 q = vec2(fu, v);
+		vec3 cuadro = color_de(azar(vec3(floor(u / cw), lado, sem)));
+		vec2 rueda_a = vec2(0.33, 1.3);
+		vec2 rueda_b = vec2(1.07, 1.3);
+		float ra = abs(length(q - rueda_a) - 0.27);
+		float rb = abs(length(q - rueda_b) - 0.27);
+		if (ra < 0.025 || rb < 0.025) {
+			return vec3(0.12);   // Cubiertas
+		}
+		if (length(q - rueda_a) < 0.03 || length(q - rueda_b) < 0.03) {
+			return vec3(0.6);    // Mazas
+		}
+		vec2 eje = vec2(0.62, 1.3);
+		vec2 asiento = vec2(0.55, 1.62);
+		vec2 manubrio = vec2(0.98, 1.64);
+		float cuadro_d = min(min(segmento(q, rueda_a, eje), segmento(q, eje, asiento)),
+			min(min(segmento(q, asiento, manubrio), segmento(q, eje, manubrio)),
+				min(segmento(q, manubrio, rueda_b), segmento(q, rueda_a, asiento))));
+		if (cuadro_d < 0.022) {
+			return cuadro;
+		}
+		if (segmento(q, asiento + vec2(-0.07, 0.03), asiento + vec2(0.07, 0.03)) < 0.025
+				|| segmento(q, manubrio + vec2(-0.05, 0.04), manubrio + vec2(0.06, 0.06)) < 0.02) {
+			return vec3(0.15);   // Asiento y manubrio
+		}
+		if (segmento(q, vec2(0.55, 1.95), vec2(0.55, 1.68)) < 0.012 || segmento(q, vec2(0.98, 1.95), vec2(0.98, 1.7)) < 0.012) {
+			return vec3(0.45);   // Los ganchos de donde cuelga
+		}
+		return col;
 	}
 	if (f == 7) {   // Peluquería: espejos grandes a los costados con su repisa; al fondo, productos
 		if (lado == 0.0) {
@@ -303,6 +446,23 @@ vec3 interior(vec3 pos, vec3 cam, vec2 med, float sem) {
 		float xa = lado_m < 0.0 ? -hx + 0.25 : hx - 0.25 - mw;
 		t = caja(ro, rd, vec3(xa, y0, -1.55), vec3(xa + mw, y0 + 0.88, -0.95), t, mueble, cm);
 		t = caja(ro, rd, vec3(xa - 0.04, y0 + 0.88, -1.6), vec3(xa + mw + 0.04, y0 + 0.95, -0.9), t, mueble * 1.2, cm);
+	} else if (muebles == 6) {   // La parrilla: de ladrillo, con la grilla sobre las brasas y la campana arriba
+		float pw = min(1.6, med.x * 0.8);
+		float xa = lado_m < 0.0 ? -hx + 0.2 : hx - 0.2 - pw;
+		float z0 = -fondo + 0.15;
+		float z1 = -fondo + 1.05;
+		t = caja(ro, rd, vec3(xa, y0, z0), vec3(xa + pw, y0 + 0.82, z1), t, vec3(0.62, 0.3, 0.22), cm);
+		t = caja(ro, rd, vec3(xa + 0.08, y0 + 0.82, z0 + 0.08), vec3(xa + pw - 0.08, y0 + 0.86, z1 - 0.08), t, vec3(1.5, 0.55, 0.15), cm);
+		for (int i = 0; i < 4; i++) {   // Los cortes sobre la grilla
+			float cx = xa + 0.2 + float(i) * (pw - 0.4) / 3.0;
+			t = caja(ro, rd, vec3(cx - 0.13, y0 + 0.86, z0 + 0.25), vec3(cx + 0.13, y0 + 0.92, z1 - 0.25), t, c1, cm);
+		}
+		t = caja(ro, rd, vec3(xa - 0.05, y0 + 1.75, z0), vec3(xa + pw + 0.05, y0 + 1.95, z1 + 0.1), t, vec3(0.55, 0.56, 0.58), cm);
+		// Y el mostrador del otro lado, cerca del vidrio
+		float mw = min(1.6, med.x * 0.8);
+		float xm = lado_m < 0.0 ? hx - 0.25 - mw : -hx + 0.25;
+		t = caja(ro, rd, vec3(xm, y0, -1.55), vec3(xm + mw, y0 + 0.88, -0.95), t, mueble, cm);
+		t = caja(ro, rd, vec3(xm - 0.04, y0 + 0.88, -1.6), vec3(xm + mw + 0.04, y0 + 0.95, -0.9), t, mueble * 1.2, cm);
 	} else if (muebles == 2) {   // Un banco largo en el medio, para mirar los cuadros
 		t = caja(ro, rd, vec3(-0.8, y0 + 0.38, -1.9), vec3(0.8, y0 + 0.46, -1.45), t, mueble * 1.1, cm);
 		t = caja(ro, rd, vec3(-0.7, y0, -1.8), vec3(-0.6, y0 + 0.38, -1.55), t, mueble * 0.7, cm);

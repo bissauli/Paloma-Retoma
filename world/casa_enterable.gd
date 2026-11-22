@@ -309,8 +309,6 @@ func _robar_salame() -> void:
 	_salame.position = Vector3(0, -0.02, 0.05)
 	_salame.rotation = Vector3(PI / 2.0, 0, 0)
 	_salame.scale = Vector3.ONE * 0.6
-	if _barras:
-		_barras.texto("¡Se robó un salame!")
 	AudioManager.reproducir("recoger", -2.0, false)
 
 
@@ -433,8 +431,7 @@ func _empezar(desde_frente: bool) -> void:
 	if nombre != "":
 		_barras.titulo(_titulo_traducido())
 	_vista = -cam_juego.global_transform.basis.z
-	if not textos.is_empty():
-		_barras.texto(textos.pick_random())
+	# Sin frases en las barras mientras cruza (sólo la placa con el nombre del lugar): la escena se ve sola
 	AudioManager.reproducir("aleteo")
 	_corriendo = true
 

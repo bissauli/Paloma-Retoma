@@ -1696,7 +1696,7 @@ const PIEZAS := {
 		"carpeta": "edificios",
 		"sombra": true,
 		"rango": 0.0,
-		"tris": 8902,
+		"tris": 8686,
 		"min": [-16.1, -0.0396, -16.35],
 		"max": [16.1, 15.2, 2.86],
 		"ancho": 32,
