@@ -28,7 +28,6 @@ const ALTURA_LIBRE := 6.0     ## Hasta esta altura se oye completo
 const ALTURA_MUDA := 50.0     ## A esta altura ya casi no se oye
 const PISO_ALTURA := 0.15
 const BAJA_DIALOGO := 0.5
-const DESPLAZAMIENTO_MAX := 4.0   ## Segundos como mucho desde el inicio al empezar a sonar
 
 var _reproductores: Array[AudioStreamPlayer] = []
 var _nivel: Array[float] = []        ## Volumen lineal actual de cada zona (0..1)

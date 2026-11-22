@@ -589,10 +589,6 @@ func _rearmar_fisica() -> void:
 	_crear_cuerpo_fisico()
 
 
-func gesto_comer() -> void:
-	_hacer_gesto("comer", 0.25, 0.35, 0.3)
-
-
 func gesto_tirar() -> void:
 	_hacer_gesto("tirar", 0.15, 0.05, 0.3)
 

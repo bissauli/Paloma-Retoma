@@ -17,7 +17,6 @@ const RETARDO_AUTO := 1.0      ## En el teléfono: segundos quieta en el agua an
 var solo_bano := false          ## Sólo la zona de baño: la fuente (modelo y colisión) ya la puso otro (ver crear_bano)
 
 var _y_agua := 0.0
-var _chorro: CPUParticles3D
 var _salpicadura: CPUParticles3D
 var _rafaga: CPUParticles3D
 var _aviso_puesto := false
@@ -164,24 +163,6 @@ func _particulas(cantidad: int, vida: float, de_golpe: bool) -> CPUParticles3D:
 	return p
 
 
-## El chorro de la fuente: gotas que suben y caen en arco.
-func _armar_chorro(pos: Vector3) -> void:
-	_chorro = CPUParticles3D.new()
-	_chorro.amount = 18
-	_chorro.lifetime = 1.15
-	_chorro.direction = Vector3.UP
-	_chorro.spread = 13.0
-	_chorro.initial_velocity_min = 2.8
-	_chorro.initial_velocity_max = 3.5
-	_chorro.gravity = Vector3(0, -6.5, 0)
-	_chorro.emission_shape = CPUParticles3D.EMISSION_SHAPE_POINT
-	_chorro.mesh = _gota(0.055, 0.9)
-	_chorro.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_chorro.visibility_range_end = 50.0
-	_chorro.position = pos
-	add_child(_chorro)
-
-
 ## Un anillo que sale del chorro hacia el borde, una y otra vez (donde caen las gotas).
 func _armar_onda_continua(_agua: Material) -> void:
 	var anillo := _anillo(0.55)
@@ -247,11 +228,6 @@ func _physics_process(delta: float) -> void:
 		_terminar_bano()
 	if _banando:
 		_pasar_bano(j, delta)
-
-
-## ¿Se está pidiendo el aviso "E · BAÑARSE" de esta fuente? (lo miran las pruebas)
-func aviso_visible() -> bool:
-	return _aviso_puesto and AvisoAccion.visible_de(_id_aviso())
 
 
 func _id_aviso() -> String:

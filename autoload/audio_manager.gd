@@ -152,11 +152,6 @@ func sonido(nombre: String) -> AudioStream:
 	return _sonidos.get(nombre)
 
 
-func detener_ambiente() -> void:
-	_ambiente.stop()
-	_musica.stop()
-
-
 ## Bus de audio por el que sale cada sonido (lo regula Opciones > Audio).
 func bus_de(nombre: String) -> StringName:
 	if nombre == "ambiente":

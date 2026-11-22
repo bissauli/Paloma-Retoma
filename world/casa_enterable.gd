@@ -27,7 +27,6 @@ enum Estilo { PERSECUCION, TIRABUZON, GRUA, DE_FRENTE, CENITAL }
 
 const ESPESOR := 0.4          ## Grosor de las paredes
 const AVISO := 3.0            ## Metros antes de la ventana en que arranca la cinemática
-const VEL_MIN := 0.5          ## Velocidad mínima hacia la ventana para que cuente
 const ENFRIAMIENTO := 1.5     ## Segundos sin volver a disparar después de una pasada
 const CALLEJON := 4.0         ## Metros libres detrás de la casa (hasta el borde del mapa)
 const VENTANA_ANCHO := 3.0

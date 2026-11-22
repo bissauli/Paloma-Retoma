@@ -10,7 +10,6 @@ extends RefCounted
 ## Sólo datos y cuentas: no sabe de la interfaz ni del perfil.
 
 const TAM := 128
-const MAX_PINCEL := 3
 
 static var _listo := false
 static var _pos := PackedVector3Array()    ## 3 vértices por triángulo (espacio del GLB, en reposo)

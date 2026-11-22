@@ -4,7 +4,6 @@ extends Node3D
 ## ciudad entera unos 394 x 222 m (ver Ciudad.X_MIN...).
 
 const ANCHO := 120.0
-const LARGO := 80.0
 
 # Paleta
 const C_ASFALTO := Color("76787a")

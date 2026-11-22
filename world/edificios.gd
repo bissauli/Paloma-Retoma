@@ -5,7 +5,6 @@ extends RefCounted
 
 const C_BLANCO := Color("f4f1e8")
 const C_CREMA := Color("e6dccb")
-const C_TEJAS := Color("b5532f")
 const C_ROSADA := Color("e8a0a0")
 const C_ROSADA_OSC := Color("c98585")
 const C_VENTANA := Color("3b4250")

@@ -25,7 +25,6 @@ const C_BLANCO := Color("f4f1e8")
 const C_VENTANA := Color("3b4250")
 const C_MADERA := Color("8a5a35")
 const C_METAL := Color("3f4a45")
-const C_ORO := Color("d8b04a")
 const PLANTA_BAJA := 6.0   ## Alto de cada sala (ocupa casi dos pisos)
 const ALTO_PISO := 3.2     ## Alto de cada piso del edificio (como Edificios.ventanas)
 const PISO_MIN := 2        ## El departamento va arriba del local (que ocupa la planta baja y el 1.º)...
