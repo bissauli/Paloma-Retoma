@@ -20,6 +20,8 @@ func _ready() -> void:
 	_crear_piso()
 	_crear_limites()
 	_crear_zonas()
+	# La bici y el macetón de cada edificio con locales, sobre la vereda (no hundidos en ella)
+	Pasaje.apoyar_en_vereda(self)
 	# Todo lo de la plaza que se ve tiene colisión (ver ColisionFaltante; la ciudad hace lo suyo)
 	ColisionFaltante.completar(self)
 	# Cada edificio con locales, en sus propias mallas (una sola pieza: ver Pasaje.fusionar_edificios)

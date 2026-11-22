@@ -241,10 +241,14 @@ func empezar_por_boton(desde_frente: bool) -> void:
 
 
 ## Lo que cuelga del techo: péndulos amortiguados. Cuando la paloma pasa cerca (por debajo) les da
-## un empujón en la dirección en que vuela; los ventiladores giran siempre.
+## un empujón en la dirección en que vuela; los ventiladores giran siempre. Fuera de la cinemática
+## también: si la paloma lo choca o le pasa volando al lado, se hamaca (ver empujar_colgantes).
 func _animar_colgantes(delta: float) -> void:
 	var lp := to_local(_pos) if _corriendo else Vector3(INF, INF, INF)
 	var lv := global_transform.basis.inverse() * (_dir * _velocidad(_s)) if _corriendo else Vector3.ZERO
+	var j := GameState.jugador
+	if not _corriendo and j and j.velocity.length() > 0.6:
+		empujar_colgantes(j.global_position + Vector3.UP * 0.22, j.velocity, 0.4, true)
 	for piv in colgantes:
 		if piv.has_meta(&"gira"):
 			piv.rotation.y += delta * 7.0
@@ -262,6 +266,42 @@ func _animar_colgantes(delta: float) -> void:
 			st[k] = clampf(float(st[k]) + float(st[k + 1]) * delta, -0.7, 0.7)
 		_pendulos[piv] = st
 		piv.rotation = Vector3(st[0], piv.rotation.y, st[2])
+
+
+## Empuja lo que cuelga cerca de "desde" (global): lo que esté a menos de "alcance" metros de su
+## contorno se hamaca hacia "impulso" (una velocidad, global, en m/s). Con "rozar", cada cosa recibe un
+## empujón y no otro hasta que la paloma se aleja (si no, pegada a la lámpara la empujaría sin parar).
+## Lo usan el vuelo de la paloma (_animar_colgantes) y el aletazo (PalomaJugador._golpear_adelante).
+## Devuelve cuántas cosas movió.
+func empujar_colgantes(desde: Vector3, impulso: Vector3, alcance: float, rozar := false) -> int:
+	var lp := to_local(desde)
+	var li := global_transform.basis.inverse() * impulso
+	var movidos := 0
+	for piv in colgantes:
+		if piv.has_meta(&"gira"):
+			continue
+		var medio: Vector3 = piv.get_meta(&"medio", Vector3(0.3, 0.3, 0.3))
+		var largo := float(piv.get_meta(&"largo", 1.5))
+		var st: Array = _pendulos.get(piv, [0.0, 0.0, 0.0, 0.0])
+		# Dónde está ahora la cosa que cuelga (el pivote está en el techo y se hamaca)
+		var centro := piv.position + Basis.from_euler(Vector3(float(st[0]), 0.0, float(st[2]))) * Vector3(0, -largo, 0)
+		var d := lp - centro
+		var fuera := Vector3(maxf(absf(d.x) - medio.x, 0.0), maxf(absf(d.y) - medio.y, 0.0), maxf(absf(d.z) - medio.z, 0.0))
+		var cerca := fuera.length() < alcance
+		if rozar:
+			if not cerca:
+				piv.remove_meta(&"rozado")
+				continue
+			if piv.has_meta(&"rozado"):
+				continue
+			piv.set_meta(&"rozado", true)
+		elif not cerca:
+			continue
+		st[3] += clampf(li.x, -12.0, 12.0) * 0.12
+		st[1] -= clampf(li.z, -12.0, 12.0) * 0.12
+		_pendulos[piv] = st
+		movidos += 1
+	return movidos
 
 
 ## Papeles que vuelan de una mesa (la oficina): un estallido de hojas que caen planeando.

@@ -252,11 +252,12 @@ func medir_suelo(p: Vector3) -> float:
 	return (r["position"] as Vector3).y
 
 
-## Rayo contra el mundo (capa 1).
-func _rayo_mundo(desde: Vector3, hasta: Vector3) -> Dictionary:
+## Rayo contra el mundo (capa 1). Para moverse, también contra lo que sólo frena a las palomas
+## (Construir.CAPA_PALOMAS: el colchón de las vidrieras), pero no para buscar el piso (no es un piso).
+func _rayo_mundo(desde: Vector3, hasta: Vector3, mascara := 1) -> Dictionary:
 	_rayo.from = desde
 	_rayo.to = hasta
-	_rayo.collision_mask = 1
+	_rayo.collision_mask = mascara
 	return get_world_3d().direct_space_state.intersect_ray(_rayo)
 
 
@@ -279,7 +280,7 @@ func mover_con_choques(desp: Vector3) -> void:
 	var hasta := desde + desp
 	if largo_h > 0.0001:
 		hasta += horiz / largo_h * RADIO_CHOQUE
-	var r := _rayo_mundo(desde, hasta)
+	var r := _rayo_mundo(desde, hasta, 1 | Construir.CAPA_PALOMAS)
 	if r.is_empty():
 		global_position += desp
 		return
@@ -301,7 +302,7 @@ func mover_con_choques(desp: Vector3) -> void:
 	if vel_adentro < 0.0:
 		velocidad -= n * vel_adentro
 	# El deslizamiento también se chequea (por ejemplo en una esquina)
-	if _rayo_mundo(desde, desde + desp + n * 0.01).is_empty():
+	if _rayo_mundo(desde, desde + desp + n * 0.01, 1 | Construir.CAPA_PALOMAS).is_empty():
 		global_position += desp
 	# Si quedó demasiado pegada, la separa un poquito de la pared
 	var hn := Vector3(n.x, 0.0, n.z)

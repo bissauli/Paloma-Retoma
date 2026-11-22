@@ -236,6 +236,31 @@ static func fusionar_edificios(raiz: Node) -> int:
 	return cuantos
 
 
+## La bici y el macetón de la vereda (meta "apoyar") se arman a la altura de la base del edificio,
+## pero la vereda de adelante está más alta (16 cm en casi toda la plaza; en algunas, al ras): la bici
+## quedaba con las ruedas hundidas en las baldosas. Acá se bajan o suben hasta el piso que tienen
+## debajo. Llamarlo con el piso ya en el árbol y antes de ColisionFaltante.completar y de fusionar.
+static func apoyar_en_vereda(raiz: Node3D) -> int:
+	var esp := raiz.get_world_3d().direct_space_state
+	var cuantos := 0
+	for e in raiz.get_tree().get_nodes_in_group(GRUPO_EDIFICIOS):
+		if not raiz.is_ancestor_of(e):
+			continue
+		for h in (e as Node).get_children():
+			var mi := h as MeshInstance3D
+			if mi == null or not mi.has_meta(&"apoyar"):
+				continue
+			var g := mi.global_position
+			mi.remove_meta(&"apoyar")
+			var q := PhysicsRayQueryParameters3D.create(g + Vector3(0, 0.6, 0), g + Vector3(0, -0.6, 0), Construir.CAPA_MUNDO)
+			var r := esp.intersect_ray(q)
+			# Sólo un piso (vereda o calle): lo que esté más alto es otra cosa (un cantero, un banco)
+			if r and absf((r["position"] as Vector3).y - g.y) < 0.3:
+				mi.global_position.y = (r["position"] as Vector3).y
+				cuantos += 1
+	return cuantos
+
+
 ## Arma los edificios de alrededor de la plaza: cada uno con un local en la planta baja y un ambiente
 ## de departamento en un piso al azar. Cada partida sortea locales, ambientes y pisos (con la variable
 ## de entorno PALOMA_SEMILLA se puede fijar). Devuelve todas las salas (locales y ambientes).
@@ -418,12 +443,16 @@ static func _sala(padre: Node3D, casa: Node3D, w_edificio: float, d: float, colo
 		_mas_adornos(sala, ce, tema)
 	if local:   # En el local también cuentan los muebles de las paredes (estantes, heladeras...)
 		ce.obstaculos += (ce.get_meta(&"ocupado", []) as Array).size()
-		PlanoLocal.objetos(sala, ce, tema)   # Mercadería sobre mostradores y mesas, para tirar de un aletazo
+	# Lo que se tira de un aletazo: mercadería sobre mostradores y mesas en los locales; platos, vasos y
+	# floreros en los departamentos (lo de vidrio y loza se rompe)
+	PlanoLocal.objetos(sala, ce, tema)
 	# El nodo de la sala cuelga del edificio (todo el edificio es una sola pieza: ver fusionar_edificios)
 	casa.add_child(ce)
 	ce.transform = Transform3D(Basis.IDENTITY, Vector3(x_off, y0, 0))
 	if local:
 		GenteLocal.poblar(sala, ce)   # Empleado y clientes
+	else:
+		Vecinos.habitar(sala, ce, tema)   # Los que viven ahí (sentados, cocinando, ordenando...)
 	return ce
 
 ## La ruta por adentro: de la ventana de adelante a la de atrás, cruzando el cuarto de punta a punta
@@ -614,6 +643,7 @@ static func _poner(casa: Node3D, ce: CasaEnterable, tema: String, tipo: String, 
 	if largo > 0.05:
 		Construir.cilindro(pivote, Vector3(0, -largo / 2.0, 0), 0.02, largo, Color("2a2a2a"), false, 4)
 	pivote.set_meta(&"largo", PLANTA_BAJA - c.y)
+	pivote.set_meta(&"medio", e)   # Para saber cuándo lo toca la paloma (CasaEnterable.empujar_colgantes)
 	ce.colgantes.append(pivote)
 	return true
 
@@ -1067,13 +1097,13 @@ static func _fachada(casa: Node3D, w: float, h: float, d: float, bandas: Array, 
 			ocupados.append(Vector2(hx, VIDRIERA_MEDIA))
 		var xm := _x_vereda_libre(w, [xp + e * 1.8, xp - e * 1.8], MACETON_MEDIO, ocupados)
 		if not is_nan(xm):
-			Kit.colocar(casa, "maceton_flores", Vector3(xm, 0.0, z + e * 0.75), 0.0)
+			Kit.colocar(casa, "maceton_flores", Vector3(xm, 0.0, z + e * 0.75), 0.0).set_meta(&"apoyar", true)
 			ocupados.append(Vector2(xm, MACETON_MEDIO))
 		# La bici, apoyada en la pared de adelante: lejos de la puerta, del macetón y de las vidrieras
 		if e > 0.0:
 			var xb := _x_vereda_libre(w, [xp - 2.5, xp + 2.5, xp - 3.6, xp + 3.6], BICI_MEDIA, ocupados)
 			if not is_nan(xb):
-				Kit.colocar(casa, "bici_azul", Vector3(xb, 0.0, z + 0.45), 0.0)
+				Kit.colocar(casa, "bici_azul", Vector3(xb, 0.0, z + 0.45), 0.0).set_meta(&"apoyar", true)
 		if not local_abajo:
 			for lado in [-1.0, 1.0]:
 				var xv: float = -e * _x_puerta(w) + lado * 1.6

@@ -18,6 +18,19 @@ const ALTO_MAX := 2.5        ## Lo alto se achica a esto (como Pasaje.DECO_ALTO_
 const AIRE := 0.06           ## Separación de la pared
 const LIBRE_VENTANA := 1.6   ## Hondo libre delante de cada ventana (por ahí entra y sale la paloma)
 const MESAS := ["mesa_comedor", "escritorio_pc", "mesa_mate", "mesa_ratona"]
+## Donde se apoyan las cosas para tirar de un aletazo (y romper): ver PlanoLocal.objetos.
+const APOYOS := ["mesa_comedor", "escritorio_pc", "mesa_mate", "mesa_ratona", "mesita_luz", "comoda", "mesada",
+	"vajillero", "lavatorio", "cajonera_juguetes"]
+## Dónde puede estar un vecino (Vecinos): sentado en una silla o un sillón, o parado frente a un mueble
+## donde se hace algo (cocinar, ordenar la ropa...). Mueble -> [cómo, actividad].
+const LUGARES := {
+	"silla": ["sentado", ""], "sillon_azul": ["sentado", ""], "sillon_amarillo": ["sentado", ""],
+	"mesada": ["parado", "revolver"], "cocina_horno": ["parado", "revolver"], "ropero": ["parado", "ordenar"],
+	"comoda": ["parado", "ordenar"], "biblioteca": ["parado", "ordenar"], "cajonera_juguetes": ["parado", "ordenar"],
+	"lavatorio": ["parado", ""],
+	# Las mesas no son lugares para estar: dicen de qué es cada silla (Vecinos._silla_de)
+	"mesa_comedor": ["mesa", ""], "mesa_mate": ["mesa", ""], "escritorio_pc": ["mesa", ""],
+}
 
 var sala: Node3D
 var ce: CasaEnterable
@@ -269,7 +282,8 @@ func _escritorio(lado: String, t: float) -> bool:
 	if not _en_pared(lado, t, "escritorio_pc"):
 		return false
 	var hacia := 1.0 if lado == "izq" else -1.0
-	return _poner("silla", ultimo.x + hacia * (0.45 + 0.6), ultimo.z, -hacia * PI / 2.0)
+	var hondo := (MueblesDatos.PIEZAS["escritorio_pc"]["tam"] as Vector3).z * escala_propia("escritorio_pc")
+	return _poner("silla", ultimo.x + hacia * (hondo / 2.0 + SILLA_MESA), ultimo.z, -hacia * PI / 2.0)
 
 
 ## Plantas en los rincones (donde tiene sentido: ni en la cocina ni en el baño) y una maceta junto a la
@@ -287,13 +301,94 @@ func _rincones(tema: String) -> void:
 			break
 
 
+# ---------------------------------------------------------------- Asientos a la medida de la gente
+
+## Altura del asiento de las sillas y sillones de las casas. Los modelos traían el almohadón del sillón a
+## 58 cm y el de la silla a 55 (en una casa de verdad, unos 45): la gente sentada (Vecinos) quedaba
+## hundida en el almohadón y chiquita al lado de un sillón enorme. Se achican enteros hasta acá.
+const ALTO_ASIENTO := 0.47
+const ASIENTOS := ["silla", "sillon_azul", "sillon_amarillo"]
+## Y lo que va con ellos, a la altura de una casa de verdad: la tapa de las mesas donde se sientan (traían
+## 78-82 cm) y la mesada y la cocina donde se cocina parado (traían 1 m).
+const TAPAS := {"mesa_comedor": 0.74, "mesa_mate": 0.74, "escritorio_pc": 0.74, "mesada": 0.9, "cocina_horno": 0.9}
+
+## Del borde de la mesa (o del escritorio) al centro de la silla: arrimada, con las rodillas debajo.
+const SILLA_MESA := 0.32
+
+static var _asientos := {}
+
+
+## Cuánto se achica un mueble para que su asiento quede a ALTO_ASIENTO, o su tapa a la de TAPAS (1 si no
+## es ninguno de esos).
+static func escala_propia(nombre: String) -> float:
+	if TAPAS.has(nombre):
+		var tapa := float(PlanoLocal.apoyos_de(nombre)["altura"])
+		return clampf(float(TAPAS[nombre]) / tapa, 0.6, 1.0) if tapa > 0.3 else 1.0
+	if not nombre in ASIENTOS:
+		return 1.0
+	var a := asiento_de(nombre)
+	return clampf(ALTO_ASIENTO / maxf(float(a["alto"]), 0.1), 0.6, 1.0)
+
+
+## El asiento de un mueble, medido con rayos sobre su malla (en sus coordenadas, sin escalar): "alto"
+## del almohadón, "respaldo" (z donde termina el respaldo y empieza el asiento) y "x" (dónde sentarse a
+## lo ancho: en el sillón, sobre un almohadón de un lado; en el medio está la junta, más baja).
+static func asiento_de(nombre: String) -> Dictionary:
+	if _asientos.has(nombre):
+		return _asientos[nombre]
+	var d: Dictionary = MueblesDatos.PIEZAS[nombre]
+	var tam: Vector3 = d["tam"]
+	var res := {"alto": 0.45, "respaldo": -tam.z / 2.0, "x": tam.x * 0.22 if tam.x > 1.2 else 0.0}
+	_asientos[nombre] = res
+	var malla := Kit.malla(nombre)
+	if malla == null:
+		return res
+	var tm := malla.generate_triangle_mesh()
+	var x: float = res["x"]
+	var alturas: Array[float] = []
+	var zs: Array[float] = []
+	for k in 41:
+		var z := (k / 40.0 - 0.5) * tam.z * 0.98
+		var r := tm.intersect_ray(Vector3(x, float(d["y1"]) + 1.0, z), Vector3.DOWN)
+		alturas.append((r["position"] as Vector3).y if r else -1.0)
+		zs.append(z)
+	# El asiento: la altura (de a 2 cm) que más se repite en la mitad de adelante (el almohadón; el borde
+	# de adelante, biselado, es más bajo y no cuenta)
+	var votos := {}
+	for k in range(20, 41):
+		if alturas[k] > 0.2:
+			var v := roundi(alturas[k] / 0.02)
+			votos[v] = int(votos.get(v, 0)) + 1
+	if votos.is_empty():
+		return res
+	var mejor: int = votos.keys()[0]
+	for v: int in votos:
+		if int(votos[v]) > int(votos[mejor]) or (int(votos[v]) == int(votos[mejor]) and v > mejor):
+			mejor = v
+	var alto := 0.0
+	var n := 0
+	for k in range(20, 41):
+		if absf(alturas[k] - mejor * 0.02) <= 0.011:
+			alto += alturas[k]
+			n += 1
+	alto /= maxf(n, 1)
+	res["alto"] = alto
+	# El respaldo: de atrás para adelante, el último punto bastante más alto que el asiento
+	for k in 41:
+		if alturas[k] > alto + 0.15:
+			res["respaldo"] = zs[k]
+		elif alturas[k] > 0.2 and k > 0 and float(res["respaldo"]) > -tam.z / 2.0:
+			break
+	return res
+
+
 # ---------------------------------------------------------------- Ayudantes
 
 ## Pone un mueble con su colisión si entra: adentro del cuarto, sin pisar a otro, sin tapar las ventanas y
 ## lejos de la ruta de la cinemática. "s" lo escala (lo alto se achica a ALTO_MAX). Devuelve si lo puso.
 func _poner(nombre: String, x: float, z: float, giro: float, s := 1.0) -> bool:
 	var d: Dictionary = MueblesDatos.PIEZAS[nombre]
-	s *= minf(1.0, ALTO_MAX / float(d["y1"]))
+	s *= minf(1.0, ALTO_MAX / float(d["y1"])) * escala_propia(nombre)
 	var tam: Vector3 = (d["tam"] as Vector3) * s
 	var e := tam / 2.0
 	var c := Vector3(x, 0.02 + e.y, z)
@@ -313,12 +408,32 @@ func _poner(nombre: String, x: float, z: float, giro: float, s := 1.0) -> bool:
 			return false
 	if not Pasaje._libre(ruta, c, e, giro):
 		return false
-	Kit.colocar(sala, nombre, Vector3(x, 0.02 - float(d["y0"]) * s, z), giro, Vector3.ONE * s)
+	var origen := Vector3(x, 0.02 - float(d["y0"]) * s, z)
+	Kit.colocar(sala, nombre, origen, giro, Vector3.ONE * s)
 	if tam.y > 0.15:
 		var forma := BoxShape3D.new()
 		forma.size = tam
-		Construir.colision(sala, c, forma, Vector3(0, giro, 0))
+		var c_col := c
+		# Donde se apoyan cosas, la colisión llega hasta la tapa (como en los locales: PlanoLocal._mueble)
+		if nombre in APOYOS:
+			var t_mueble := Transform3D(Basis.from_euler(Vector3(0, giro, 0)) * Basis.from_scale(Vector3.ONE * s), origen)
+			var ap := PlanoLocal.apoyos_de(nombre)
+			if not (ap["puntos"] as Array).is_empty():
+				var tapa := (t_mueble * Vector3(0, float(ap["altura"]), 0)).y
+				if tapa < c.y + e.y - 0.03:
+					forma.size.y = tapa - 0.02
+					c_col = Vector3(c.x, 0.02 + forma.size.y / 2.0, c.z)
+				var lista: Array = ce.get_meta(&"apoyos", [])
+				lista.append([nombre, t_mueble])
+				ce.set_meta(&"apoyos", lista)
+		Construir.colision(sala, c_col, forma, Vector3(0, giro, 0))
 	ce.cajas.append([c, e, giro])
+	if LUGARES.has(nombre):
+		# Mirando hacia donde mira el mueble (+Z girado): la persona mira hacia -Z, así que media vuelta más
+		var lugares: Array = ce.get_meta(&"lugares", [])
+		lugares.append({"mueble": nombre, "como": LUGARES[nombre][0], "actividad": LUGARES[nombre][1],
+			"pos": Vector3(x, 0.02, z), "giro": giro, "medio": e, "escala": s})
+		ce.set_meta(&"lugares", lugares)
 	if nombre in MESAS:   # De ahí vuelan papeles o servilletas cuando pasa la paloma (CasaEnterable)
 		ce.mesas.append(Vector3(x, c.y + e.y, z))
 	puestos += 1
@@ -330,7 +445,7 @@ func _poner(nombre: String, x: float, z: float, giro: float, s := 1.0) -> bool:
 ## de ella. Si "correr", prueba también corriéndolo de a 0,5 m a cada lado hasta encontrar lugar.
 func _en_pared(lado: String, t: float, nombre: String, s := 1.0, correr := true) -> bool:
 	var d: Dictionary = MueblesDatos.PIEZAS[nombre]
-	var hondo: float = (d["tam"] as Vector3).z * s * minf(1.0, ALTO_MAX / float(d["y1"]))
+	var hondo: float = (d["tam"] as Vector3).z * s * minf(1.0, ALTO_MAX / float(d["y1"])) * escala_propia(nombre)
 	var pruebas := [0.0]
 	if correr:
 		for k in range(1, 9):
@@ -366,7 +481,7 @@ func _fila(lado: String, desde: float, nombres: Array, aire := 0.05) -> int:
 	var largo := hx if lado in ["fondo", "frente"] else hz
 	for nombre: String in nombres:
 		var d: Dictionary = MueblesDatos.PIEZAS[nombre]
-		var s := minf(1.0, ALTO_MAX / float(d["y1"]))
+		var s := minf(1.0, ALTO_MAX / float(d["y1"])) * escala_propia(nombre)
 		var ancho: float = (d["tam"] as Vector3).x * s
 		var hondo: float = (d["tam"] as Vector3).z * s
 		var puesto := false
@@ -386,7 +501,7 @@ func _fila(lado: String, desde: float, nombres: Array, aire := 0.05) -> int:
 ## Una mesa con sus sillas alrededor, todas mirando la mesa: en los lados largos y, si son 6, una en
 ## cada punta. Si la mesa no entra en "centro", prueba un poco corrida.
 func _mesa_con_sillas(centro: Vector3, mesa: String, sillas: int) -> bool:
-	var tam: Vector3 = MueblesDatos.PIEZAS[mesa]["tam"]
+	var tam: Vector3 = (MueblesDatos.PIEZAS[mesa]["tam"] as Vector3) * escala_propia(mesa)
 	for dx in [0.0, 1.0, -1.0, 2.0, -2.0]:
 		for dz in [0.0, 0.8, -0.8]:
 			var c := centro + Vector3(dx, 0, dz)
@@ -395,11 +510,11 @@ func _mesa_con_sillas(centro: Vector3, mesa: String, sillas: int) -> bool:
 			var largos := 2 if sillas >= 4 else 1
 			for k in largos:
 				var x := c.x + ((k - (largos - 1) / 2.0) * (tam.x / largos) if largos > 1 else 0.0)
-				_poner("silla", x, c.z + tam.z / 2.0 + 0.4, PI)      # Del lado de adelante, mirando hacia atrás
-				_poner("silla", x, c.z - tam.z / 2.0 - 0.4, 0.0)     # Del lado de atrás, mirando hacia adelante
+				_poner("silla", x, c.z + tam.z / 2.0 + SILLA_MESA, PI)      # Del lado de adelante, mirando hacia atrás
+				_poner("silla", x, c.z - tam.z / 2.0 - SILLA_MESA, 0.0)     # Del lado de atrás, mirando hacia adelante
 			if sillas >= 6:
-				_poner("silla", c.x + tam.x / 2.0 + 0.4, c.z, -PI / 2.0)
-				_poner("silla", c.x - tam.x / 2.0 - 0.4, c.z, PI / 2.0)
+				_poner("silla", c.x + tam.x / 2.0 + SILLA_MESA, c.z, -PI / 2.0)
+				_poner("silla", c.x - tam.x / 2.0 - SILLA_MESA, c.z, PI / 2.0)
 			return true
 	return false
 

@@ -778,6 +778,11 @@ func _golpear_adelante() -> int:
 		if p and p.modo == PalomaNPC.Modo.SUELTA and _al_alcance(p.global_position, dir):
 			p.espantar(global_position)
 			tiradas += 1
+	# Lo que cuelga del techo de los locales y los departamentos (lámparas, sábanas...) se hamaca
+	for n in get_tree().get_nodes_in_group("casa_enterable"):
+		var ce := n as CasaEnterable
+		if ce and ce.global_position.distance_to(global_position) < 14.0 and not ce.colgantes.is_empty():
+			tiradas += ce.empujar_colgantes(global_position + Vector3.UP * 0.25 + dir * 0.6, dir * 9.0, 0.9)
 	var bandada := get_tree().get_first_node_in_group("bandada") as Bandada
 	if bandada:
 		for p in bandada.seguidoras.duplicate():

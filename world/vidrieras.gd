@@ -8,6 +8,13 @@ extends RefCounted
 
 const SHADER := preload("res://shaders/vidriera.gdshader")
 const RANGO := 70.0   ## Más lejos no se distingue el interior: queda el vidrio oscuro del kit
+## El colchón de choque de cada vidriera (sólo para las palomas, ver Construir.CAPA_PALOMAS): sale
+## SALIENTE metros por delante del plano y llega FONDO metros hacia adentro. La esfera de la paloma
+## mide 22 cm, pero el modelo (pico, cola, alas) llega a 40 cm del centro, y la pared del kit está
+## 10 cm detrás del plano: pegada al vidrio, media paloma quedaba "adentro" del local pintado. Y en
+## algunas fachadas del kit había huecos detrás del vidrio por donde se metía entera.
+const SALIENTE := 0.2
+const FONDO := 0.5
 
 ## Cada rubro: pared, piso, mueble (estantes y mostrador), los cuatro colores de la mercadería, la
 ## forma de las paredes (ver el shader: 0 cajas, 1 redondos, 2 ropa, 3 botellas, 4 libros, 5 lavarropas,
@@ -135,4 +142,24 @@ static func poner(padre: Node3D, centro: Vector3, rot_y: float, tam: Vector2, te
 	padre.add_child(mi)
 	mi.position = centro
 	mi.rotation.y = rot_y
+	var cuerpo := StaticBody3D.new()
+	cuerpo.name = "Choque"
+	cuerpo.collision_layer = Construir.CAPA_PALOMAS
+	cuerpo.collision_mask = 0
+	# De costado es un trapecio: arriba baja en pendiente hacia afuera (más de 45°), así no queda un
+	# estante invisible delante del vidrio donde la paloma se pueda parar
+	var hx := tam.x / 2.0 + 0.05
+	var y0 := -tam.y / 2.0 - 0.05
+	var y1 := tam.y / 2.0 + 0.05
+	var puntos := PackedVector3Array()
+	for x: float in [-hx, hx]:
+		for p: Vector2 in [Vector2(-FONDO, y0), Vector2(-FONDO, y1), Vector2(0.0, y1), Vector2(SALIENTE, y1 - 0.3),
+				Vector2(SALIENTE, y0)]:
+			puntos.append(Vector3(x, p.y, p.x))
+	var forma := ConvexPolygonShape3D.new()
+	forma.points = puntos
+	var cs := CollisionShape3D.new()
+	cs.shape = forma
+	cuerpo.add_child(cs)
+	mi.add_child(cuerpo)
 	return mi
