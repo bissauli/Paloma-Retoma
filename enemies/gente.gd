@@ -213,9 +213,54 @@ func _salir_oficinista() -> void:
 	var h := ESC_HUMANO.instantiate() as Humano
 	h.tipo = "oficinista"
 	h.preparar_aspecto()
-	h.destino_final = SALIDAS[randi() % SALIDAS.size()] + Vector3(randf_range(-4, 4), 0, 0)
+	var desde := _subte + Vector3(randf_range(-0.8, 0.8), 0, 2.5)
+	h.destino_final = salida_libre(desde)
 	add_child(h)
-	h.global_position = _subte + Vector3(randf_range(-0.8, 0.8), 0, 2.5)
+	h.global_position = desde
+
+
+## Una salida para un oficinista que está en "desde": un punto de SALIDAS (con un poco de azar) que no
+## caiga adentro de nada y al que se llegue derecho sin pasar por un edificio de alrededor. Desde que se sumaron
+## los edificios con locales, varias salidas quedaban adentro de un edificio y los oficinistas se
+## quedaban empujando contra la pared para siempre. Si no encuentra ninguna, una al azar (y el oficinista
+## se va cuando se traba: ver Humano._paso_oficinista).
+func salida_libre(desde: Vector3) -> Vector3:
+	var espacio := get_world_3d().direct_space_state
+	var cuerpo := PhysicsShapeQueryParameters3D.new()
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.4
+	cap.height = 1.6
+	cuerpo.shape = cap
+	cuerpo.collision_mask = Construir.CAPA_MUNDO
+	var lista := SALIDAS.duplicate()
+	lista.shuffle()
+	for s: Vector3 in lista:
+		for intento in 3:
+			var p: Vector3 = s + Vector3(randf_range(-4, 4), 0, 0)
+			if _cruza_edificio(desde, p):
+				continue   # (los locales tienen la planta baja hueca: el rayo pasaba por la vidriera)
+			cuerpo.transform = Transform3D(Basis.IDENTITY, Vector3(p.x, desde.y + 1.0, p.z))
+			if espacio.intersect_shape(cuerpo, 1).is_empty():
+				return p   # (árboles, farolas y bancos del camino los esquiva caminando)
+	# Ninguna con el azar: la primera salida que no esté en un edificio, sin correrla
+	for s: Vector3 in lista:
+		if not _cruza_edificio(desde, s):
+			return s
+	return lista[0]
+
+
+## ¿El camino derecho de "a" a "b" pasa por el terreno de algún edificio de alrededor (con 1 m de margen)?
+func _cruza_edificio(a: Vector3, b: Vector3) -> bool:
+	var n := maxi(2, int(Enemigo.plano(b - a).length()))
+	for e: Array in Edificios.ALREDEDORES:
+		var base: Vector3 = e[0]
+		var tam: Vector3 = e[1]
+		var r := Rect2(base.x - tam.x / 2.0, base.z - tam.z / 2.0, tam.x, tam.z).grow(1.0)
+		for i in n + 1:
+			var p := a.lerp(b, float(i) / n)
+			if r.has_point(Vector2(p.x, p.z)):
+				return true
+	return false
 
 
 

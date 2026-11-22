@@ -70,6 +70,10 @@ func _ready() -> void:
 	var paseantes: Array = get_tree().get_nodes_in_group("humanos").filter(func(n: Node) -> bool:
 		return n is Humano and (n as Humano).zona_tam != Vector2.ZERO and Enemigo.plano((n as Humano).zona_centro - FUENTE).length() < 1.0)
 	print("  paseantes en el rombo: ", paseantes.size())
+	for h: Humano in paseantes:
+		h.va_a_locales = false   # Que ningún local se los lleve en medio de la prueba
+		if h.visita != null:
+			h.terminar_visita()   # (y si uno ya se lo llevó, que vuelva)
 	_check("hay gente paseando alrededor de la fuente", paseantes.size() >= 3)
 	var minima := INF
 	# Uno arranca del otro lado de la fuente y tiene que cruzar

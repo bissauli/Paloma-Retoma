@@ -22,6 +22,8 @@ func _ready() -> void:
 	_crear_zonas()
 	# Todo lo de la plaza que se ve tiene colisión (ver ColisionFaltante; la ciudad hace lo suyo)
 	ColisionFaltante.completar(self)
+	# Cada edificio con locales, en sus propias mallas (una sola pieza: ver Pasaje.fusionar_edificios)
+	Pasaje.fusionar_edificios(self)
 	# Miles de piezas fijas (edificios, árboles, bancos...) pasan a ser unas pocas mallas grandes
 	Construir.fusionar_estaticas(self)
 

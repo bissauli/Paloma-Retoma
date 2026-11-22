@@ -764,7 +764,7 @@ def hacer_edificios_v3():
       techo_col="techo")
     # Edificios especiales
     E("hospital_32", 32, 16, 3, "ladrillo", "hospital", 411, pb="entrada", remate="cruz_roja", techo_col="techo",
-      extra=extra_hospital, azotea_ocupada=[(8.0, 8.0, 3.6, 3.6)])
+      extra=extra_hospital, azotea_ocupada=[(8.0, 8.0, 3.6, 3.6)], pb_libre=[(-(32 / 2 - 3.5), 2.1)])   # La guardia
     E("comisaria_20", 20, 16, 2, "ladrillo", "policia_claro", 412, pb="entrada", remate="policia", techo_col="techo",
       extra=extra_comisaria)
     for n in ("panaderia_8", "golosineria_8", "farmacia_8", "minimercado_10", "ropa_10", "cafe_10", "taller_12", "hospital_32",

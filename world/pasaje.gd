@@ -215,6 +215,27 @@ static func es_local(tema: String) -> bool:
 	return tema in LOCALES
 
 
+## Grupo de los edificios con locales: cada uno es UNA pieza (un Node3D "Edificio_*") con todo adentro:
+## paredes, fachada, salas, muebles, carteles, gente y los nodos de las salas (CasaEnterable).
+const GRUPO_EDIFICIOS := &"edificio_con_locales"
+
+
+## Cada edificio con locales se fusiona en sus propias mallas (una por material, con el origen en el
+## edificio), aparte del resto de la plaza: antes sus paredes y muebles quedaban repartidos en las
+## mallas de 24 m de la plaza, mezclados con la vereda y los árboles de al lado. Así cada edificio es
+## una sola entidad (se puede mover, esconder o sacar entero). Lo que tiene script (gente, salas,
+## objetos para tirar) o se mueve (lo que cuelga y se hamaca) queda aparte, como siempre.
+## Llamarlo después de ColisionFaltante.completar (que necesita ver las piezas sueltas).
+static func fusionar_edificios(raiz: Node) -> int:
+	var cuantos := 0
+	for e in raiz.get_tree().get_nodes_in_group(GRUPO_EDIFICIOS):
+		if not raiz.is_ancestor_of(e) or e.has_meta(&"no_fusionar"):
+			continue
+		cuantos += Construir.fusionar_estaticas(e as Node3D, 0.0)
+		e.set_meta(&"no_fusionar", true)   # La fusión de la plaza ya no lo toca
+	return cuantos
+
+
 ## Arma los edificios de alrededor de la plaza: cada uno con un local en la planta baja y un ambiente
 ## de departamento en un piso al azar. Cada partida sortea locales, ambientes y pisos (con la variable
 ## de entorno PALOMA_SEMILLA se puede fijar). Devuelve todas las salas (locales y ambientes).
@@ -285,6 +306,7 @@ static func crear_edificio(padre: Node3D, base: Vector3, tam: Vector3, color: Co
 	bandas.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
 	var casa := Node3D.new()
 	casa.name = "Edificio_" + String(salas[0]["nombre"]).replace(" ", "_")
+	casa.add_to_group(GRUPO_EDIFICIOS)
 	padre.add_child(casa)
 	casa.position = base
 	casa.rotation.y = atan2(frente.x, frente.z)
@@ -385,13 +407,21 @@ static func _sala(padre: Node3D, casa: Node3D, w_edificio: float, d: float, colo
 
 	# --- Adentro: texturas, muebles sobre la ruta, adornos y luz
 	_interior(sala, ce, w, d, esc)
-	ce.obstaculos = PlanoLocal.armar(sala, ce, tema) if local else _obstaculos(sala, ce, tema)
+	if local:
+		ce.obstaculos = PlanoLocal.armar(sala, ce, tema)
+	else:
+		# Departamento: lo que cuelga sobre la ruta (lámparas, sábanas...) y el resto acomodado como en una
+		# casa de verdad (PlanoCasa: la cama contra la pared con sus mesitas, la mesa con sus sillas...)
+		ce.obstaculos = _obstaculos(sala, ce, tema, true) + PlanoCasa.armar(sala, ce, tema)
 	ce.luz = _adornos(sala, ce, tema, esc["cartel"])
-	_mas_adornos(sala, ce, tema)
+	if local:
+		_mas_adornos(sala, ce, tema)
 	if local:   # En el local también cuentan los muebles de las paredes (estantes, heladeras...)
 		ce.obstaculos += (ce.get_meta(&"ocupado", []) as Array).size()
-	padre.add_child(ce)
-	ce.transform = casa.transform * Transform3D(Basis.IDENTITY, Vector3(x_off, y0, 0))
+		PlanoLocal.objetos(sala, ce, tema)   # Mercadería sobre mostradores y mesas, para tirar de un aletazo
+	# El nodo de la sala cuelga del edificio (todo el edificio es una sola pieza: ver fusionar_edificios)
+	casa.add_child(ce)
+	ce.transform = Transform3D(Basis.IDENTITY, Vector3(x_off, y0, 0))
 	if local:
 		GenteLocal.poblar(sala, ce)   # Empleado y clientes
 	return ce
@@ -468,13 +498,15 @@ static func _giro(tang: Vector3) -> float:
 	return atan2(-tang.z, tang.x)   # Una caja con ese giro tiene su eje X sobre "tang"
 
 
-static func _obstaculos(casa: Node3D, ce: CasaEnterable, tema: String) -> int:
+## Con "solo_arriba" (los departamentos, que acomoda PlanoCasa) pone sólo lo que cuelga del techo sobre
+## la ruta, y marca dónde va la cámara lenta.
+static func _obstaculos(casa: Node3D, ce: CasaEnterable, tema: String, solo_arriba := false) -> int:
 	var m := _muestras(ce)
 	var r := ce.ruta
 	var n := r.size() - 2
 	var cant := 0
 	# 1) De costado, en cada vuelta del zigzag (del lado de adentro de la curva)
-	for i in range(1, n + 1):
+	for i in range(1, n + 1 if not solo_arriba else 1):
 		var w := r[i]
 		var medio := (r[i - 1] + r[i + 1]) / 2.0
 		var adentro := Vector3(medio.x - w.x, 0, medio.z - w.z)
@@ -524,7 +556,7 @@ static func _obstaculos(casa: Node3D, ce: CasaEnterable, tema: String) -> int:
 					if _poner(casa, ce, tema, "arriba", c, e, giro, k):
 						cant += 1
 					break
-		if tipo == "abajo" or tipo == "entre":
+		if (tipo == "abajo" or tipo == "entre") and not solo_arriba:
 			for intento in 4:
 				var arriba := pm.y - 0.6 - intento * 0.15
 				if arriba < 0.5:
@@ -759,6 +791,19 @@ static func _adorno(casa: Node3D, ce: CasaEnterable, ruta: PackedVector3Array, n
 	return true
 
 
+## ¿Algo colgado en la pared en "p" (a "medio" metros a cada lado) quedaría tapado por un mueble alto?
+static func _tapado(ce: CasaEnterable, p: Vector3, medio: float) -> bool:
+	for caja: Array in ce.cajas:
+		var c: Vector3 = caja[0]
+		var e: Vector3 = caja[1]
+		if c.y + e.y < p.y - 0.4 or c.y - e.y > p.y + 0.4:
+			continue
+		var m := PlanoLocal._medio_aabb(e, float(caja[2]))
+		if absf(c.x - p.x) < m.x + medio and absf(c.z - p.z) < m.y + 0.6:
+			return true
+	return false
+
+
 ## Lo que se pone contra las paredes de cada escenario, en orden. En los locales se repite si sobra
 ## pared (un súper tiene muchas heladeras); en las casas cada cosa respeta LIMITE y hay pocas.
 const DECO := {
@@ -775,7 +820,7 @@ const DECO := {
 	"mecanico": ["tablero_herramientas", "pila_neumaticos", "caja_herramientas", "barril"],
 	"farmacia": ["armario_medico"],
 	"kiosco": ["heladera_bebidas", "gondola"],
-	"heladeria": ["heladera_bebidas", "maceta"],
+	"heladeria": ["vitrina_helados", "maceta"],   # Vitrinas de helados (no heladeras de bebidas: no es un kiosco)
 	"ferreteria": ["tablero_herramientas"],
 	"peluqueria": ["sillas_espera", "maceta"],
 	"floreria": ["torre_macetas", "balde_flores"],
@@ -898,12 +943,13 @@ static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: Stri
 	var hz := d / 2.0 - CasaEnterable.ESPESOR
 	var ruta := _muestras(ce)
 	var pared: Array = PARED.get(tema, [0, false, false])
+	var casa_de_familia := ce.has_meta(&"plano_casa")   # (alfombras, rincones y muebles los puso PlanoCasa)
 	# Alfombra en el medio, sólo donde va (abajo de todo: nunca tapa la ruta)
-	if pared[2]:
+	if pared[2] and not casa_de_familia:
 		Kit.colocar(casa, "alfombra", Vector3(0, 0.02, 0), 0.0, Vector3(minf(w * 0.3, 2.2), 1.0, minf(d * 0.35, 2.0)) / Vector3(2.4, 1.0, 1.6) * 1.6)
 	# Rincón de atrás a la izquierda: algo del lugar, o el sillón con el gato encima y una lámpara
-	if not ce.con_cinematica:
-		pass   # En los locales, el mostrador y lo del rubro ya los puso PlanoLocal
+	if not ce.con_cinematica or casa_de_familia:
+		pass   # En los locales, el mostrador y lo del rubro ya los puso PlanoLocal (y en las casas, PlanoCasa)
 	elif RINCON.has(tema):
 		var nombre_r: String = RINCON[tema]
 		var tam_r: Vector3 = MueblesDatos.PIEZAS[nombre_r]["tam"]
@@ -917,14 +963,14 @@ static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: Stri
 			_adorno(casa, ce, ruta, "lampara_pie", Vector3(-hx + 0.35, 0.02, -hz + 2.6), 0.0)
 	# Los otros rincones: plantas donde tiene sentido, cajas de mercadería en los demás locales y nada
 	# en la cocina y el baño. Una sola planta junto a la vidriera; las cajas, al fondo
-	var rincon := _rincon_de(tema, ce)
+	var rincon := "" if casa_de_familia else _rincon_de(tema, ce)
 	if rincon == "maceta":
 		_adorno(casa, ce, ruta, "maceta", Vector3(hx - 0.4, 0.02, hz - 0.4), 0.0)
 		_adorno(casa, ce, ruta, "maceta", Vector3(hx - 0.5, 0.02, -hz + 0.5), 0.3)
 	elif rincon == "cajas":
 		_adorno(casa, ce, ruta, "cajas", Vector3(hx - 0.5, 0.02, -hz + 0.5), 0.3)
 	# Algo propio de cada lugar, contra la pared derecha
-	var propio: String = PROPIO[tema] if ce.con_cinematica else ""
+	var propio: String = PROPIO[tema] if ce.con_cinematica and not casa_de_familia else ""
 	if propio != "":
 		var tam_p: Vector3 = MueblesDatos.PIEZAS[propio]["tam"]
 		_adorno(casa, ce, ruta, propio, Vector3(hx - tam_p.z / 2.0 - 0.1, 0.02, 0.0), -PI / 2.0)
@@ -934,18 +980,23 @@ static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: Stri
 		if pared[1] and lado < 0.0:
 			var x := -hx + 1.0
 			while x < hx - 0.9:
-				if absf(x - ce.x_fondo) > 2.6:
+				if absf(x - ce.x_fondo) > 2.6 and not _tapado(ce, Vector3(x, 3.6, -hz), 0.9):
 					Kit.colocar(casa, "estante_pared", Vector3(x, 3.6, -hz + 0.17), 0.0)
 				x += 3.6
 		var xs: float = lado * (hx - 0.03)
 		var cuadros: int = pared[0]
 		for k in cuadros:
 			var z := 0.0 if cuadros == 1 else (k - 0.5) * d * 0.4
-			Kit.colocar(casa, "cuadro", Vector3(xs, 2.9, z), -lado * PI / 2.0)
+			if not _tapado(ce, Vector3(xs, 2.9, z), 0.6):
+				Kit.colocar(casa, "cuadro", Vector3(xs, 2.9, z), -lado * PI / 2.0)
 	# Cartel del tema, pintado en la pared izquierda
 	var l := Construir.cartel(casa, Vector3(-hx + 0.03, 4.9, 0), cartel, Color("3a2a1e"), 56)
 	l.rotation.y = PI / 2.0
 	l.outline_size = 0
+	# Que no sea más largo que la pared: si no entra en una línea, baja a dos (antes los textos largos,
+	# como "TORNILLOS - PINTURAS - HERRAMIENTAS", salían por la fachada y se veían desde la calle)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.width = (hz * 2.0 - 1.2) / l.pixel_size
 	# Luz: una principal del color del lugar (con sombras sólo mientras la paloma pasa, ver
 	# CasaEnterable) y dos de relleno más suaves cerca de las ventanas, como la luz que entra de la calle
 	var color_luz: Color = ESCENARIOS[tema]["luz"]
@@ -1005,19 +1056,53 @@ static func _fachada(casa: Node3D, w: float, h: float, d: float, bandas: Array, 
 		# Puerta del edificio (la de los departamentos), del lado contrario a la ventana abierta
 		# Donde no caiga sobre una vidriera de adelante ni una ventana de atrás de los locales (y si no
 		# hay lugar, sin puerta)
-		var xp := _x_puerta_libre(w, vidrieras if e > 0.0 else ventanas_atras, e)
+		var huecos: Array[float] = vidrieras if e > 0.0 else ventanas_atras
+		var xp := _x_puerta_libre(w, huecos, e)
 		if is_nan(xp):
 			continue
 		Kit.colocar(casa, "puerta_local", Vector3(xp, 0.14, z), rot)
-		Kit.colocar(casa, "maceton_flores", Vector3(xp + e * 1.3, 0.0, z + e * 0.6), 0.0)
+		# El macetón al lado de la puerta, sin pisar su marco ni una vidriera (si no entra, no va)
+		var ocupados: Array[Vector2] = [Vector2(xp, PUERTA_MEDIA)]
+		for hx in huecos:
+			ocupados.append(Vector2(hx, VIDRIERA_MEDIA))
+		var xm := _x_vereda_libre(w, [xp + e * 1.8, xp - e * 1.8], MACETON_MEDIO, ocupados)
+		if not is_nan(xm):
+			Kit.colocar(casa, "maceton_flores", Vector3(xm, 0.0, z + e * 0.75), 0.0)
+			ocupados.append(Vector2(xm, MACETON_MEDIO))
+		# La bici, apoyada en la pared de adelante: lejos de la puerta, del macetón y de las vidrieras
+		if e > 0.0:
+			var xb := _x_vereda_libre(w, [xp - 2.5, xp + 2.5, xp - 3.6, xp + 3.6], BICI_MEDIA, ocupados)
+			if not is_nan(xb):
+				Kit.colocar(casa, "bici_azul", Vector3(xb, 0.0, z + 0.45), 0.0)
 		if not local_abajo:
 			for lado in [-1.0, 1.0]:
 				var xv: float = -e * _x_puerta(w) + lado * 1.6
 				if absf(xv) < w / 2.0 - 0.9:
 					Kit.colocar(casa, "ventana_vidrio", Vector3(xv, 0.6, z), rot)
-	var xb := _x_puerta_libre(w, vidrieras, 1.0)
-	if not is_nan(xb):
-		Kit.colocar(casa, "bici_azul", Vector3(xb - 1.7, 0.0, d / 2.0 + 0.45), 0.0)
+
+
+## Medio ancho (con aire) de lo que va en la vereda pegado a la fachada: la puerta con su marco, una
+## vidriera con sus postigos abiertos, el macetón y la bici.
+const PUERTA_MEDIA := 1.05
+const VIDRIERA_MEDIA := CasaEnterable.VENTANA_ANCHO / 2.0 + 1.15
+const MACETON_MEDIO := 0.7
+const BICI_MEDIA := 0.95
+
+
+## La primera de las "x" donde entra algo de medio ancho "media" sin pisar nada de "ocupados" ([x, medio
+## ancho]) ni salirse de la fachada. NAN si no entra en ninguna.
+static func _x_vereda_libre(w: float, xs: Array, media: float, ocupados: Array[Vector2]) -> float:
+	for x: float in xs:
+		if absf(x) + media > w / 2.0 - 0.2:
+			continue
+		var libre := true
+		for o in ocupados:
+			if absf(x - o.x) < media + o.y:
+				libre = false
+				break
+		if libre:
+			return x
+	return NAN
 
 
 ## Dónde va la puerta del edificio en la cara "e" (+1 adelante, -1 atrás): la primera posición que no

@@ -4,21 +4,29 @@ extends Node3D
 ## - Un EMPLEADO, parado detrás del mostrador (lo pone ahí PlanoLocal), mirando hacia la vidriera, con
 ##   el uniforme del rubro (delantal, guardapolvo, mameluco...) y moviéndose un poco de un lado al
 ##   otro, como quien atiende.
-## - CLIENTES que van y vienen: llegan caminando por la vereda, entran por la vidriera, miran dos o
-##   tres lugares del local (frente a los estantes, las góndolas o las mesas), a veces pasan por el
-##   mostrador a pagar, y se van otra vez por la vereda. Cada uno que entra es una persona nueva (otra
-##   ropa, otra altura): el local nunca tiene siempre la misma gente.
-## Caminan por una grilla de puntos libres del piso (con un camino buscado a lo ancho, que esquiva los
-## muebles). Usan ModeloHumano (con su cápsula: la paloma los choca, no los atraviesa). Sólo se mueven
-## cuando la paloma está cerca (a menos de CERCA metros). Todo en coordenadas de la sala.
+## - CLIENTES: no se inventan en la puerta. Son los paseantes de la ciudad (Humano de tipo "turista",
+##   repartidos por todo el mapa en sus zonas de paseo): de vez en cuando uno que anda cerca y tiene la
+##   vidriera a la vista se desvía, camina hasta el local, entra, mira dos o tres lugares (frente a los
+##   estantes, las góndolas o las mesas), a veces pasa por el mostrador a pagar, sale y vuelve a pasear
+##   por su zona (Humano.visita). Antes cada cliente aparecía y desaparecía en la vereda, a 7 m de la
+##   vidriera, y pasaba por encima del macetón o por adentro de la pared.
+## Adentro caminan por una grilla de puntos libres del piso (con un camino buscado a lo ancho, que esquiva
+## los muebles). El empleado usa ModeloHumano y los clientes son Humano (los dos con su cápsula: la
+## paloma los choca, no los atraviesa). Los clientes se llaman sólo con la paloma cerca (a menos de CERCA
+## metros). Todo en coordenadas de la sala.
 
 const CERCA := 45.0
 const PASO_GRILLA := 0.5      ## Separación de los puntos del piso donde se puede estar
 const HOLGURA := 0.45         ## Distancia mínima entre una persona y un mueble
-const VELOCIDAD := 0.9        ## m/s de los clientes
-const MAX_ADENTRO := 3        ## Cuántos clientes puede haber a la vez
-const VEREDA := 1.7           ## A cuánto de la vidriera caminan por la vereda
-const LARGO_VEREDA := 7.0     ## Desde dónde llegan (y hasta dónde se van) por la vereda
+const MAX_ADENTRO := 3        ## Cuántos clientes puede haber a la vez (llegando o adentro)
+const VEREDA := 1.7           ## A cuánto de la vidriera se paran antes de entrar (y al salir)
+const RADIO_LLAMADO := 40.0   ## De cuán lejos puede venir un paseante (con la vidriera a la vista)
+const MAX_LLEGANDO := 50.0    ## Si en estos segundos no llegó a la vidriera (se trabó), sigue paseando
+## Si no hay paseantes cerca, se "presta" uno de cualquier parte del mapa: aparece en una punta de la
+## vereda, a esta distancia de la vidriera y siempre fuera de la vista, y al irse vuelve a su zona igual.
+const PUNTA_VEREDA := Vector2(11.0, 24.0)
+const LEJOS_DE_LA_PALOMA := 9.0   ## Ni de donde sale ni adonde llega puede estar más cerca de la paloma
+const ESPERA_SALIDA := 15.0   ## Un prestado que en estos segundos no pudo irse busca otra punta de la vereda
 
 ## Quién atiende cada rubro (uno de los personajes de modelos/personas; si hay varios, uno al azar).
 const EMPLEADOS := {
@@ -30,6 +38,9 @@ const EMPLEADOS := {
 }
 
 enum Paso { MIRANDO, CAMINANDO }
+## Caminando por la ciudad hasta la vidriera, adentro (y saliendo a la vereda), o yéndose por la vereda
+## hasta perderse de vista (los prestados, que después vuelven a su zona)
+enum Fase { LLEGANDO, ADENTRO, YENDOSE }
 
 var ce: CasaEnterable
 var _libres: PackedVector3Array = []        ## Puntos del piso donde se puede estar (sala)
@@ -45,7 +56,9 @@ var _puerta_adentro := -1                   ## Punto libre de la grilla junto a 
 var _caja := -1                             ## Punto libre delante del mostrador (para pagar)
 var _y_vereda := NAN                        ## Altura de la vereda (local), medida la primera vez
 var entraron := 0                           ## Cuántos clientes entraron desde la vereda (para los tests)
-var salieron := 0                           ## Cuántos se fueron por la vereda
+var salieron := 0                           ## Cuántos salieron otra vez a la vereda
+var llamados := 0                           ## Cuántos paseantes se desviaron hacia el local
+var prestados := 0                          ## De esos, cuántos vinieron de lejos (ver _punta_oculta)
 
 
 ## Crea la gente del local "ce" (todo colgando de "sala").
@@ -77,16 +90,9 @@ func _armar() -> void:
 	if not ce.mesas.is_empty():
 		var m: Vector3 = ce.mesas[0]
 		_caja = _mas_cercano(Vector3(m.x, 0, m.z + 1.1))
-	# --- Algunos clientes ya están adentro al empezar (mirando algo); los demás van llegando
+	# --- Los clientes son paseantes de la ciudad que se desvían hacia acá (ver _llamar_uno)
 	_rng.randomize()   # De acá en adelante, cada partida distinta
-	var cuantos := _rng.randi_range(1, 2)
-	for k in cuantos:
-		var i := _destino_al_azar(_puerta_adentro)
-		if i >= 0:
-			var c := _nuevo_cliente(_libres[i])
-			c["paradas"] = _rng.randi_range(1, 2)
-			_mirar(c)
-	_proximo = _rng.randf_range(2.0, 6.0)
+	_proximo = _rng.randf_range(1.0, 4.0)
 
 
 func _persona(personaje: String, alto: float) -> ModeloHumano:
@@ -97,22 +103,239 @@ func _persona(personaje: String, alto: float) -> ModeloHumano:
 	return m
 
 
-## Un cliente nuevo (otra ropa, otra altura) parado en "pos".
-func _nuevo_cliente(pos: Vector3) -> Dictionary:
-	var nombre: String = ModeloHumano.PASEANTES[_rng.randi_range(0, ModeloHumano.PASEANTES.size() - 1)]
-	var m := _persona(nombre, float(ModeloHumano.info(nombre).get("alto", 1.75)) * _rng.randf_range(0.96, 1.04))
-	m.position = pos
-	m.rotation.y = _rng.randf() * TAU
-	var c := {"m": m, "camino": PackedVector3Array(), "paso": Paso.MIRANDO, "espera": 0.0,
-		"paradas": _rng.randi_range(1, 3), "pago": false, "saliendo": false, "mirar": Vector3.INF,
-		"vel": VELOCIDAD * _rng.randf_range(0.85, 1.15)}
-	_clientes.append(c)
-	return c
-
-
-## Cuántos clientes hay ahora (adentro o en la vereda, llegando o yéndose).
+## Cuántos clientes hay ahora (llegando por la ciudad, adentro o saliendo).
 func clientes() -> int:
 	return _clientes.size()
+
+
+## Cuántos clientes están adentro del local ahora.
+func adentro() -> int:
+	var n := 0
+	for c in _clientes:
+		if c["fase"] == Fase.ADENTRO:
+			n += 1
+	return n
+
+
+## Llama a un paseante de la ciudad: uno de los que andan a menos de RADIO_LLAMADO de la vidriera y la
+## tienen a la vista (así camina derecho, esquivando, sin meterse en un edificio), elegido al azar.
+func _llamar_uno() -> void:
+	if _puerta_adentro < 0:
+		return
+	var puerta := to_global(_frente_puerta())
+	var candidatos: Array[Humano] = []
+	for n in get_tree().get_nodes_in_group("humanos"):
+		var h := n as Humano
+		if h == null or not h.puede_visitar():
+			continue
+		var d := h.global_position.distance_to(puerta)
+		if d > RADIO_LLAMADO or d < 1.0:
+			continue
+		# Con el camino libre para todo el cuerpo (antes era un rayo a la altura del pecho, que pasaba por
+		# encima de lo bajo, y la prueba larga encontró gente empujando 50 s contra algo frente al café)
+		if not _camino_libre(h.global_position, puerta):
+			continue
+		candidatos.append(h)
+	var destino := _destino_al_azar(_puerta_adentro)
+	var por_adentro := _camino(_puerta_adentro, destino)
+	if por_adentro.is_empty():
+		return
+	var h: Humano = null
+	var prestado := false
+	var entrada := Vector3.ZERO
+	if not candidatos.is_empty():
+		h = candidatos[_rng.randi_range(0, candidatos.size() - 1)]
+	else:
+		# Nadie cerca: uno de cualquier parte del mapa, que entra por una punta de la vereda
+		var punta := _punta_oculta()
+		if is_nan(punta.x):
+			return
+		h = _paseante_oculto()
+		if h == null:
+			return
+		h.global_position = punta
+		h.reset_physics_interpolation()
+		entrada = punta
+		prestado = true
+		prestados += 1
+	h.visita = self
+	var cam := PackedVector3Array([Vector3(ce.x_frente, 0.04, ce.fondo / 2.0 + 0.1), _libres[_puerta_adentro]])
+	cam.append_array(por_adentro)
+	_clientes.append({"h": h, "fase": Fase.LLEGANDO, "t": 0.0, "pos": Vector3.ZERO, "rumbo": 0.0, "rapidez": 0.0,
+		"camino": cam, "paso": Paso.CAMINANDO, "espera": 0.0, "paradas": _rng.randi_range(1, 3), "pago": false,
+		"saliendo": false, "fin": false, "mirar": _cosa_cercana(_libres[destino]),
+		"vel": clampf(h.velocidad, 0.7, 1.2), "prestado": prestado, "salida": entrada})
+	llamados += 1
+
+
+## ¿Se ve "p" desde la cámara (o está muy cerca de la paloma)? Ahí no puede aparecer ni desaparecer nadie.
+## Algo en el cuadro pero tapado por una pared o un edificio no se ve.
+func _a_la_vista(p: Vector3) -> bool:
+	var j := GameState.jugador
+	if j and j.global_position.distance_to(p) < LEJOS_DE_LA_PALOMA:
+		return true
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	if cam == null:
+		return false
+	var cabeza := p + Vector3.UP * 1.2
+	if not cam.is_position_in_frustum(cabeza):
+		return false
+	var q := PhysicsRayQueryParameters3D.create(cam.global_position, cabeza, Construir.CAPA_MUNDO)
+	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+
+
+## Una punta de la vereda (a un lado o al otro de la vidriera) fuera de la vista, con piso y sin nada
+## encima, desde donde se ve la vidriera (así camina derecho hasta ella). NAN si no hay.
+func _punta_oculta(solo_vereda := false) -> Vector3:
+	var espacio := get_world_3d().direct_space_state
+	var puerta := to_global(_frente_puerta())
+	for intento in 10:
+		var local: Vector3
+		if intento % 3 == 2 and not solo_vereda:   # De enfrente (cruzando la calle o desde la plaza)
+			local = Vector3(ce.x_frente + _rng.randf_range(-8.0, 8.0), 2.5, ce.fondo / 2.0 + _rng.randf_range(12.0, 24.0))
+		else:                  # Por la vereda, desde una punta o la otra
+			var lado := -1.0 if _rng.randf() < 0.5 else 1.0
+			local = Vector3(ce.x_frente + lado * _rng.randf_range(PUNTA_VEREDA.x, PUNTA_VEREDA.y), 2.5, ce.fondo / 2.0 + VEREDA)
+		var arriba := to_global(local)
+		var r := espacio.intersect_ray(PhysicsRayQueryParameters3D.create(arriba, arriba + Vector3.DOWN * 5.0, Construir.CAPA_MUNDO))
+		if r.is_empty():
+			continue
+		var p: Vector3 = r["position"]
+		if absf(p.y - puerta.y) > 0.6 or _a_la_vista(p):
+			continue
+		# Parado ahí no tiene que estar adentro de nada (un banco, un cantero, un auto estacionado)
+		var cuerpo := PhysicsShapeQueryParameters3D.new()
+		var cap := CapsuleShape3D.new()
+		cap.radius = 0.35
+		cap.height = 1.6
+		cuerpo.shape = cap
+		cuerpo.transform = Transform3D(Basis.IDENTITY, p + Vector3.UP * 0.95)
+		cuerpo.collision_mask = Construir.CAPA_MUNDO
+		if not espacio.intersect_shape(cuerpo, 1).is_empty():
+			continue
+		if not _camino_libre(p, puerta):
+			continue
+		return p
+	return Vector3(NAN, NAN, NAN)
+
+
+## Otra punta de la vereda fuera de la vista a la que "h" llegue caminando derecho (ver _camino_libre).
+## NAN si no hay.
+func _otra_salida(h: Humano) -> Vector3:
+	for intento in 6:
+		var p := _punta_oculta(true)   # Por la misma vereda (no baja a la calle)
+		if is_nan(p.x) or Enemigo.plano(p - h.global_position).length() < 3.0:
+			continue
+		if _camino_libre(h.global_position, p):
+			return p
+	return Vector3(NAN, NAN, NAN)
+
+
+## ¿Puede caminar derecho de "desde" a "hasta" (en el piso)? Barre una cápsula del ancho de una persona,
+## de los tobillos a la cabeza, hasta un poco antes de "hasta" (ahí está la vidriera o la vereda).
+func _camino_libre(desde: Vector3, hasta: Vector3) -> bool:
+	var tramo := Enemigo.plano(hasta - desde)
+	var largo := tramo.length() - 0.6
+	if largo <= 0.0:
+		return true
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.25
+	cap.height = 1.5
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = cap
+	q.transform = Transform3D(Basis.IDENTITY, desde + Vector3.UP * 1.0)   # De 0,25 a 1,75 m
+	q.motion = tramo.normalized() * largo
+	q.collision_mask = Construir.CAPA_MUNDO
+	var r := get_world_3d().direct_space_state.cast_motion(q)
+	return r.size() == 2 and r[0] >= 1.0
+
+
+## Un paseante suelto de cualquier parte del mapa que no se esté viendo ahora (al azar).
+func _paseante_oculto() -> Humano:
+	var lista: Array[Humano] = []
+	for n in get_tree().get_nodes_in_group("humanos"):
+		var h := n as Humano
+		if h and h.puede_visitar() and not _a_la_vista(h.global_position):
+			lista.append(h)
+	return null if lista.is_empty() else lista[_rng.randi_range(0, lista.size() - 1)]
+
+
+## Deja de guiar a "h" (se cortó la visita desde afuera: Humano.terminar_visita).
+func soltar(h: Humano) -> void:
+	var c := _cliente_de(h)
+	if not c.is_empty():
+		_clientes.erase(c)
+
+
+func _cliente_de(h: Humano) -> Dictionary:
+	for c in _clientes:
+		if c["h"] == h:
+			return c
+	return {}
+
+
+## Mueve a un cliente (lo llama Humano mientras está de visita). Devuelve false cuando la visita terminó
+## (salió a la vereda, o no llegó nunca): ahí el Humano vuelve a pasear por su zona.
+func guiar(h: Humano, delta: float) -> bool:
+	var c := _cliente_de(h)
+	if c.is_empty():
+		return false
+	if c["fase"] == Fase.LLEGANDO:
+		c["t"] = float(c["t"]) + delta
+		if float(c["t"]) > MAX_LLEGANDO:
+			if c["prestado"]:   # Lejos de su zona: espera a que nadie lo vea y vuelve
+				c["fase"] = Fase.YENDOSE
+				c["salida"] = h.global_position
+				return true
+			_clientes.erase(c)
+			return false
+		if h.caminar_hacia(to_global(_frente_puerta()), delta) < 0.35:
+			c["fase"] = Fase.ADENTRO
+			c["pos"] = to_local(h.global_position)
+			c["rumbo"] = 0.0
+			entraron += 1
+		return true
+	if c["fase"] == Fase.YENDOSE:
+		# Un prestado se va por la vereda; cuando nadie lo ve, vuelve a su zona (de donde vino)
+		var llego := h.caminar_hacia(c["salida"], delta) < 0.5
+		# Si no puede terminar de irse (la están mirando ahí, o algo le tapa el paso) no se queda yendo y
+		# viniendo: la prueba larga encontró uno 4 minutos así. Sigue hasta otra punta que no se vea
+		c["t_salida"] = float(c.get("t_salida", 0.0)) + delta
+		if float(c["t_salida"]) > ESPERA_SALIDA:
+			c["t_salida"] = 0.0
+			var otra := _otra_salida(h)
+			if not is_nan(otra.x):
+				c["salida"] = otra
+			else:
+				# Sin otra punta posible varias veces seguidas: deja de ser cliente y sigue paseando desde acá
+				c["sin_salida"] = int(c.get("sin_salida", 0)) + 1
+				if int(c["sin_salida"]) >= 3:
+					_clientes.erase(c)
+					return false
+			return true
+		if llego and not _a_la_vista(h.global_position):
+			var zona := h.zona_centro
+			if h.zona_tam != Vector2.ZERO:
+				zona += Vector3(_rng.randf_range(-0.4, 0.4) * h.zona_tam.x, 0, _rng.randf_range(-0.4, 0.4) * h.zona_tam.y)
+			if not h.nav_zona.is_empty():
+				zona = Navegacion.mas_cercano(h.nav_zona, zona)
+			if not _a_la_vista(zona):
+				h.global_position = Vector3(zona.x, h.global_position.y, zona.z)
+				h.reset_physics_interpolation()
+				_clientes.erase(c)
+				return false
+		return true
+	# Adentro (y saliendo hasta la vereda): lo lleva el local por la grilla, que esquiva los muebles
+	_mover_cliente(c, delta)
+	if c["fin"]:
+		salieron += 1
+		if c["prestado"]:   # Se va por donde vino (un camino que se sabe libre) y de ahí vuelve a su zona
+			c["fase"] = Fase.YENDOSE
+			return true
+		_clientes.erase(c)
+		return false
+	h.poner_en(to_global(c["pos"]), global_rotation.y + float(c["rumbo"]), float(c["rapidez"]), delta)
+	return true
 
 
 # ---------------------------------------------------------------- La grilla
@@ -251,8 +474,9 @@ func _cosa_cercana(p: Vector3) -> Vector3:
 
 func _ocupado_por_otro(p: Vector3) -> bool:
 	for c in _clientes:
-		var m: ModeloHumano = c["m"]
-		if m.position.distance_to(p) < 0.9:
+		if c["fase"] != Fase.ADENTRO:
+			continue
+		if (c["pos"] as Vector3).distance_to(p) < 0.9:
 			return true
 		var cam: PackedVector3Array = c["camino"]
 		if not cam.is_empty() and cam[cam.size() - 1].distance_to(p) < 0.9:
@@ -278,37 +502,18 @@ func _altura_vereda() -> float:
 	return _y_vereda
 
 
-## Por dónde se llega o se va por la vereda: a la izquierda o a la derecha de la vidriera.
-func _punta_vereda(lado: float) -> Vector3:
-	return Vector3(ce.x_frente + lado * LARGO_VEREDA, _altura_vereda(), ce.fondo / 2.0 + VEREDA)
-
-
+## Dónde se para un cliente en la vereda antes de entrar (y adonde sale antes de volver a pasear).
 func _frente_puerta() -> Vector3:
 	return Vector3(ce.x_frente, _altura_vereda(), ce.fondo / 2.0 + VEREDA)
-
-
-## Llega un cliente nuevo por la vereda, entra y va a mirar algo.
-func _llega_uno() -> void:
-	if _puerta_adentro < 0:
-		return
-	var destino := _destino_al_azar(_puerta_adentro)
-	var adentro := _camino(_puerta_adentro, destino)
-	if adentro.is_empty():
-		return
-	var lado := -1.0 if _rng.randf() < 0.5 else 1.0
-	var c := _nuevo_cliente(_punta_vereda(lado))
-	var cam := PackedVector3Array([_frente_puerta(), Vector3(ce.x_frente, 0.04, ce.fondo / 2.0 + 0.1),
-		_libres[_puerta_adentro]])
-	cam.append_array(adentro)
-	c["camino"] = cam
-	c["paso"] = Paso.CAMINANDO
-	c["mirar"] = _cosa_cercana(_libres[destino])
-	entraron += 1
 
 
 # ---------------------------------------------------------------- Cada cuadro
 
 func _process(delta: float) -> void:
+	# Los que dejaron de existir (un paseante que se fue del mapa) dejan su lugar
+	for c in _clientes.duplicate():
+		if not is_instance_valid(c["h"]):
+			_clientes.erase(c)
 	var j := GameState.jugador
 	if j == null or _empleado == null or global_position.distance_to(j.global_position) > CERCA:
 		return
@@ -319,25 +524,25 @@ func _process(delta: float) -> void:
 	var x := 0.0 if quieto else sin(_t * 0.4) * minf(0.35, ancho * 0.3)
 	_empleado.position = _base_empleado + Vector3(x, 0, 0)
 	_empleado.animar(delta, 0.0 if quieto else absf(cos(_t * 0.4)) * 0.14)
-	# Llegan clientes nuevos de a uno
+	# De vez en cuando se desvía hacia acá un paseante de la ciudad (los mueve guiar(), que llama el Humano)
 	_proximo -= delta
 	if _proximo <= 0.0:
 		if _clientes.size() < MAX_ADENTRO:
-			_llega_uno()
+			_llamar_uno()
 		_proximo = _rng.randf_range(4.0, 10.0)
-	for c in _clientes.duplicate():
-		_mover_cliente(c, delta)
 
 
+## Un paso de un cliente adentro del local (en coordenadas de la sala: "pos", "rumbo" y "rapidez", que
+## guiar() le pasa al Humano).
 func _mover_cliente(c: Dictionary, delta: float) -> void:
-	var m: ModeloHumano = c["m"]
+	var pos: Vector3 = c["pos"]
 	if c["paso"] == Paso.MIRANDO:
 		c["espera"] = float(c["espera"]) - delta
-		m.animar(delta, 0.0)
+		c["rapidez"] = 0.0
 		var mirar: Vector3 = c["mirar"]
 		if mirar != Vector3.INF:
-			var al := mirar - m.position
-			m.rotation.y = lerp_angle(m.rotation.y, atan2(-al.x, -al.z), minf(delta * 4.0, 1.0))
+			var al := mirar - pos
+			c["rumbo"] = lerp_angle(float(c["rumbo"]), atan2(-al.x, -al.z), minf(delta * 4.0, 1.0))
 		if float(c["espera"]) <= 0.0:
 			_siguiente(c)
 		return
@@ -346,27 +551,26 @@ func _mover_cliente(c: Dictionary, delta: float) -> void:
 		_llego(c)
 		return
 	var destino := cam[0]
-	var plano := Vector3(destino.x - m.position.x, 0, destino.z - m.position.z)
+	var plano := Vector3(destino.x - pos.x, 0, destino.z - pos.z)
 	var vel: float = c["vel"]
 	if plano.length() < 0.05:
-		m.position = destino
+		c["pos"] = destino
 		cam.remove_at(0)
 		c["camino"] = cam
 		return
 	var paso := minf(vel * delta, plano.length())
 	var dir := plano.normalized()
-	m.position += dir * paso
-	m.position.y = move_toward(m.position.y, destino.y, delta * 0.8)
-	m.rotation.y = lerp_angle(m.rotation.y, atan2(-dir.x, -dir.z), minf(delta * 8.0, 1.0))
-	m.animar(delta, vel)
+	pos += dir * paso
+	pos.y = move_toward(pos.y, destino.y, delta * 0.8)
+	c["pos"] = pos
+	c["rumbo"] = lerp_angle(float(c["rumbo"]), atan2(-dir.x, -dir.z), minf(delta * 8.0, 1.0))
+	c["rapidez"] = vel
 
 
-## Terminó de caminar: se queda mirando, o (si se estaba yendo) desaparece al final de la vereda.
+## Terminó de caminar: se queda mirando, o (si se estaba yendo) ya está en la vereda y sigue paseando.
 func _llego(c: Dictionary) -> void:
 	if c["saliendo"]:
-		(c["m"] as Node).queue_free()
-		_clientes.erase(c)
-		salieron += 1
+		c["fin"] = true
 		return
 	_mirar(c)
 
@@ -374,15 +578,13 @@ func _llego(c: Dictionary) -> void:
 func _mirar(c: Dictionary) -> void:
 	c["paso"] = Paso.MIRANDO
 	c["espera"] = _rng.randf_range(2.5, 6.0)
-	var m: ModeloHumano = c["m"]
 	if c["mirar"] == Vector3.INF:
-		c["mirar"] = _cosa_cercana(m.position)
+		c["mirar"] = _cosa_cercana(c["pos"])
 
 
 ## Qué hace después de mirar: otro lugar, pagar en el mostrador o irse.
 func _siguiente(c: Dictionary) -> void:
-	var m: ModeloHumano = c["m"]
-	var aca := _mas_cercano(m.position)
+	var aca := _mas_cercano(c["pos"])
 	c["paradas"] = int(c["paradas"]) - 1
 	var cam := PackedVector3Array()
 	if int(c["paradas"]) > 0:
@@ -394,13 +596,11 @@ func _siguiente(c: Dictionary) -> void:
 		cam = _camino(aca, _caja)
 		c["mirar"] = Vector3(_base_empleado.x, 1.0, _base_empleado.z)
 	else:
-		# Se va: a la puerta, afuera y por la vereda
+		# Se va: a la puerta y afuera, a la vereda (de ahí vuelve a pasear por su zona)
 		cam = _camino(aca, _puerta_adentro)
 		if aca == _puerta_adentro or cam.is_empty():
 			cam = PackedVector3Array([_libres[_puerta_adentro]])
-		var lado := -1.0 if _rng.randf() < 0.5 else 1.0
-		cam.append_array(PackedVector3Array([Vector3(ce.x_frente, 0.04, ce.fondo / 2.0 + 0.1), _frente_puerta(),
-			_punta_vereda(lado)]))
+		cam.append_array(PackedVector3Array([Vector3(ce.x_frente, 0.04, ce.fondo / 2.0 + 0.1), _frente_puerta()]))
 		c["saliendo"] = true
 	if cam.is_empty():
 		c["espera"] = 1.5   # No encontró camino (o ya está ahí): sigue mirando un rato

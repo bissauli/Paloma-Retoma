@@ -11,16 +11,23 @@ const RANGO := 70.0   ## Más lejos no se distingue el interior: queda el vidrio
 
 ## Cada rubro: pared, piso, mueble (estantes y mostrador), los cuatro colores de la mercadería, la
 ## forma de las paredes (ver el shader: 0 cajas, 1 redondos, 2 ropa, 3 botellas, 4 libros, 5 lavarropas,
-## 6 cuadros, 7 espejos de peluquería, 8 boiserie de banco, 9 pizarrón, 10 anteojos),
+## 6 cuadros, 7 espejos de peluquería, 8 boiserie de banco, 9 pizarrón, 10 anteojos, 11 local de comida, 12 bicis
+## colgadas, 13 heladería),
 ## cuántos estantes, el ancho de cada cosa y, si hace falta, los muebles del medio (0 mostrador, 2 banco
-## para sentarse, 3 sillones de barbero, 4 cajas de banco, 5 escritorios) y el damero del piso (0 a 1).
+## para sentarse, 3 sillones de barbero, 4 cajas de banco, 5 escritorios, 6 parrilla) y el damero del piso (0 a 1).
 const RUBROS := {
 	"kiosco": ["fbe9b0", "d9d2c6", "c8423a", "e0403a", "f2c23a", "3a7fd0", "e86aa0", 0, 4, 0.18],
-	"comida": ["f3e3c3", "c96f4a", "8a5a35", "6b8f3a", "b8423a", "e8c060", "3a5a8a", 3, 2, 0.16],
+	# Locales de comida (forma 11): el menú y el mostrador vidriado con bandejas; cada uno con su comida
+	"parrilla": ["e8d2b0", "8a5a35", "5b3b2a", "8a3a2a", "a8462e", "9a3a30", "4a2420", 11, 3, 0.24, 6, 0.0],
+	"empanadas": ["f3e3c3", "c96f4a", "8a5a35", "d8a050", "c98a3a", "e0b060", "b8783a", 11, 3, 0.2, 0, 0.0],
+	"pizzeria": ["f4e6cc", "b8423a", "6b3a2c", "e07a3a", "d8a040", "c84a2a", "f0c060", 11, 3, 0.26, 0, 0.0],
+	"pastas": ["f6ead0", "c9b79a", "8a5a35", "f2d070", "e8c060", "f4e0a0", "c84a2a", 11, 3, 0.18, 0, 0.0],
+	"polleria": ["f4ecd8", "d9d2c6", "8a5a35", "c8783a", "b0602a", "d89048", "e0a058", 11, 3, 0.26, 0, 0.0],
+	"rotiseria": ["f1e6d0", "b7b2a8", "6b4a32", "c8783a", "4f8a3a", "e0b060", "b8423a", 11, 3, 0.22, 0, 0.0],
 	"ferreteria": ["e4dccd", "9a958c", "4a4a52", "c0c4c8", "d8a03a", "c8423a", "3a6fc0", 0, 4, 0.26],
 	"pintureria": ["f2f2ee", "9a958c", "6b6f75", "e0403a", "3a7fd0", "f2c23a", "4fa060", 0, 4, 0.24],
 	"verduleria": ["f1e6d0", "b7b2a8", "8a6a45", "e0503a", "f0a030", "6fae3a", "f2d23a", 1, 3, 0.2],
-	"heladeria": ["fde7ef", "f4ecef", "e06a9a", "f6d6e2", "b8e0c8", "f4e4a8", "8a5a40", 0, 2, 0.4],
+	"heladeria": ["fde7ef", "f4ecef", "e06a9a", "f6a0c0", "9ad8b0", "f4e090", "8a5a40", 13, 2, 0.4, 1, 0.0],   # Vitrina con baldes de helado
 	"lavadero": ["dff0f6", "dfe9ee", "8aa0b0", "f4f6f8", "f4f6f8", "f4f6f8", "f4f6f8", 5, 2, 0.75],
 	"tintoreria": ["e8f2f6", "dfe9ee", "6b7a85", "f4f6f8", "3a5a8a", "c8d4dc", "2f3036", 2, 2, 0.22],
 	"almacen": ["efe2c4", "b9b1a5", "8a5a35", "c8423a", "f2c23a", "3a7fd0", "f4f1e8", 0, 4, 0.2],
@@ -36,7 +43,7 @@ const RUBROS := {
 	"jugueteria": ["d6ecf8", "c08a5a", "4a90d0", "e0403a", "f2c23a", "3a7fd0", "4fa060", 0, 3, 0.3],
 	"bazar": ["f4efe4", "b9b1a5", "8a5a35", "f4f4f4", "c8d4dc", "d8b04a", "3a6fc0", 3, 3, 0.2],
 	"vinoteca": ["b8634e", "744a2c", "5b3b2a", "5a1f2a", "2f4a2a", "7a2a3a", "3a3020", 3, 4, 0.11],
-	"bicicleteria": ["e6eaee", "8f969c", "3f4a45", "e0403a", "3a7fd0", "2f3036", "f2c23a", 0, 2, 0.4],
+	"bicicleteria": ["e6eaee", "8f969c", "3f4a45", "e0403a", "3a7fd0", "2f3036", "f2c23a", 12, 2, 0.4, 1, 0.0],   # Bicis colgadas
 	"floreria": ["e9f2dc", "c9b79a", "6b4a32", "e06a9a", "e0403a", "f2c23a", "6fae3a", 1, 3, 0.24],
 	"libreria": ["efe4c8", "8a5a35", "6b4a32", "8a2f3a", "2f5a8a", "4f7a3a", "d8b04a", 4, 4, 0.06],
 	"ropa": ["f4f1f6", "d8d2c8", "8a8f95", "3a6fc0", "e06a9a", "f4f1e8", "2f3036", 2, 2, 0.24],
@@ -55,8 +62,8 @@ const RUBROS := {
 
 ## Qué rubro corresponde a cada palabra del cartel (sin tildes, en minúscula). Gana la primera que aparece.
 const PALABRAS := [
-	["kiosco", "kiosco"], ["pizzeria", "comida"], ["empanadas", "comida"], ["parrilla", "comida"],
-	["rotiseria", "comida"], ["pastas", "comida"], ["polleria", "comida"], ["ferreteria", "ferreteria"],
+	["kiosco", "kiosco"], ["pizzeria", "pizzeria"], ["empanadas", "empanadas"], ["parrilla", "parrilla"],
+	["rotiseria", "rotiseria"], ["pastas", "pastas"], ["polleria", "polleria"], ["ferreteria", "ferreteria"],
 	["pintureria", "pintureria"], ["verduleria", "verduleria"], ["heladeria", "heladeria"],
 	["lavadero", "lavadero"], ["tintoreria", "tintoreria"], ["sastreria", "tintoreria"], ["almacen", "almacen"],
 	["optica", "optica"], ["peluqueria", "peluqueria"], ["barberia", "peluqueria"], ["zapateria", "zapateria"],

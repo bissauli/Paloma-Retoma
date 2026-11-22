@@ -41,6 +41,31 @@ var tiempo_comida := 30.0
 var _comiendo := false
 var _timer_bocado := 2.0
 
+## Los paseantes de la ciudad entran a los locales de la planta baja (world/gente_local.gd): mientras
+## dura la visita, el local lo guía (de su zona a la vidriera, por adentro y otra vez afuera).
+var visita: GenteLocal = null
+var va_a_locales := true            ## false: no lo llama ningún local (las pruebas que lo manejan a mano)
+var _t_seguir_piso := 0.0           ## Segundos en que, de vuelta de un local, sigue la altura del piso
+var _t_medir_piso := 0.0
+# Oficinistas: cuánto les faltaba hace un rato para llegar a su salida (para darse cuenta si se trabaron)
+var _t_progreso := 0.0
+var _falta_antes := INF
+var _intentos_salida := 0
+
+
+## ¿Lo está viendo la cámara? (en el cuadro y sin una pared en el medio)
+func _a_la_vista() -> bool:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return false
+	var cabeza := global_position + Vector3.UP * 1.2
+	if cam.global_position.distance_to(cabeza) < 10.0:
+		return true
+	if not cam.is_position_in_frustum(cabeza):
+		return false
+	var q := PhysicsRayQueryParameters3D.create(cam.global_position, cabeza, Construir.CAPA_MUNDO)
+	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+
 @onready var modelo: ModeloHumano = $Modelo
 
 
@@ -108,6 +133,10 @@ func _physics_process(delta: float) -> void:
 	if _atendiendo != null:
 		_paso_conversando(delta)
 		return
+	if visita != null:
+		if is_instance_valid(visita) and visita.guiar(self, delta):
+			return
+		terminar_visita()
 	match tipo:
 		"agente":
 			# En su esquina: no se mueve; si lo sacaron de la mirada (sorpresa) vuelve a mirar hacia su puesto
@@ -136,6 +165,9 @@ func _physics_process(delta: float) -> void:
 			_revisar_susto()
 			_pasear(delta)
 			_tirar_migas(delta)
+	if _t_seguir_piso > 0.0:
+		_t_seguir_piso -= delta
+		_seguir_piso(delta)
 	_avanzar(delta, _altura)
 	_girar_hacia_velocidad(delta, 6.0)
 	modelo.rotation.y = _rumbo
@@ -230,6 +262,65 @@ func _pasear(delta: float) -> void:
 	_acelerar(Vector3.ZERO if hacia.length() < 0.3 else hacia.normalized() * velocidad, 3.0, delta)
 
 
+# ---------------------------------------------------------------- Visitas a los locales
+
+## ¿Puede ir a un local ahora? Sólo los paseantes sueltos: no los que tienen algo que hacer (comensales,
+## oficinistas, agentes, señoras en su banco, escolares con la maestra), ni los que hablan con la
+## paloma, se asustaron o ya están en otro local.
+func puede_visitar() -> bool:
+	return va_a_locales and tipo == "turista" and visita == null and _atendiendo == null and _miedo <= 0.0 \
+		and get_node_or_null("Interlocutor") == null and is_inside_tree()
+
+
+## Camina hacia "destino" (global) por su cuenta, esquivando lo que tenga adelante y siguiendo la altura
+## del piso. Devuelve la distancia que le falta (en el plano).
+func caminar_hacia(destino: Vector3, delta: float) -> float:
+	var falta := plano(destino - global_position).length()
+	_ir_hacia(destino, velocidad if falta > 0.6 else velocidad * maxf(falta / 0.6, 0.3), 4.0, delta)
+	_seguir_piso(delta)
+	_avanzar(delta, _altura)
+	_girar_hacia_velocidad(delta, 6.0)
+	modelo.rotation.y = _rumbo
+	modelo.animar(delta, _vel.length())
+	return falta
+
+
+## Lo ubica a mano (adentro del local lo mueve el local, por una grilla que esquiva los muebles).
+func poner_en(pos: Vector3, rumbo: float, rapidez: float, delta: float) -> void:
+	global_position = pos
+	_altura = pos.y
+	_vel = Vector3.ZERO
+	_rumbo = rumbo
+	modelo.rotation.y = _rumbo
+	modelo.animar(delta, rapidez)
+
+
+## Se terminó la visita (o el local dejó de existir): vuelve a pasear por su zona desde donde está.
+func terminar_visita() -> void:
+	if visita != null and is_instance_valid(visita):
+		visita.soltar(self)   # Que el local no lo siga contando como cliente
+	visita = null
+	_vel = Vector3.ZERO
+	_altura = global_position.y
+	_destino = zona_centro
+	_timer_paseo = 0.0
+	_t_seguir_piso = 25.0   # Hasta volver a su zona puede pasar por veredas y escalones
+
+
+## La altura del piso que tiene debajo (un rayo cada tanto, contra el mundo), para cuando camina fuera
+## de su zona: la vereda de un local está más alta que la plaza.
+func _seguir_piso(delta: float) -> void:
+	_t_medir_piso -= delta
+	if _t_medir_piso > 0.0:
+		return
+	_t_medir_piso = 0.25
+	var desde := global_position + Vector3.UP * 0.9
+	var q := PhysicsRayQueryParameters3D.create(desde, desde + Vector3.DOWN * 1.6, Construir.CAPA_MUNDO)
+	var r := get_world_3d().direct_space_state.intersect_ray(q)
+	if not r.is_empty():
+		_altura = move_toward(_altura, (r["position"] as Vector3).y, 0.3)
+
+
 func _tirar_migas(delta: float) -> void:
 	if generador == null or _miedo > 0.0:
 		return
@@ -271,9 +362,24 @@ func asustar(desde: Vector3) -> void:
 
 
 func _paso_oficinista(delta: float) -> void:
-	if plano(destino_final - global_position).length() < 1.0:
+	var falta := plano(destino_final - global_position).length()
+	if falta < 1.0:
 		queue_free()
 		return
+	# Si en un rato no se acercó a su salida (se trabó contra algo: iba y venía o empujaba sin avanzar),
+	# prueba otra; y si ya probó y nadie lo ve, se va (antes quedaban trabados para siempre)
+	_t_progreso += delta
+	if _t_progreso > 5.0:
+		if falta > _falta_antes - 1.0:
+			_intentos_salida += 1
+			if _intentos_salida >= 2 and not _a_la_vista():
+				queue_free()
+				return
+			var gente := get_parent()
+			if gente and gente.has_method("salida_libre"):
+				destino_final = gente.salida_libre(global_position)
+		_t_progreso = 0.0
+		_falta_antes = plano(destino_final - global_position).length()
 	_ir_hacia(destino_final, velocidad, 3.0, delta)
 	if _soltar_factura_en > 0.0:
 		_soltar_factura_en -= delta

@@ -33,6 +33,8 @@ ARCHIVO_DATOS = os.path.join(OUT, "kit_datos.gd")
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 HACER_RENDER = "--sin-render" not in args
 HACER_EXPORT = "--sin-export" not in args
+# --solo a,b,c: exporta sólo esas piezas (y sus versiones "_lejos"); el resto de los GLB no se toca
+SOLO = set(args[args.index("--solo") + 1].split(",")) if "--solo" in args else set()
 
 for d in (DIR_PIEZAS, DIR_EDIF, DIR_FUENTE, DIR_PREVIAS):
     os.makedirs(d, exist_ok=True)
@@ -738,7 +740,10 @@ def planta_baja(F, tipo, fachada, rng, toldo_col=None, rayas=0, cartel_col=None)
                 u = s * (1.6 + 0.9 + b * 2.3)
                 if abs(u) + 0.7 > W / 2:
                     continue
-                det += ventana(F, u, 1.0, 1.2, 2.0, rng, 0.5)
+                v = ventana(F, u, 1.0, 1.2, 2.0, rng, 0.5)   # (se arma igual: así el azar no cambia lo demás)
+                if any(abs(u - c) < m + 0.75 for c, m in ESTILO.get("pb_libre", ())):
+                    continue   # Ahí va otra entrada (la guardia del hospital): sin ventana ni reja encima
+                det += v
                 det += baranda(F, u, 1.0, 1.25, 0.17, alto=2.0, sep=0.14)
     elif tipo == "garaje":
         g = min(3.2, W - 1.6)
@@ -961,13 +966,15 @@ def cano_desague(F, u, H, alto_extra=PRETIL):
 
 def edificio(nombre, W, D, pisos, estilo, fachada, seed, pb="local", toldo_col=None, rayas=0,
              techo="plano", opciones=None, cartel_col=None, remate="piedra", techo_col=None, cartel="local",
-             icono=None, extra=None, cano=True, azotea_ocupada=()):
+             icono=None, extra=None, cano=True, azotea_ocupada=(), pb_libre=()):
     """Edificio entre medianeras: fachada en y=0 mirando a -Y, de x=-W/2 a W/2, fondo hasta y=D.
     remate: color de la tapa del pretil, la banda de la planta baja y la cornisa. cartel/icono: tipo de
     cartel del local (Godot elige el texto) y dibujo al costado. extra(F, H, rng) -> (est, det) suma
-    partes propias (edificios especiales)."""
+    partes propias (edificios especiales). pb_libre: [(u, medio ancho)] de la fachada donde la planta baja
+    no pone ventanas (porque "extra" pone ahí otra entrada)."""
     empezar()
     fijar_estilo(seed, remate, techo_col, cartel, icono)
+    ESTILO["pb_libre"] = pb_libre
     rng = random.Random(seed)
     H = PB + pisos * PISO
     F = Frente((0, 0), (0, -1), W)
@@ -1866,6 +1873,8 @@ for n, o in ASSETS.items():
 
 if HACER_EXPORT:
     for n, o in ASSETS.items():
+        if SOLO and n not in SOLO and n.removesuffix("_lejos") not in SOLO:
+            continue
         _activar([o])
         carpeta = DIR_EDIF if DATOS[n]["carpeta"] == "edificios" else DIR_PIEZAS
         bpy.ops.export_scene.gltf(filepath=os.path.join(carpeta, n + ".glb"), export_format="GLB",

@@ -57,7 +57,8 @@ func _ready() -> void:
 		for g in get_tree().get_nodes_in_group("cuerpos_humanos"):
 			if (g as Node3D).get_parent() is GenteLocal and ((g as Node3D).get_parent() as GenteLocal).ce == casa:
 				personas += 1
-		_check("%s: tiene empleado y al menos un cliente (%d personas)" % [casa.name, personas], personas >= 2)
+		# Los clientes son paseantes de la ciudad que van entrando (ver tests/test_clientes_locales.gd)
+		_check("%s: tiene empleado (%d personas)" % [casa.name, personas], personas >= 1)
 	for casa in deptos:
 		temas_d[casa.tema] = true
 		pisos[casa.piso] = true

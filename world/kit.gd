@@ -332,6 +332,120 @@ static func _sombra(padre: Node3D, forma: PrimitiveMesh, t: Transform3D, rango: 
 ## Superficies donde la paloma se puede posar en un auto: techo, capó y baúl. Cada una es
 ## [centro, tamaño] en el espacio del modelo (la trompa mira a +X). Vacío si no es un auto común
 ## (colectivos y el auto abandonado no tienen).
+## Son bloques macizos desde la carrocería (BASE_TAPAS, que se pisa con la caja de abajo del auto) hasta
+## la tapa: antes eran láminas de 12 cm con la cabina hueca debajo, y la paloma atravesaba el techo
+## (al posarse con el auto andando, o en picada) y se metía por las ventanillas.
+const BASE_TAPAS := 0.55
+
+static var _cabinas := {}
+
+
+## La cabina de un auto (parabrisas, ventanillas, luneta y techo) como una forma convexa: los vértices de
+## la malla que están por encima del capó, más los mismos bajados hasta la carrocería. Los bloques de
+## superficies_auto() son cajas y dejaban sin colisión la cuña del parabrisas y de la luneta (que van
+## inclinados): por ahí se metía la paloma. Null si no es un auto común.
+static func cabina_auto(nombre: String) -> ConvexPolygonShape3D:
+	if _cabinas.has(nombre):
+		return _cabinas[nombre]
+	_cabinas[nombre] = null
+	var tapas := superficies_auto(nombre)
+	if tapas.is_empty():
+		return null
+	# El techo es la tapa más alta; el capó y el baúl, las otras. La cabina va del baúl al capó (con el pie
+	# del parabrisas y de la luneta, que están a la altura del capó) y no más arriba que el techo (el
+	# cartel del taxi o las balizas del patrullero no cuentan)
+	var techo: Array = tapas[0]
+	for s: Array in tapas:
+		if (s[0] as Vector3).y + (s[1] as Vector3).y / 2.0 > (techo[0] as Vector3).y + (techo[1] as Vector3).y / 2.0:
+			techo = s
+	var y_techo := (techo[0] as Vector3).y + (techo[1] as Vector3).y / 2.0
+	var x_techo := (techo[0] as Vector3).x
+	var capo := INF
+	var desde := -INF   # Hasta dónde llega el baúl (si hay)
+	var hasta := INF    # Dónde empieza el capó
+	for s: Array in tapas:
+		if s == techo:
+			continue
+		var c: Vector3 = s[0]
+		var t: Vector3 = s[1]
+		capo = minf(capo, c.y + t.y / 2.0)
+		if c.x > x_techo:
+			hasta = minf(hasta, c.x - t.x / 2.0 + 0.08)
+		else:
+			desde = maxf(desde, c.x + t.x / 2.0 - 0.08)
+	var m := malla(nombre)
+	if m == null:
+		return null
+	# El perfil de arriba, medido con rayos sobre la malla (es low poly: los vértices están sólo en las
+	# esquinas de cada pieza y no alcanzan para saber dónde está el pie del parabrisas)
+	var tm := m.generate_triangle_mesh()
+	var lo := m.get_aabb().position.x
+	var hi := m.get_aabb().end.x
+	var puntos := PackedVector3Array()
+	var x := maxf(lo, desde)
+	while x <= minf(hi, hasta):
+		for z in [-0.6, 0.0, 0.6]:
+			var r := tm.intersect_ray(Vector3(x, y_techo + 1.0, z), Vector3.DOWN)
+			if r.is_empty():
+				continue
+			var y := minf((r["position"] as Vector3).y, y_techo)
+			if y > capo + 0.02:
+				puntos.append(Vector3(x, y, z))
+				puntos.append(Vector3(x, BASE_TAPAS, z))
+		x += 0.05
+	if puntos.size() < 8:
+		return null
+	var forma := ConvexPolygonShape3D.new()
+	forma.points = puntos
+	_cabinas[nombre] = forma
+	return forma
+
+
+static var _cascos := {}
+
+
+## La carrocería de un vehículo sin tapas (los colectivos) como formas convexas medidas con rayos sobre
+## la malla, una por tramo de TRAMO_CASCO a lo largo: el techo de verdad (con la franja del medio más
+## alta y el frente más bajo) y los costados donde están. Antes era una caja de 3,2 x 2,5 m y el techo
+## del modelo llega a 3,38: la paloma se hundía en el techo del colectivo.
+const TRAMO_CASCO := 0.5
+
+static func casco_vehiculo(nombre: String) -> Array:
+	if _cascos.has(nombre):
+		return _cascos[nombre]
+	var formas: Array = []
+	_cascos[nombre] = formas
+	var m := malla(nombre)
+	if m == null:
+		return formas
+	var tm := m.generate_triangle_mesh()
+	var caja := m.get_aabb()
+	var piso := maxf(caja.position.y, 0.15)
+	var x0 := caja.position.x
+	while x0 < caja.end.x - 0.01:
+		var x1 := minf(x0 + TRAMO_CASCO, caja.end.x)
+		var puntos := PackedVector3Array()
+		for x: float in [x0 + 0.01, x0 + (x1 - x0) * 0.25, (x0 + x1) / 2.0, x0 + (x1 - x0) * 0.75, x1 - 0.01]:
+			# Costado: dónde está la carrocería a media altura (los espejos no cuentan)
+			var lado := tm.intersect_ray(Vector3(x, 1.5, caja.end.z + 1.0), Vector3.FORWARD)
+			var ancho := absf((lado["position"] as Vector3).z) if not lado.is_empty() else 0.0
+			if ancho <= 0.0:
+				continue
+			var z := -ancho
+			while z <= ancho + 0.001:
+				var r := tm.intersect_ray(Vector3(x, caja.end.y + 1.0, clampf(z, -ancho + 0.05, ancho - 0.05)), Vector3.DOWN)
+				if not r.is_empty() and (r["position"] as Vector3).y > piso + 0.3:
+					puntos.append(Vector3(x, (r["position"] as Vector3).y, z))
+					puntos.append(Vector3(x, piso, z))
+				z += ancho / 10.0
+		if puntos.size() >= 8:
+			var forma := ConvexPolygonShape3D.new()
+			forma.points = puntos
+			formas.append(forma)
+		x0 = x1
+	return formas
+
+
 static func superficies_auto(nombre: String) -> Array:
 	var tapas: Array   # [x desde, x hasta, altura de arriba]
 	if nombre.begins_with("auto_hatch"):
@@ -343,7 +457,8 @@ static func superficies_auto(nombre: String) -> Array:
 	var res: Array = []
 	for tp: Array in tapas:
 		var largo_tapa: float = tp[1] - tp[0]
-		res.append([Vector3((tp[0] + tp[1]) / 2.0, tp[2] - 0.06, 0.0), Vector3(largo_tapa, 0.12, 1.4)])
+		var alto: float = float(tp[2]) - BASE_TAPAS
+		res.append([Vector3((tp[0] + tp[1]) / 2.0, BASE_TAPAS + alto / 2.0, 0.0), Vector3(largo_tapa, alto, 1.4)])
 	return res
 
 
@@ -356,6 +471,9 @@ static func colisiones(nombre: String, t: Transform3D, cuerpo: StaticBody3D) -> 
 		var forma_s := BoxShape3D.new()
 		forma_s.size = s[1]
 		_forma(cuerpo, forma_s, Transform3D(t.basis.orthonormalized(), t * (s[0] as Vector3)))
+	var cabina := cabina_auto(nombre)
+	if cabina and t.basis.get_scale().is_equal_approx(Vector3.ONE):
+		_forma(cuerpo, cabina, t)
 	for c: Array in d.get("cajas", []):
 		# Mapa V4.5: las cajas del pretil de los edificios cubren también la tapa de color (ColisionAuto)
 		var cj := ColisionAuto.caja(d, c)
