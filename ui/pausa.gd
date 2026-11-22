@@ -104,9 +104,9 @@ func _teclas(acciones: Array) -> String:
 				var k := ev as InputEventKey
 				var kc := k.keycode
 				if k.physical_keycode != 0:
-					# En la web esa conversión no existe (tira error): el código físico sirve igual, salvo
-					# en teclados que no son QWERTY
-					kc = k.physical_keycode if OS.has_feature("web") \
+					# En la web y sin pantalla (headless) esa conversión no existe (tira error): el código físico
+					# sirve igual, salvo en teclados que no son QWERTY
+					kc = k.physical_keycode if OS.has_feature("web") or DisplayServer.get_name() == "headless" \
 						else DisplayServer.keyboard_get_keycode_from_physical(k.physical_keycode)
 				texto = OS.get_keycode_string(kc).to_upper()
 				if texto == "SPACE":
