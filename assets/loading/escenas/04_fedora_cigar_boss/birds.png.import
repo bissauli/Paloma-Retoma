@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b768bg0st4i0o"
-path="res://.godot/imported/loading4.png-4be65d2a87e612492456abf410778e7d.ctex"
+uid="uid://crmy3thl1am3g"
+path="res://.godot/imported/birds.png-ba30c001e138d043d5dea637c192b04f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/loading/loading4.png"
-dest_files=["res://.godot/imported/loading4.png-4be65d2a87e612492456abf410778e7d.ctex"]
+source_file="res://assets/loading/escenas/04_fedora_cigar_boss/birds.png"
+dest_files=["res://.godot/imported/birds.png-ba30c001e138d043d5dea637c192b04f.ctex"]
 
 [params]
 
@@ -37,4 +37,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

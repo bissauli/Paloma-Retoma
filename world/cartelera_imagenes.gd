@@ -134,7 +134,7 @@ static func _quad_en(padre: Node3D, t: Transform3D, cara: int, rect: Rect2, z: f
 	var local := Transform3D(Basis(Vector3.UP, giro).scaled_local(Vector3(rect.size.x, rect.size.y, 1.0)),
 		Vector3(c.x * lado, c.y, z * lado))
 	padre.add_child(m)
-	m.global_transform = t * local
+	Construir.poner_global(m, t * local)
 
 
 static func _malla() -> QuadMesh:

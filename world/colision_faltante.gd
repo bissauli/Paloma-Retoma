@@ -38,9 +38,13 @@ static var _envolventes := {}     ## id de malla (o malla y escala) -> ConvexPol
 
 ## Agrega las colisiones que faltan a lo que cuelga de "raiz". Devuelve cuántas agregó.
 static func completar(raiz: Node3D) -> int:
-	if MapaOverrides.modo_admin or not raiz.is_inside_tree():
+	if MapaOverrides.modo_admin:
 		return 0
-	var escena: Node = raiz.get_tree().root
+	# Fuera del árbol (el mundo se arma en otro hilo, ver Arranque) se miran las formas de todo lo que
+	# cuelga de lo más alto de esa rama
+	var escena: Node = raiz.get_tree().root if raiz.is_inside_tree() else raiz
+	while not raiz.is_inside_tree() and escena.get_parent():
+		escena = escena.get_parent()
 	var formas: Array = []          # [inversa, aabb local]
 	var indice := {}
 	_juntar_formas(escena, formas, indice)
@@ -57,13 +61,13 @@ static func completar(raiz: Node3D) -> int:
 				continue
 			pendientes.append(h)
 			var mi := h as MeshInstance3D
-			if mi == null or mi.mesh == null or not mi.is_visible_in_tree():
+			if mi == null or mi.mesh == null or not Construir.visible_de(mi):
 				continue
 			if mi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
 				continue
 			if _es_atravesable(mi):
 				continue
-			var caja := mi.global_transform * mi.mesh.get_aabb()
+			var caja := Construir.global_de(mi) * mi.mesh.get_aabb()
 			if caja.size.y < MIN_ALTO or minf(caja.size.x, minf(caja.size.y, caja.size.z)) < MIN_ESPESOR:
 				continue
 			var c := caja.get_center()
@@ -72,7 +76,7 @@ static func completar(raiz: Node3D) -> int:
 				continue
 			if _cubierta(caja, formas, indice):
 				continue
-			var gt := mi.global_transform
+			var gt := Construir.global_de(mi)
 			var forma_t := _forma_para(mi.mesh, gt)
 			if forma_t.is_empty():
 				continue
@@ -83,7 +87,7 @@ static func completar(raiz: Node3D) -> int:
 				b.collision_layer = Construir.CAPA_MUNDO
 				b.collision_mask = 0
 				raiz.add_child(b)
-				b.global_transform = Transform3D.IDENTITY
+				b.transform = Construir.global_de(raiz).affine_inverse()
 				cuerpos[clave] = b
 			var cs := CollisionShape3D.new()
 			cs.shape = forma_t[0]
@@ -118,7 +122,7 @@ static func _juntar_formas(raiz: Node, formas: Array, indice: Dictionary) -> voi
 		var local := _caja_forma(cs.shape)
 		if local.size == Vector3.ZERO:
 			continue
-		_agregar_forma(formas, indice, cs.global_transform, local)
+		_agregar_forma(formas, indice, Construir.global_de(cs), local)
 
 
 static func _agregar_forma(formas: Array, indice: Dictionary, t: Transform3D, local: AABB) -> void:

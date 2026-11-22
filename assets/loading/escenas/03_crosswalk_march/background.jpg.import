@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cp65tki8hy00y"
-path="res://.godot/imported/frames.png-fc29ae1d6e08d73b6aade25d9aa89ede.ctex"
+uid="uid://bhjommis5syoy"
+path="res://.godot/imported/background.jpg-054492c94c845decb0a16f6c303c290a.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/loading/frames.png"
-dest_files=["res://.godot/imported/frames.png-fc29ae1d6e08d73b6aade25d9aa89ede.ctex"]
+source_file="res://assets/loading/escenas/03_crosswalk_march/background.jpg"
+dest_files=["res://.godot/imported/background.jpg-054492c94c845decb0a16f6c303c290a.ctex"]
 
 [params]
 
@@ -37,4 +37,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

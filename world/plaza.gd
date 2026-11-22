@@ -14,16 +14,30 @@ var entorno: Environment
 var cielo: Cielo
 
 
+var armada := false   ## Ya se construyó (Arranque la arma en otro hilo, antes de entrar a la escena)
+
+
 func _ready() -> void:
+	if not armada:
+		construir()
+
+
+## Arma toda la plaza y la ciudad. Puede correr fuera del árbol y en otro hilo (ver Arranque): todo lo
+## que hace sólo toca nodos que todavía no están en la escena.
+func construir() -> void:
+	armada = true
 	MapaOverrides.reiniciar()   # IDs de las piezas editables (ver MapaOverrides)
 	_crear_ambiente()
 	_crear_piso()
 	_crear_limites()
 	_crear_zonas()
 	# Todo lo de la plaza que se ve tiene colisión (ver ColisionFaltante; la ciudad hace lo suyo)
+	PantallaCarga.informar_armado(0.9)
 	ColisionFaltante.completar(self)
 	# Miles de piezas fijas (edificios, árboles, bancos...) pasan a ser unas pocas mallas grandes
+	PantallaCarga.informar_armado(0.95)
 	Construir.fusionar_estaticas(self)
+	PantallaCarga.informar_armado(1.0)
 
 
 # ---------------------------------------------------------------- Luz y cielo
@@ -108,14 +122,21 @@ func _crear_zonas() -> void:
 	Edificios.subte(edif, Edificios.SUBTE)
 	posicion_balcon = Edificios.casa_rosada(edif)
 	var mesas := Edificios.cafes(edif)
+	PantallaCarga.informar_armado(0.08)
 	# Nivel inferior (Fase 1): pasajes entre los cafés y mercado
 	NivelInferior.armar(self)
 	# La ciudad alrededor de la plaza (mapa V2): arma y fusiona sus propias piezas
-	add_child(Ciudad.new())
+	var ciudad := Ciudad.new()
+	add_child(ciudad)
+	if not ciudad.armada:
+		ciudad.construir()
 	# Nivel medio (Fase 2): toldos de los cafés, balcones alrededor, columnas de farol y árboles altos
 	# (después de la ciudad: al armarse, la ciudad pone en cero las cuentas que miran las pruebas)
 	NivelMedio.plaza(self)
-	add_child(Transito.new())
+	var transito := Transito.new()
+	add_child(transito)
+	if not transito.armado:
+		transito.construir()
 
 	_crear_jardines()
 	_crear_fuentes()

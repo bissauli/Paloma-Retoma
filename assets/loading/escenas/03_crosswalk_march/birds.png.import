@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c8jnpxgrr8pel"
-path="res://.godot/imported/loading5.png-cdc1a36e621e8898f9d2a0eba497867b.ctex"
+uid="uid://m5fsvjhikh2o"
+path="res://.godot/imported/birds.png-6a2129a48bf7f224d5185267f1a41107.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/loading/loading5.png"
-dest_files=["res://.godot/imported/loading5.png-cdc1a36e621e8898f9d2a0eba497867b.ctex"]
+source_file="res://assets/loading/escenas/03_crosswalk_march/birds.png"
+dest_files=["res://.godot/imported/birds.png-6a2129a48bf7f224d5185267f1a41107.ctex"]
 
 [params]
 
@@ -37,4 +37,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

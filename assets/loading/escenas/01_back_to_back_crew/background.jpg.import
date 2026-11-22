@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cryi6x47r8txg"
-path="res://.godot/imported/loading3.png-e2c44dce88f298160d5a98b9f9629e7b.ctex"
+uid="uid://db726r4facjes"
+path="res://.godot/imported/background.jpg-b4b5e512cd700651e1d96320155d5ad8.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/loading/loading3.png"
-dest_files=["res://.godot/imported/loading3.png-e2c44dce88f298160d5a98b9f9629e7b.ctex"]
+source_file="res://assets/loading/escenas/01_back_to_back_crew/background.jpg"
+dest_files=["res://.godot/imported/background.jpg-b4b5e512cd700651e1d96320155d5ad8.ctex"]
 
 [params]
 
@@ -37,4 +37,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

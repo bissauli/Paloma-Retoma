@@ -310,10 +310,56 @@ static var _suaves := {}      ## Forma de primitiva -> normales suavizadas de la
 ## los vértices); las demás, por material. Además se separan por celdas de "celda" metros (así la
 ## cámara sigue descartando lo que no ve) y por si proyectan sombra o no.
 ## Las colisiones no se tocan. Devuelve cuántas piezas se fusionaron.
+## Transformación de "n" en el mundo. Funciona también fuera del árbol (el mundo se arma en otro hilo
+## antes de entrar a la escena, ver Arranque): ahí se arma subiendo por los padres.
+static func global_de(n: Node3D) -> Transform3D:
+	if n.is_inside_tree():
+		return n.global_transform
+	return _global_padre(n) * n.transform
+
+
+## Pone "n" en la transformación "t" del mundo (como global_transform = t), también fuera del árbol:
+## ahí global_transform tomaría "t" como local y la pieza quedaría corrida si el padre no está en el origen.
+static func poner_global(n: Node3D, t: Transform3D) -> void:
+	if n.is_inside_tree():
+		n.global_transform = t
+	else:
+		n.transform = _global_padre(n).affine_inverse() * t
+
+
+## Como poner_global, pero sólo la posición.
+static func poner_global_pos(n: Node3D, pos: Vector3) -> void:
+	var t := global_de(n)
+	t.origin = pos
+	poner_global(n, t)
+
+
+static func _global_padre(n: Node) -> Transform3D:
+	var t := Transform3D.IDENTITY
+	var p := n.get_parent()
+	while p:
+		if p is Node3D:
+			t = (p as Node3D).transform * t
+		p = p.get_parent()
+	return t
+
+
+## Como is_visible_in_tree(), pero también fuera del árbol.
+static func visible_de(n: Node3D) -> bool:
+	if n.is_inside_tree():
+		return n.is_visible_in_tree()
+	var p: Node = n
+	while p:
+		if p is Node3D and not (p as Node3D).visible:
+			return false
+		p = p.get_parent()
+	return true
+
+
 static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
 	var grupos := {}
 	var fusionadas: Array[MeshInstance3D] = []
-	var inv := raiz.global_transform.affine_inverse()
+	var inv := global_de(raiz).affine_inverse()
 	var pendientes: Array[Node] = [raiz]
 	while not pendientes.is_empty():
 		var n: Node = pendientes.pop_back()
@@ -324,12 +370,12 @@ static func fusionar_estaticas(raiz: Node3D, celda := 24.0) -> int:
 			var mi := h as MeshInstance3D
 			if mi and mi.get_child_count() == 0:
 				var mat := mi.material_override
-				if mi.mesh == null or mat == null or not mi.is_visible_in_tree():
+				if mi.mesh == null or mat == null or not visible_de(mi):
 					continue
 				if mat is BaseMaterial3D and (mat as BaseMaterial3D).transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
 					continue   # Lo transparente se ordena por distancia: queda suelto
 				var con_color := mat.has_meta(&"color_plano")
-				var t := inv * mi.global_transform
+				var t := inv * global_de(mi)
 				var centro := t * mi.mesh.get_aabb().get_center()
 				var clave_mat := ("v%.2f" % rugosidad_de(mat)) if con_color else ("m%d" % mat.get_instance_id())
 				# Las piezas con la meta "rango" (árboles, props chicos) van aparte y se dejan de

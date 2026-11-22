@@ -67,7 +67,7 @@ static func poblar(raiz: Node) -> int:
 			p.set_meta("look", GUARDIAS[k_guardia % GUARDIAS.size()])
 			k_guardia += 1
 		raiz.add_child(p)
-		p.global_transform = marca.global_transform
+		Construir.poner_global(p, Construir.global_de(marca))   # (se arma fuera del árbol, ver Arranque)
 		cuantas += 1
 	return cuantas
 

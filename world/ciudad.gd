@@ -118,7 +118,17 @@ var luces_edificios: Array = []     ## [pieza, transformación] de los edificios
 var arboles_achicados := 0          ## Árboles de la ciudad que se achicaron o sacaron para no meterse en un edificio
 
 
+var armada := false   ## Ya se construyó (la plaza la arma apenas la agrega, también fuera del árbol)
+
+
 func _ready() -> void:
+	if not armada:
+		construir()
+
+
+## Arma la ciudad entera. Puede correr fuera del árbol y en otro hilo (ver Plaza.construir y Arranque).
+func construir() -> void:
+	armada = true
 	name = "Ciudad"
 	var t0 := Time.get_ticks_msec()
 	_rng.seed = 20261115
@@ -136,11 +146,14 @@ func _ready() -> void:
 	var etapas: Array[String] = []
 	CarteleraImagenes.reiniciar()
 	SuperficiesSonido.reiniciar()
-	for etapa: Callable in [_suelos, _manzanas, _parque, _barrio, _peatonal, _pasaje, _props_veredas, _estacionamientos,
-			_obras, _obra_cuadra, _mobiliario, _nivel_medio, _nivel_alto, _fondo, _puntos_de_juego]:
+	var lista: Array[Callable] = [_suelos, _manzanas, _parque, _barrio, _peatonal, _pasaje, _props_veredas,
+		_estacionamientos, _obras, _obra_cuadra, _mobiliario, _nivel_medio, _nivel_alto, _fondo, _puntos_de_juego]
+	for k in lista.size():
+		var etapa := lista[k]
 		var t := Time.get_ticks_usec()
 		_rng.seed = 20261115 + hash(etapa.get_method())
 		etapa.call()
+		PantallaCarga.informar_armado(0.1 + 0.7 * float(k + 1) / lista.size())   # La barra de la pantalla de carga
 		PantallaCarga.refrescar()     # Que la pantalla de carga siga animada entre etapa y etapa
 		etapas.append("%s %d" % [etapa.get_method(), (Time.get_ticks_usec() - t) / 1000])
 	# Piezas que se agregaron a mano con el builder de administrador
@@ -160,7 +173,9 @@ func _ready() -> void:
 	# aparte y se dejan de dibujar lejos)
 	t1 = Time.get_ticks_usec()
 	var piezas := get_child_count()
+	PantallaCarga.informar_armado(0.82)
 	Construir.fusionar_estaticas(self, 96.0)    # celdas más grandes = menos mallas = menos llamadas de dibujo
+	PantallaCarga.informar_armado(0.88)
 	etapas.append("fusión de %d piezas %d" % [piezas, (Time.get_ticks_usec() - t1) / 1000])
 	PantallaCarga.refrescar()
 	# Luces de la noche: ventanas encendidas y faroles (después de fusionar, así no se las lleva la fusión)

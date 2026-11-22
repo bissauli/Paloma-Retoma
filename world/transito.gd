@@ -61,7 +61,17 @@ var _peso_total := 0.0
 var _tiempo := 0.0
 
 
+var armado := false   ## Ya se construyó (la plaza lo arma fuera del árbol, en otro hilo: ver Arranque)
+
+
 func _ready() -> void:
+	if not armado:
+		construir()
+
+
+## Rutas, cruces, semáforos y los primeros autos. Puede correr fuera del árbol y en otro hilo.
+func construir() -> void:
+	armado = true
 	name = "Transito"
 	_definir_rutas()
 	_detectar_cruces()
@@ -368,7 +378,7 @@ func _ubicar(a: Auto) -> void:
 	var dir: Vector3 = pose[1]
 	if dir.length_squared() > 0.0001:
 		a.rotation.y = atan2(-dir.z, dir.x)
-	a.global_position = (pose[0] as Vector3) + Vector3(0, 0.005, 0)
+	Construir.poner_global_pos(a, (pose[0] as Vector3) + Vector3(0, 0.005, 0))   # (también fuera del árbol)
 
 
 # ---------------------------------------------------------------- Semáforos
@@ -447,7 +457,7 @@ func _max_autos() -> int:
 ## ¿No hay ningún auto a menos de "radio" metros de ese punto?
 func _lugar_libre(pos: Vector3, radio: float) -> bool:
 	for a in _autos:
-		if is_instance_valid(a) and a.global_position.distance_to(pos) < radio:
+		if is_instance_valid(a) and Construir.global_de(a).origin.distance_to(pos) < radio:
 			return false
 	return true
 

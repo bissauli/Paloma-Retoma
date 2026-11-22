@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cl2ixfch3l84i"
-path="res://.godot/imported/splash.png-d27fad381481d327892137667f730f36.ctex"
+uid="uid://3yexdijkfg28"
+path="res://.godot/imported/background.jpg-966a73b03a7199947eab74a17355f76c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/loading/splash.png"
-dest_files=["res://.godot/imported/splash.png-d27fad381481d327892137667f730f36.ctex"]
+source_file="res://assets/loading/escenas/04_fedora_cigar_boss/background.jpg"
+dest_files=["res://.godot/imported/background.jpg-966a73b03a7199947eab74a17355f76c.ctex"]
 
 [params]
 
@@ -37,4 +37,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
