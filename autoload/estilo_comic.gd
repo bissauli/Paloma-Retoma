@@ -23,6 +23,7 @@ const VERTICES_MAX_SUAVIZAR := 6000
 var _contorno: ShaderMaterial
 var _con_contorno := false
 var _suavizadas := {}   ## ArrayMesh -> true: ya revisada por _suavizar()
+var _pendientes := PackedInt64Array()   ## Ids de las mallas que entraron al árbol y falta revisar
 
 
 func _ready() -> void:
@@ -63,14 +64,25 @@ func _recorrer(n: Node) -> void:
 
 
 func _al_agregar(n: Node) -> void:
-	# Diferido: muchas veces la malla y el material se asignan después del add_child
+	# Diferido: muchas veces la malla y el material se asignan después del add_child.
+	# Se juntan los ids (no los objetos) y se revisan todos juntos con una sola llamada diferida:
+	# al armar la ciudad entran miles de mallas y muchas se liberan en el mismo cuadro (las piezas que
+	# Construir fusiona). Una llamada diferida por malla con el objeto adentro fallaba en cada malla
+	# liberada ("Cannot convert argument 1 from Object to Object": GDScript no acepta un objeto
+	# liberado como argumento, tenga tipo o no) y trababa la vuelta al menú con miles de errores.
 	if _con_contorno and (n is MeshInstance3D or n is MultiMeshInstance3D):
-		_revisar_diferido.call_deferred(n)
+		if _pendientes.is_empty():
+			_revisar_pendientes.call_deferred()
+		_pendientes.append(n.get_instance_id())
 
 
-func _revisar_diferido(n: Object) -> void:
-	if is_instance_valid(n) and (n as Node).is_inside_tree():
-		_revisar(n as GeometryInstance3D)
+func _revisar_pendientes() -> void:
+	var ids := _pendientes
+	_pendientes = PackedInt64Array()
+	for id in ids:
+		var g := instance_from_id(id) as GeometryInstance3D
+		if g != null and g.is_inside_tree():
+			_revisar(g)
 
 
 func _revisar(g: GeometryInstance3D) -> void:
