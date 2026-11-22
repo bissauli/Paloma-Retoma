@@ -2,7 +2,6 @@ extends CanvasLayer
 ## Menú de pausa (Esc): Continuar, Reiniciar, Opciones (las mismas del menú principal) y
 ## Salir al menú (guarda la partida para poder continuarla).
 
-const ESCENA_MENU := "res://main.tscn"
 const TEMA := preload("res://ui/tema/tema_paloma.tres")
 
 var _opciones: OpcionesMenu
@@ -158,7 +157,7 @@ func continuar() -> void:
 func _reiniciar() -> void:
 	get_tree().paused = false
 	GameState.saltar_menu = true   # Reiniciar arranca directo a jugar, sin el menú principal
-	get_tree().reload_current_scene()
+	get_tree().change_scene_to_file(Arranque.ESCENA)   # Con la pantalla de carga (ver Arranque)
 
 
 func _salir() -> void:
@@ -166,7 +165,7 @@ func _salir() -> void:
 	get_tree().paused = false
 	GameState.en_partida = false
 	AvisoAccion.limpiar()
-	get_tree().change_scene_to_file(ESCENA_MENU)
+	get_tree().change_scene_to_file(Arranque.ESCENA)   # Con la pantalla de carga (ver Arranque)
 
 
 func _abrir_opciones() -> void:

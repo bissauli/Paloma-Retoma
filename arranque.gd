@@ -5,7 +5,11 @@ extends Node
 ## en otro hilo también, fuera de la escena, así la pantalla de carga sigue fluida todo el tiempo.
 ## Recién cuando está todo listo el juego entra a la escena; la pantalla se va cuando el menú principal
 ## ya está listo (señal Main.listo).
+## Volver al menú (pausa, victoria) y Reiniciar también pasan por acá (Arranque.ESCENA): rearmar la ciudad
+## adentro de la escena traba el hilo principal unos 5 s; acá el armado va en otro hilo y la pantalla de
+## carga sigue animada.
 
+const ESCENA := "res://arranque.tscn"
 const JUEGO := "res://main.tscn"
 
 var _carga: PantallaCarga

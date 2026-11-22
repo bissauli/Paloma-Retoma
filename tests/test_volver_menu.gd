@@ -3,7 +3,7 @@ extends Node
 ## headless si la calidad no lo deja, y lo que se mide es el juego de verdad):
 ## godot --path . res://tests/test_volver_menu.tscn
 ## Arranca como el juego (arranque.tscn: pantalla de carga y mundo armado en otro hilo), entra a una
-## partida, sale al menú desde la pausa 5 veces seguidas y después gana y vuelve desde la victoria.
+## partida, sale al menú desde la pausa 5 veces seguidas, gana y vuelve desde la victoria, y reinicia.
 ## Falla si sale cualquier error del motor o de un script, si una vuelta tarda de más o si las mallas
 ## que se agregan en partida se quedan sin el contorno de tinta.
 
@@ -11,6 +11,7 @@ const VUELTAS := 5
 const SEGUNDOS_MAX := 60.0
 
 var fallas := 0
+var peor_cuadro_ms := 0.0   ## El cuadro más lento de la última espera (_esperar_menu)
 var _errores := Contador.new()
 
 
@@ -55,9 +56,34 @@ func _ready() -> void:
 	(victoria.get_node("%VolverTitulo") as Button).pressed.emit()
 	main = await _esperar_menu("victoria", main)
 	if main:
-		print("  vuelta desde la victoria: %.1f s" % ((Time.get_ticks_msec() - t) / 1000.0))
+		print("  vuelta desde la victoria: %.1f s, cuadro más lento %.0f ms" % [
+			(Time.get_ticks_msec() - t) / 1000.0, peor_cuadro_ms])
 		_check("volver desde la victoria no tira errores", _errores.cantidad() == antes)
+		await _reiniciar(main)
 	_terminar()
+
+
+## Reiniciar desde la pausa: arranca directo a jugar, sin el menú.
+func _reiniciar(main: Node) -> void:
+	await _entrar_a_partida(main)
+	var pausa: Node = main.get_node("Pausa")
+	pausa.pausar()
+	await get_tree().process_frame
+	var antes := _errores.cantidad()
+	var id_viejo := main.get_instance_id()
+	pausa._reiniciar()
+	var limite := Time.get_ticks_msec() + int(SEGUNDOS_MAX * 1000.0)
+	var actual: Node = null
+	while Time.get_ticks_msec() < limite:
+		await get_tree().process_frame
+		actual = get_tree().current_scene
+		if actual and actual.get_instance_id() != id_viejo and actual.name == "Main" and GameState.en_partida:
+			break
+		actual = null
+	_check("reiniciar vuelve a una partida sin menú", actual != null and not GameState.menu_activo)
+	for i in 60:
+		await get_tree().process_frame
+	_check("reiniciar no tira errores", _errores.cantidad() == antes)
 
 
 ## Como al abrir el juego: arranque.tscn pasa a ser la escena actual (main.gd lo mira para abrir el menú).
@@ -79,7 +105,7 @@ func _vuelta_desde_pausa(main: Node, n: int) -> Node:
 	pausa._salir()
 	var nuevo := await _esperar_menu("vuelta %d" % n, main)
 	if nuevo:
-		print("  vuelta %d: %.1f s" % [n, (Time.get_ticks_msec() - t) / 1000.0])
+		print("  vuelta %d: %.1f s, cuadro más lento %.0f ms" % [n, (Time.get_ticks_msec() - t) / 1000.0, peor_cuadro_ms])
 		_check("vuelta %d: volver al menú no tira errores" % n, _errores.cantidad() == antes)
 	return nuevo
 
@@ -125,8 +151,13 @@ func _contorno_en_malla_nueva(main: Node) -> bool:
 func _esperar_menu(nombre: String, viejo: Node = null) -> Node:
 	var limite := Time.get_ticks_msec() + int(SEGUNDOS_MAX * 1000.0)
 	var id_viejo := viejo.get_instance_id() if viejo else 0
+	peor_cuadro_ms = 0.0
+	var t := Time.get_ticks_usec()
 	while Time.get_ticks_msec() < limite:
 		await get_tree().process_frame
+		var ahora := Time.get_ticks_usec()
+		peor_cuadro_ms = maxf(peor_cuadro_ms, (ahora - t) / 1000.0)
+		t = ahora
 		var actual := get_tree().current_scene
 		if actual == null or actual.get_instance_id() == id_viejo or actual.name != "Main" or not GameState.menu_activo:
 			continue
