@@ -24,6 +24,7 @@ var zona_radio := 5.0
 var desplazamiento := Vector3.ZERO   ## Lugar propio dentro de la formación de la bandada
 var altura_suelo := 0.0
 var modo_anim := 0                   ## Lo usa la bandada para animar
+var miga := -1                       ## La miga del rastro de la jugadora que está siguiendo (ver Bandada._miga_para); -1: ninguna
 
 var _rumbo := 0.0
 var _dir_corrida := Vector3.ZERO
@@ -259,6 +260,11 @@ func _rayo_mundo(desde: Vector3, hasta: Vector3, mascara := 1) -> Dictionary:
 	_rayo.to = hasta
 	_rayo.collision_mask = mascara
 	return get_world_3d().direct_space_state.intersect_ray(_rayo)
+
+
+## ¿Ve "hasta" desde "desde"? (nada del mundo ni de lo que frena a las palomas en el medio)
+func ve(desde: Vector3, hasta: Vector3) -> bool:
+	return _rayo_mundo(desde, hasta, 1 | Construir.CAPA_PALOMAS).is_empty()
 
 
 func _lejos_de_camara() -> bool:

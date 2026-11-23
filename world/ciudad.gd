@@ -167,6 +167,8 @@ func construir() -> void:
 	PantallaCarga.refrescar()
 	# Lo que quedó sin colisión (autos estacionados, bicis, carteles, arbustos...) recibe la suya
 	t1 = Time.get_ticks_usec()
+	# La bici y el macetón de los edificios con interiores, sobre la vereda (ver Pasaje.apoyar_en_vereda)
+	Pasaje.apoyar_en_vereda(self)
 	var completadas := ColisionFaltante.completar(self)
 	etapas.append("%d colisiones completadas %d" % [completadas, (Time.get_ticks_usec() - t1) / 1000])
 	# Miles de piezas pasan a ser pocas mallas grandes por celda (los árboles y props chicos van
@@ -174,6 +176,8 @@ func construir() -> void:
 	t1 = Time.get_ticks_usec()
 	var piezas := get_child_count()
 	PantallaCarga.informar_armado(0.82)
+	# Cada edificio con interiores, en sus propias mallas (ver Pasaje.fusionar_edificios)
+	Pasaje.fusionar_edificios(self)
 	Construir.fusionar_estaticas(self, 96.0)    # celdas más grandes = menos mallas = menos llamadas de dibujo
 	PantallaCarga.informar_armado(0.88)
 	etapas.append("fusión de %d piezas %d" % [piezas, (Time.get_ticks_usec() - t1) / 1000])
@@ -581,6 +585,12 @@ func _fila(a: Vector3, dir: Vector3, largo: float, rot: float, pool: Array, coli
 	var d := 0.0
 	for n: String in lista:
 		var w := float(KitDatos.PIEZAS[n]["ancho"])
+		# Algunos edificios de las manzanas tienen interiores (un local, departamentos): ver Pasaje
+		if colision and not lejos and not (n in fijos) and Pasaje.toca_en_ciudad(n, a + dir * (d + w / 2.0), rot):
+			Pasaje.edificio_ciudad(self, n, a + dir * (d + w / 2.0), rot, _c(Pasaje.elegir(COLORES_CASA)),
+				_c(Pasaje.elegir(COLORES_PRETIL)))
+			d += w
+			continue
 		var mi := _poner(n, a + dir * (d + w / 2.0), rot, Vector3.ONE, colision, {}, colision, lejos)
 		if not sombra:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

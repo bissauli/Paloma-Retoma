@@ -1,6 +1,8 @@
 class_name Pasaje
 extends RefCounted
-## Los edificios de alrededor de la plaza (Edificios.ALREDEDORES), con interiores que se recorren:
+## Edificios con interiores que se recorren: los de alrededor de la plaza (Edificios.ALREDEDORES) y algunos
+## de la ciudad, al azar (ver edificio_ciudad). Cada edificio tiene sólo un local, sólo un departamento,
+## las dos cosas, dos departamentos o un local y dos (y alrededor de la plaza, a veces ninguno):
 ## - En la PLANTA BAJA, un local (supermercado, verdulería, taller mecánico, café...): la vidriera de
 ##   adelante está abierta hasta el piso, así que se entra caminando o volando. Sin cinemática.
 ## - En un PISO AL AZAR (del 2 al 7), un ambiente de un departamento (living, dormitorio, cocina,
@@ -8,7 +10,7 @@ extends RefCounted
 ##   adelante y otra atrás. Se puede entrar libremente; y si la paloma se acerca a la ventana aparece
 ##   un aviso ("E · ATRAVESAR VOLANDO"): si lo aprieta, la cinemática de world/casa_enterable.gd la
 ##   hace cruzar el cuarto esquivando todo (si no, no pasa nada).
-## Cada partida sortea qué local y qué ambiente van en cada edificio y en qué piso.
+## Cada partida sortea qué edificios tienen interiores, qué local y qué ambientes van y en qué piso.
 ##
 ## Cada sala (local o ambiente) tiene una ruta en zigzag y los muebles grandes se ubican SOBRE ella:
 ## - "costado": en cada vuelta del zigzag, del lado de adentro (la paloma lo rodea).
@@ -199,8 +201,8 @@ const ESCENARIOS := {
 		"textos": ["Home office con visitas", "¡Que no se apague la compu!", "Entre libros y papeles"]},
 }
 
-## Qué hay en cada edificio de Edificios.ALREDEDORES: índice -> {"local": tema, "ambiente": tema,
-## "piso": piso del ambiente}. Lo llena alrededores() y lo consulta NivelMedio (para no ponerles
+## Qué hay en cada edificio de Edificios.ALREDEDORES que tiene interiores: índice -> {"locales": [temas],
+## "ambientes": [temas]}. Lo llena alrededores() y lo consulta NivelMedio (para no ponerles
 ## balcones ni toldos, que ya traen los suyos).
 static var interiores := {}
 
@@ -358,16 +360,8 @@ static func _piso_debajo(formas: Array, desde: Vector3, hasta: Vector3) -> float
 ## de entorno PALOMA_SEMILLA se puede fijar). Devuelve todas las salas (locales y ambientes).
 static func alrededores(padre: Node3D) -> Array[CasaEnterable]:
 	interiores.clear()
-	var rng := RandomNumberGenerator.new()
-	var semilla := OS.get_environment("PALOMA_SEMILLA")
-	if semilla.is_valid_int():
-		rng.seed = int(semilla)
-	else:
-		rng.randomize()
-	var locales := _mezclar(LOCALES.duplicate(), rng)
-	var ambientes := _mezclar(AMBIENTES.duplicate(), rng)
+	_empezar_sorteo()
 	var out: Array[CasaEnterable] = []
-	var il := 0   # Cuántos locales se usaron (no se repiten)
 	for k in Edificios.ALREDEDORES.size():
 		var e: Array = Edificios.ALREDEDORES[k]
 		var base: Vector3 = e[0]
@@ -375,27 +369,136 @@ static func alrededores(padre: Node3D) -> Array[CasaEnterable]:
 		var frente: Vector3 = e[3]
 		var ancho_frente := tam.x if absf(frente.z) > 0.5 else tam.z
 		var lado := 1.0 if base.x >= 0.0 else -1.0   # Al salir por atrás dobla hacia afuera de la plaza
-		var ambiente: String = ambientes[k % ambientes.size()]
-		var piso := rng.randi_range(PISO_MIN, PISO_MAX)
-		var esc_a: Dictionary = ESCENARIOS[ambiente]
-		var nombre_a := "%s · %d.º %s" % [esc_a["nombres"][0], piso, LETRAS[rng.randi_range(0, LETRAS.size() - 1)]]
+		var salas := _salas_al_azar(ancho_frente, lado, PISO_MIN, true)
+		if not salas.is_empty():
+			var temas_l: Array = []
+			var ambientes_k: Array = []
+			for sa: Dictionary in salas:
+				if es_local(sa["tema"]):
+					temas_l.append(sa["tema"])
+				else:
+					ambientes_k.append(sa["tema"])
+			interiores[k] = {"locales": temas_l, "ambientes": ambientes_k}
+		out.append_array(crear_edificio(padre, base, tam, e[2], e[4], frente, salas))
+	return out
+
+
+## Sorteo de qué interiores hay y dónde. Cada partida es distinta (con la variable de entorno
+## PALOMA_SEMILLA se puede fijar). Lo empieza alrededores(); la ciudad (edificio_ciudad) sigue con el
+## mismo, así los locales y los ambientes no se repiten hasta que se usaron todos.
+static var _rng: RandomNumberGenerator
+static var _locales_mezclados: Array = []
+static var _ambientes_mezclados: Array = []
+static var _il := 0
+static var _ia := 0
+static var en_ciudad := 0   ## Cuántos edificios de la ciudad tienen interiores (ver edificio_ciudad)
+
+## En la ciudad (Ciudad._fila): cada edificio de las manzanas de 8 m de frente o más tiene esta
+## probabilidad de ser uno con interiores, hasta CIUDAD_MAX en todo el mapa.
+const CIUDAD_PROB := 0.12
+const CIUDAD_MAX := 10
+const CIUDAD_ANCHO_MIN := 8.0
+## En la ciudad, el fondo de la manzana tiene casas bajas y PH pegados atrás: los departamentos van del
+## 3.º piso para arriba, así la ventana de atrás da por encima de los techos.
+const CIUDAD_PISO_MIN := 3
+
+
+static func _empezar_sorteo() -> void:
+	_rng = RandomNumberGenerator.new()
+	var semilla := OS.get_environment("PALOMA_SEMILLA")
+	if semilla.is_valid_int():
+		_rng.seed = int(semilla)
+	else:
+		_rng.randomize()
+	_locales_mezclados = _mezclar(LOCALES.duplicate(), _rng)
+	_ambientes_mezclados = _mezclar(AMBIENTES.duplicate(), _rng)
+	_il = 0
+	_ia = 0
+	en_ciudad = 0
+
+
+## Qué salas tiene un edificio, al azar: sólo un local, sólo un departamento, las dos cosas, dos
+## departamentos (en pisos distintos) o un local y dos departamentos; con "puede_nada", también ninguna
+## (un edificio común). [{tema, piso, nombre, lado, (x, ancho en los locales)}]
+static func _salas_al_azar(ancho_frente: float, lado: float, piso_min: int, puede_nada: bool) -> Array:
+	if _rng == null:
+		_empezar_sorteo()
+	if puede_nada and _rng.randf() < 0.2:
+		return []
+	var dado := _rng.randf()
+	var con_local := dado < 0.3 or (dado >= 0.6 and dado < 0.85) or dado >= 0.95
+	var deptos := 0 if dado < 0.3 else (2 if dado >= 0.85 else 1)
+	var salas: Array = []
+	if con_local:
 		# Planta baja: un local, o dos lado a lado si el frente es ancho
-		var salas: Array = []
 		var cuantos := 2 if ancho_frente >= ANCHO_DOS_LOCALES else 1
-		var temas_l: Array = []
 		for j in cuantos:
-			var local: String = locales[il % locales.size()]
-			il += 1
-			temas_l.append(local)
+			var local: String = _locales_mezclados[_il % _locales_mezclados.size()]
+			_il += 1
 			var esc_l: Dictionary = ESCENARIOS[local]
-			var nombre_l: String = esc_l["nombres"][rng.randi_range(0, esc_l["nombres"].size() - 1)]
+			var nombre_l: String = esc_l["nombres"][_rng.randi_range(0, esc_l["nombres"].size() - 1)]
 			var ancho_l := ancho_frente / cuantos
 			salas.append({"tema": local, "piso": 0, "nombre": nombre_l, "lado": lado,
 				"x": -ancho_frente / 2.0 + ancho_l * (j + 0.5), "ancho": ancho_l})
+	# Los departamentos: cada sala ocupa casi dos pisos, así que dos van por lo menos a dos pisos de distancia
+	var pisos: Array[int] = []
+	for j in deptos:
+		for intento in 20:
+			var piso := _rng.randi_range(piso_min, PISO_MAX)
+			var libre := true
+			for q in pisos:
+				if absi(q - piso) < 2:
+					libre = false
+			if libre:
+				pisos.append(piso)
+				break
+	for piso in pisos:
+		var ambiente: String = _ambientes_mezclados[_ia % _ambientes_mezclados.size()]
+		_ia += 1
+		var esc_a: Dictionary = ESCENARIOS[ambiente]
+		var nombre_a := "%s · %d.º %s" % [esc_a["nombres"][0], piso, LETRAS[_rng.randi_range(0, LETRAS.size() - 1)]]
 		salas.append({"tema": ambiente, "piso": piso, "nombre": nombre_a, "lado": lado})
-		interiores[k] = {"locales": temas_l, "ambiente": ambiente, "piso": piso}
-		out.append_array(crear_edificio(padre, base, tam, e[2], e[4], frente, salas))
-	return out
+	return salas
+
+
+## ¿El edificio de la ciudad "nombre" (una pieza del kit de la fila de una manzana, con el frente en
+## "pos" y girada "rot") pasa a tener interiores? Ver CIUDAD_PROB. Sólo los que miran hacia adentro del
+## mapa: en las manzanas del borde, el frente de afuera da contra la pared invisible del límite (ver
+## Plaza._crear_limites) y a la ventana de adelante no se llegaría.
+static func toca_en_ciudad(nombre: String, pos: Vector3, rot: float) -> bool:
+	if _rng == null:
+		_empezar_sorteo()
+	if en_ciudad >= CIUDAD_MAX or float(KitDatos.PIEZAS[nombre].get("ancho", 0.0)) < CIUDAD_ANCHO_MIN:
+		return false
+	var adelante := pos + Vector3(sin(rot), 0.0, cos(rot)) * 6.0
+	if adelante.x < Ciudad.X_MIN or adelante.x > Ciudad.X_MAX or adelante.z < Ciudad.Z_MIN or adelante.z > Ciudad.Z_MAX:
+		return false
+	return _rng.randf() < CIUDAD_PROB
+
+
+## Un elemento al azar de "lista" con el sorteo de los interiores (no el de la ciudad: así la ciudad
+## sale igual con o sin interiores).
+static func elegir(lista: Array) -> Variant:
+	if _rng == null:
+		_empezar_sorteo()
+	return lista[_rng.randi_range(0, lista.size() - 1)]
+
+
+## En lugar de la pieza del kit "nombre" (frente en "pos", girada "rot", como la pone Ciudad._fila), un
+## edificio con interiores del mismo frente, fondo y alto, de color "color". Lo llama Ciudad._fila.
+static func edificio_ciudad(padre: Node3D, nombre: String, pos: Vector3, rot: float, color: Color,
+		color_remate: Color) -> Array[CasaEnterable]:
+	var d: Dictionary = KitDatos.PIEZAS[nombre]
+	var w := float(d["ancho"])
+	var fondo := float(d["fondo"])
+	var alto := float(d["alto"])
+	var frente := Vector3(sin(rot), 0.0, cos(rot)).snapped(Vector3.ONE * 0.001)
+	var salas := _salas_al_azar(w, 1.0 if _rng.randf() < 0.5 else -1.0, CIUDAD_PISO_MIN, false)
+	en_ciudad += 1
+	var base := pos - frente * fondo / 2.0
+	base.y = Ciudad.Y_VEREDA
+	var tam := Vector3(w, alto, fondo) if absf(frente.z) > 0.5 else Vector3(fondo, alto, w)
+	return crear_edificio(padre, base, tam, color, color_remate, frente, salas)
 
 
 static func _mezclar(lista: Array, rng: RandomNumberGenerator) -> Array:
@@ -422,7 +525,7 @@ static func crear_edificio(padre: Node3D, base: Vector3, tam: Vector3, color: Co
 		h = maxf(h, y0 + pb + ALTO_PISO)   # El edificio crece lo que haga falta (con un piso más arriba)
 	bandas.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
 	var casa := Node3D.new()
-	casa.name = "Edificio_" + String(salas[0]["nombre"]).replace(" ", "_")
+	casa.name = "Edificio_" + (String(salas[0]["nombre"]).replace(" ", "_") if not salas.is_empty() else "sin_interiores")
 	casa.add_to_group(GRUPO_EDIFICIOS)
 	padre.add_child(casa)
 	casa.position = base

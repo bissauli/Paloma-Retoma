@@ -43,6 +43,18 @@ var _lado_salt := 0
 var _t_salto := 0.0
 var _rumbo_descanso := 0.0
 
+## Rastro de la jugadora: por dónde pasó (un punto cada PASO_RASTRO m, los últimos MAX_RASTRO). Una
+## seguidora que no ve su lugar en la formación (hay una pared en el medio: la jugadora entró a una sala
+## por la ventana o la puerta) va por el rastro, de miga en miga, y entra por el mismo hueco que ella.
+const PASO_RASTRO := 0.5
+const MAX_RASTRO := 160
+const CADA_VISTA := 6           ## Cada cuántos pasos de física cada seguidora vuelve a mirar si ve su lugar
+const FORMACION_ADENTRO := 0.3  ## Adentro de una sala, la formación se achica a esto (si no, cae en las paredes)
+var _rastro := PackedVector3Array()
+var _rastro_base := 0           ## Índice absoluto del primer punto del rastro (los viejos se van sacando)
+var _sala_jugadora: CasaEnterable   ## La sala en la que está la jugadora (null: afuera)
+var _t_sala := 0.0
+
 
 func _ready() -> void:
 	child_entered_tree.connect(func(n: Node) -> void:
@@ -443,6 +455,75 @@ func _physics_process(delta: float) -> void:
 		_resolver_choques()
 
 
+# ---------------------------------------------------------------- Rastro de la jugadora
+
+## Anota por dónde pasa la jugadora y en qué sala está (cada tanto: hay pocas salas, pero no hace falta
+## mirarlas en cada paso).
+func _anotar_rastro(jpos: Vector3, delta: float) -> void:
+	var p := jpos + Vector3.UP * PalomaNPC.ALTURA_RAYO
+	if _rastro.is_empty() or _rastro[_rastro.size() - 1].distance_to(p) >= PASO_RASTRO:
+		_rastro.append(p)
+		if _rastro.size() > MAX_RASTRO:
+			_rastro.remove_at(0)
+			_rastro_base += 1
+	_t_sala -= delta
+	if _t_sala <= 0.0:
+		_t_sala = 0.25
+		_sala_jugadora = null
+		for n in get_tree().get_nodes_in_group("casa_enterable"):
+			var ce := n as CasaEnterable
+			if ce.contiene(jpos):
+				_sala_jugadora = ce
+				break
+
+
+## Si la seguidora "p" (en "desde") no ve su lugar "objetivo", la próxima miga del rastro hacia la
+## jugadora que sí ve (o, si ninguna, la última que vio); si lo ve, Vector3.INF. Mira cada CADA_VISTA pasos
+## (repartidas: no todas en el mismo); entre vistas, sigue la miga que tenía y avanza cuando llega.
+func _miga_para(p: PalomaNPC, desde: Vector3, objetivo: Vector3, i: int) -> Vector3:
+	var ojo := desde + Vector3.UP * PalomaNPC.ALTURA_RAYO
+	if (_frame + i) % CADA_VISTA == 0:
+		if p.ve(ojo, objetivo + Vector3.UP * PalomaNPC.ALTURA_RAYO):
+			p.miga = -1
+		else:
+			p.miga = _miga_visible(p, ojo)
+	if p.miga < _rastro_base:
+		p.miga = -1
+		return Vector3.INF
+	var k := p.miga - _rastro_base
+	if k >= _rastro.size():
+		p.miga = -1
+		return Vector3.INF
+	# Llegó a la miga: la siguiente (hacia la jugadora)
+	while k < _rastro.size() - 1 and ojo.distance_to(_rastro[k]) < 0.6:
+		k += 1
+	p.miga = k + _rastro_base
+	return _rastro[k] - Vector3.UP * PalomaNPC.ALTURA_RAYO
+
+
+## La miga más nueva del rastro que ve la paloma desde "ojo" (de la jugadora para atrás, de a saltos y
+## después fino). Si no ve ninguna, la más cercana (algo es mejor que quedarse contra la pared).
+func _miga_visible(p: PalomaNPC, ojo: Vector3) -> int:
+	var n := _rastro.size()
+	if n == 0:
+		return -1
+	var k := n - 1
+	var salto := 4
+	while k >= 0:
+		if p.ve(ojo, _rastro[k]):
+			# Un poco más nueva todavía, si también la ve
+			for j in range(mini(k + salto - 1, n - 1), k, -1):
+				if p.ve(ojo, _rastro[j]):
+					return j + _rastro_base
+			return k + _rastro_base
+		k -= salto
+	var mejor := n - 1
+	for j in n:
+		if ojo.distance_squared_to(_rastro[j]) < ojo.distance_squared_to(_rastro[mejor]):
+			mejor = j
+	return mejor + _rastro_base
+
+
 # ---------------------------------------------------------------- Choques
 
 ## Las palomas NPC no usan física, así que acá se separan a mano para que no se atraviesen:
@@ -573,6 +654,8 @@ func _mover_seguidoras(delta: float) -> void:
 		return
 	var jpos := _jugador.global_position
 	var jvel := _jugador.velocity
+	_anotar_rastro(jpos, delta)
+	var escala_formacion := FORMACION_ADENTRO if _sala_jugadora != null else 1.0
 	var j_suelo := _jugador.estado == PalomaJugador.Estado.SUELO
 	var j_picada := _jugador.en_picada
 	var vel_max := maxf(jvel.length() * 1.15, velocidad_minima)
@@ -653,13 +736,25 @@ func _mover_seguidoras(delta: float) -> void:
 			a = ali[i] / vecinos[i] - vel[i]
 			c = coh[i] / vecinos[i] - pos_i
 
-		# Punto propio en la formación alrededor de la jugadora
-		var objetivo := jpos + Vector3(p.desplazamiento.x, 0, p.desplazamiento.z) + atras
+		# Punto propio en la formación alrededor de la jugadora (adentro de una sala, más apretada)
+		var objetivo := jpos + (Vector3(p.desplazamiento.x, 0, p.desplazamiento.z) + atras) * escala_formacion
 		var aterrizar := j_suelo and dist_j < 7.0
 		if aterrizar:
 			objetivo.y = p.altura_suelo
 		else:
-			objetivo.y = jpos.y + p.desplazamiento.y
+			objetivo.y = jpos.y + p.desplazamiento.y * escala_formacion
+		# Adentro de una sala, el lugar tiene que caer adentro: si no (la jugadora cerca de la puerta o de una
+		# pared), se corre hacia el medio del cuarto, al lado de ella
+		if _sala_jugadora != null and not _sala_jugadora.contiene(objetivo, 0.35):
+			var medio := Construir.global_de(_sala_jugadora).origin
+			var al_medio := Vector3(medio.x - jpos.x, 0, medio.z - jpos.z)
+			var lado := Vector3(p.desplazamiento.x, 0, p.desplazamiento.z).normalized() * 0.45
+			objetivo = jpos + al_medio.limit_length(1.0) + lado + Vector3.UP * (objetivo.y - jpos.y)
+		# Si no ve su lugar (una pared en el medio), va por el rastro de la jugadora
+		var miga := _miga_para(p, pos_i, objetivo, i)
+		if miga != Vector3.INF:
+			objetivo = miga
+			aterrizar = false
 
 		var hacia := objetivo - pos_i
 		var largo_hacia := hacia.length()

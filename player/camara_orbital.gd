@@ -31,6 +31,13 @@ var _t_sin_tocar := 10.0   ## Segundos desde que el dedo movió la cámara (sól
 ## cada paso de física: en el teléfono la física va a 30 Hz y el acercamiento de la cámara al
 ## despegar o al hacer picada se vería a los saltos.
 var _consulta_resorte := PhysicsShapeQueryParameters3D.new()
+## El punto de donde cuelga el brazo (sobre la paloma) tiene que quedar del mismo lado de las paredes que
+## ella: pegada al techo de una sala, 75 cm más arriba ya es el hueco entre pisos del edificio, y la cámara
+## mostraba eso (paredes negras, el piso de arriba). Ver _pivote_libre.
+var _consulta_pivote := PhysicsShapeQueryParameters3D.new()
+const AIRE_PIVOTE := 0.06     ## Lo que queda separado el punto de la cámara de lo que lo frena
+const BRAZO_CORTO := 1.5        ## Más corto que esto, el brazo prueba ir derecho (ver _resorte)
+const CENTRO_PALOMA := 0.22   ## Alto del centro de la esfera de choque de la paloma (player/paloma.tscn)
 
 @onready var brazo: SpringArm3D = $Brazo
 @onready var camara: Camera3D = $Brazo/Camara
@@ -46,6 +53,9 @@ func _ready() -> void:
 	brazo.set_physics_process_internal(false)
 	_consulta_resorte.shape = brazo.shape
 	_consulta_resorte.collision_mask = brazo.collision_mask
+	_consulta_pivote.shape = brazo.shape
+	_consulta_pivote.collision_mask = brazo.collision_mask
+	_consulta_pivote.exclude = _consulta_resorte.exclude
 	yaw = _objetivo.global_rotation.y
 	global_position = _objetivo.global_position + Vector3.UP * altura
 
@@ -90,7 +100,7 @@ func _process(delta: float) -> void:
 		var k := clampf(rapidez / 8.0, 0.0, 1.0) * seguir_rumbo
 		yaw = lerp_angle(yaw, _objetivo.call("rumbo"), 1.0 - exp(-k * delta))
 	var destino := _objetivo.get_global_transform_interpolated().origin + Vector3.UP * altura
-	global_position = global_position.lerp(destino, 1.0 - exp(-suavizado * delta))
+	global_position = _pivote_libre(global_position.lerp(destino, 1.0 - exp(-suavizado * delta)))
 	rotation = Vector3(pitch, yaw, 0.0)
 
 	var dist := distancia_suelo
@@ -129,8 +139,28 @@ func sacudir(intensidad: float) -> void:
 ## Coloca la cámara de golpe detrás del objetivo (después de un teletransporte).
 func reubicar() -> void:
 	if _objetivo:
-		global_position = _objetivo.global_position + Vector3.UP * altura
+		global_position = _pivote_libre(_objetivo.global_position + Vector3.UP * altura)
 		_resorte()
+
+
+## "p" o, si entre la paloma y "p" hay algo del mundo (el techo de una sala, una pared al entrar por una
+## ventana con la cámara atrasada), el último punto libre antes de eso.
+func _pivote_libre(p: Vector3) -> Vector3:
+	# Desde el centro de la esfera de la paloma (su origen está en las patas: desde ahí la esfera del brazo
+	# arrancaría tocando el piso y no se movería)
+	var desde := _objetivo.get_global_transform_interpolated().origin + Vector3.UP * CENTRO_PALOMA
+	var mov := p - desde
+	if mov.length_squared() < 1e-6:
+		return p
+	_consulta_pivote.transform = Transform3D(Basis.IDENTITY, desde)
+	_consulta_pivote.motion = mov
+	var r := get_world_3d().direct_space_state.cast_motion(_consulta_pivote)
+	var k: float = r[0] if r.size() > 0 else 1.0
+	if k < 1.0:
+		# Con un poco de aire: si la esfera queda apoyada en el techo, el brazo (que arranca de acá) ya
+		# empieza tocando, mide 0 y la cámara se mete adentro de la paloma
+		k = maxf(k - AIRE_PIVOTE / mov.length(), 0.0)
+	return desde + mov * k
 
 
 ## Lo mismo que hace el SpringArm3D: estira el brazo hacia atrás hasta spring_length o hasta
@@ -142,10 +172,20 @@ func _resorte() -> void:
 	_consulta_resorte.motion = mov
 	var r := get_world_3d().direct_space_state.cast_motion(_consulta_resorte)
 	var k: float = r[0] if r.size() > 0 else 1.0
-	var objetivo_z := brazo.spring_length * k
+	var objetivo := Vector3(0, 0, brazo.spring_length * k)
+	# Mirando hacia abajo, el brazo va hacia atrás y hacia arriba: pegada al techo de una sala chocaba
+	# enseguida y la cámara quedaba encima de la paloma. Si así queda corto, prueba con el brazo derecho
+	# (la cámara atrás, a la misma altura) y se queda con el más largo
+	if k * brazo.spring_length < BRAZO_CORTO and mov.y > 0.01:
+		var plano := Vector3(mov.x, 0.0, mov.z).normalized() * brazo.spring_length
+		_consulta_resorte.motion = plano
+		var r2 := get_world_3d().direct_space_state.cast_motion(_consulta_resorte)
+		var k2: float = r2[0] if r2.size() > 0 else 1.0
+		if k2 * brazo.spring_length > k * brazo.spring_length + 0.2:
+			objetivo = t.basis.inverse() * (plano * k2)
 	# Acercarse a la paloma (algo tapa) es rápido; volver a alejarse es suave: si no, la cámara pegaba
 	# saltos de más de 3 cm cada vez que el resorte tocaba o soltaba algo
 	var dt := get_process_delta_time()
-	var z := camara.position.z
-	var paso := 1.0 - exp(-(28.0 if objetivo_z < z else 7.0) * dt)
-	camara.position = Vector3(0, 0, lerpf(z, objetivo_z, paso))
+	var actual := camara.position
+	var paso := 1.0 - exp(-(28.0 if objetivo.length() < actual.length() else 7.0) * dt)
+	camara.position = actual.lerp(objetivo, paso)
