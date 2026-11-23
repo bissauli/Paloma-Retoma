@@ -33,10 +33,17 @@ func _ready() -> void:
 			deptos.append(casa)
 		else:
 			locales.append(casa)
-	var n := Edificios.ALREDEDORES.size()
-	_check("hay al menos un local por edificio y un departamento por edificio (%d y %d)" % [locales.size(), deptos.size()],
-		locales.size() >= n and deptos.size() == n)
-	_check("los edificios anchos tienen dos locales (hay más locales que edificios: %d)" % locales.size(), locales.size() > n)
+	# Cada partida sortea qué edificios tienen interiores (alrededor de la plaza y en la ciudad) y qué tiene
+	# cada uno (ver Pasaje._salas_al_azar): sólo se pide que haya varios de cada cosa
+	_check("hay varios locales y varios departamentos (%d y %d)" % [locales.size(), deptos.size()],
+		locales.size() >= 4 and deptos.size() >= 4)
+	_check("hay interiores también en la ciudad, no sólo alrededor de la plaza (%d edificios)" % Pasaje.en_ciudad,
+		Pasaje.en_ciudad >= 2)
+	var lejos := 0
+	for c in todas:
+		if Vector2((c as Node3D).global_position.x, (c as Node3D).global_position.z).length() > 75.0:
+			lejos += 1
+	_check("hay salas lejos del centro (%d a más de 75 m)" % lejos, lejos >= 2)
 	if deptos.size() < 4:
 		get_tree().quit(1)
 		return
@@ -51,7 +58,7 @@ func _ready() -> void:
 		temas_l[casa.tema] = true
 		print("  %s: local (%s) en la planta baja" % [casa.name, casa.tema])
 		_check("%s: el local es de la lista de locales" % casa.name, Pasaje.LOCALES.has(casa.tema))
-		_check("%s: el local está en la planta baja" % casa.name, casa.piso == 0 and absf(casa.global_position.y) < 0.01)
+		_check("%s: el local está en la planta baja" % casa.name, casa.piso == 0 and absf(casa.position.y) < 0.01)   # (a la altura de la base de su edificio)
 		_check("%s: al local se entra caminando (la vidriera llega al piso)" % casa.name, _cruza(casa, casa.x_frente, -1.0, 0.35))
 		var personas := 0
 		for g in get_tree().get_nodes_in_group("cuerpos_humanos"):
@@ -73,9 +80,10 @@ func _ready() -> void:
 		_check("%s: está en un piso del %d al %d" % [casa.name, Pasaje.PISO_MIN, Pasaje.PISO_MAX],
 			casa.piso >= Pasaje.PISO_MIN and casa.piso <= Pasaje.PISO_MAX)
 		_check("%s: está a la altura de su piso" % casa.name,
-			absf(casa.global_position.y - casa.piso * Pasaje.ALTO_PISO) < 0.01)
-	_check("los locales son todos distintos (%d)" % temas_l.size(), temas_l.size() == locales.size())
-	_check("los ambientes son todos distintos (%d)" % temas_d.size(), temas_d.size() == n)
+			absf(casa.position.y - casa.piso * Pasaje.ALTO_PISO) < 0.01)   # (sobre la base de su edificio)
+	# Se repiten recién cuando se usaron todos (ver Pasaje._salas_al_azar)
+	_check("los locales no se repiten hasta usarlos todos (%d)" % temas_l.size(), temas_l.size() == mini(locales.size(), Pasaje.LOCALES.size()))
+	_check("los ambientes no se repiten hasta usarlos todos (%d)" % temas_d.size(), temas_d.size() == mini(deptos.size(), Pasaje.AMBIENTES.size()))
 	_check("hay al menos 7 ambientes de casa posibles (%d)" % Pasaje.AMBIENTES.size(), Pasaje.AMBIENTES.size() >= 7)
 	_check("los pisos no son todos iguales (%d distintos)" % pisos.size(), pisos.size() > 1)
 
@@ -257,8 +265,11 @@ func _ruta_choca(casa: CasaEnterable, curva: Curve3D, solo_adentro := false) -> 
 			continue
 		var p := casa.to_global(pl)
 		q.transform = Transform3D(Basis.IDENTITY, p)
-		if not paloma.get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty():
-			return "en %.1f de %.1f m, local %s" % [s, largo, str(casa.to_local(p).snapped(Vector3.ONE * 0.01))]
+		var r := paloma.get_world_3d().direct_space_state.intersect_shape(q, 1)
+		if not r.is_empty():
+			var con := r[0]["collider"] as Node
+			return "en %.1f de %.1f m, local %s, contra %s" % [s, largo, str(casa.to_local(p).snapped(Vector3.ONE * 0.01)),
+				con.get_path() if con else "?"]
 		s += 0.1
 	return ""
 

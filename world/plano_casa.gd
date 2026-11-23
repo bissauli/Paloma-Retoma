@@ -69,7 +69,7 @@ static func armar(sala_: Node3D, ce_: CasaEnterable, tema: String) -> int:
 	p._obstaculos_ruta(tema)
 	p._rincones(tema)
 	ce_.set_meta(&"plano_casa", true)
-	ce_.set_meta(&"esquiva", p.esquiva)
+	ce_.set_meta(&"esquiva", p._cerca_de_la_ruta())
 	return p.puestos
 
 
@@ -96,14 +96,18 @@ func _dormitorio() -> void:
 
 
 func _living() -> void:
-	# El sillón contra la pared izquierda, la mesa ratona adelante, la alfombra y la tele enfrente
-	if _en_pared("izq", 0.0, "sillon_azul"):
+	# La tele contra la pared izquierda y, enfrente, el sillón (de espaldas al resto del cuarto) con la
+	# mesa ratona y la alfombra en el medio, y el otro sillón de costado. (Antes el sillón iba contra la
+	# pared y la tele quedaba parada sola en el medio del cuarto.)
+	if _en_pared("izq", 0.0, "mueble_tv"):
 		var zc := ultimo.z
-		var x_mesa := -hx + 0.905 + 1.0
+		var x_tele := ultimo.x
+		var x_mesa := x_tele + 1.5
+		var x_sillon := x_mesa + 1.3
 		_poner("mesa_ratona", x_mesa, zc, PI / 2.0)
 		_alfombra(Vector3(x_mesa + 0.2, 0, zc), 2.6, 3.0)
-		_poner("mueble_tv", x_mesa + 2.0, zc, -PI / 2.0)   # De frente al sillón
-		_poner("sillon_amarillo", x_mesa, zc + 2.0, PI)    # El otro sillón, de costado
+		_poner("sillon_azul", x_sillon, zc, -PI / 2.0)       # Mirando a la tele
+		_poner("sillon_amarillo", x_mesa + 0.3, zc + 2.0, PI)    # El otro sillón, de costado
 		_en_pared("izq", zc - 1.6, "lampara_pie", 1.0, false)
 	# Bibliotecas contra la pared de atrás, una al lado de la otra
 	_fila("fondo", -hx * 0.75, ["biblioteca", "biblioteca", "biblioteca"])
@@ -193,60 +197,38 @@ func _conventillo() -> void:
 		var xs := ultimo.x
 		Kit.colocar(sala, "gato", Vector3(xs + 0.4, 0.47, hz - 0.905 / 2.0 - 0.05), PI + 0.4)
 		_en_pared("frente", xs + 1.35, "lampara_pie", 1.0, false)
-	_poner("jaula", -hx * 0.15 + 1.4, -1.2, 0.3)
+	_en_pared("fondo", hx * 0.15, "jaula")   # La jaula del canario, contra la pared (no suelta en el medio)
 
 
 # ---------------------------------------------------------------- Obstáculos de la cinemática
 
-## Lo que la paloma esquiva al cruzar el cuarto volando, con sentido en cada ambiente:
-## "costado": algo alto y suelto, en cada vuelta del zigzag (del lado de adentro de la curva), que rodea.
-## "abajo": algo bajo justo debajo de la ruta entre vuelta y vuelta, que pasa por encima.
-const OBSTACULOS := {
-	"living": {"costado": ["biblioteca", "planta_alta", "lampara_pie"], "abajo": ["sillon_amarillo", "comoda", "mesa_ratona"]},
-	"dormitorio": {"costado": ["ropero", "planta_alta", "lampara_pie"], "abajo": ["comoda", "sillon_azul", "mesita_luz"]},
-	"comedor": {"costado": ["vajillero", "planta_alta", "lampara_pie"], "abajo": ["comoda", "mesa_ratona", "sillon_azul"]},
-	"cocina": {"costado": ["alacena_alta", "heladera_casa", "alacena_alta"], "abajo": ["mesada", "cocina_horno", "mesada"]},
-	"lectura": {"costado": ["biblioteca", "planta_alta", "lampara_pie"], "abajo": ["mesa_ratona", "comoda", "sillon_azul"]},
-	"cuarto_chicos": {"costado": ["cajonera_juguetes", "planta_alta", "lampara_pie"], "abajo": ["mesa_ratona", "comoda", "oso_peluche"]},
-	"estudio": {"costado": ["biblioteca", "archivero", "planta_alta"], "abajo": ["escritorio_pc", "mesa_ratona", "comoda"]},
-	"conventillo": {"costado": ["torre_macetas", "planta_alta", "lampara_pie"], "abajo": ["mesa_mate", "comoda", "jaula"]},
+## Lo único que puede ir suelto en el medio del cuarto, debajo de la ruta de la cinemática (la paloma
+## pasa por encima): lo que en una casa de verdad está en el medio, uno solo por cuarto. Antes, además, en
+## cada vuelta del zigzag iba algo alto y suelto al costado (bibliotecas, roperos, alacenas, cajoneras,
+## lámparas de pie, plantas): quedaban parados en el medio de la habitación sin ningún sentido. Ahora lo
+## alto va siempre contra una pared (lo acomoda cada ambiente) y la paloma esquiva lo que cuelga del
+## techo y lo que el cuarto ya tiene en el medio (la mesa con sus sillas, la cama...).
+const SUELTOS := {
+	"living": ["mesa_ratona"],
+	"lectura": ["mesa_ratona"],
+	"estudio": ["mesa_ratona"],
+	"cuarto_chicos": ["mesa_ratona"],
+	"cocina": ["mesada"],   # La isla de la cocina
 }
 
-var esquiva := 0   ## Cuántas cosas de costado o de abajo esquiva la paloma en la cinemática
+var esquiva := 0   ## Cuántas cosas del medio del cuarto esquiva la paloma en la cinemática
 
 
-## Pone los obstáculos de la cinemática (OBSTACULOS) sobre la ruta, después del resto de los muebles.
-## Van derechos (girados de a 90°, lo más alineados que se pueda con la ruta) y con el mismo margen de
-## siempre: la ruta nunca los toca.
+## Pone lo suelto del medio (SUELTOS) debajo de la ruta, entre vuelta y vuelta, después del resto de los
+## muebles, si ahí no hay ya algo. Va derecho (girado de a 90°) y con el margen de siempre: la ruta nunca
+## lo toca. Cuenta lo que la paloma esquiva por abajo.
 func _obstaculos_ruta(tema: String) -> void:
-	var lista: Dictionary = OBSTACULOS.get(tema, {})
-	if lista.is_empty():
-		return
 	var r := ce.ruta
 	var n := r.size() - 2
-	# De costado, en cada vuelta: primero del lado de adentro de la curva y si no, del de afuera
-	for i in range(1, n + 1):
-		var w := r[i]
-		var medio := (r[i - 1] + r[i + 1]) / 2.0
-		var adentro := Vector3(medio.x - w.x, 0, medio.z - w.z)
-		adentro = adentro.normalized() if adentro.length() > 0.05 else Vector3(0, 0, 1)
-		var tang := Vector3(r[i + 1].x - r[i - 1].x, 0, r[i + 1].z - r[i - 1].z).normalized()
-		var giro := _recto(Pasaje._giro(tang))
-		var nombres: Array = lista["costado"]
-		var nombre: String = nombres[(i - 1) % nombres.size()]
-		var puesto := false
-		for hacia: Vector3 in [adentro, -adentro]:
-			for k in 6:
-				var c := Vector3(w.x, 0, w.z) + hacia * (1.0 + k * 0.3)
-				if _poner(nombre, c.x, c.z, giro):
-					esquiva += 1
-					puesto = true
-					break
-			if puesto:
-				break
-	# Por abajo, entre vuelta y vuelta (donde el escenario lo pide), si no hay ya un mueble debajo
 	var curva := CasaEnterable.curva_de(r)
 	var medios: Array = Pasaje.ESCENARIOS[tema]["medios"]
+	var nombres: Array = SUELTOS.get(tema, [])
+	var puesto := false
 	for k in mini(medios.size(), n - 1):
 		if not (medios[k] in ["abajo", "entre"]):
 			continue
@@ -257,12 +239,31 @@ func _obstaculos_ruta(tema: String) -> void:
 		if _hay_algo_debajo(pm):
 			esquiva += 1
 			continue
+		if puesto or nombres.is_empty():
+			continue
 		var giro := _recto(Pasaje._giro(Vector3(p2.x - pm.x, 0, p2.z - pm.z).normalized()))
-		var nombres: Array = lista["abajo"]
-		for j in nombres.size():
-			if _poner(nombres[(k + j) % nombres.size()], pm.x, pm.z, giro):
+		for nombre: String in nombres:
+			if _poner(nombre, pm.x, pm.z, giro):
 				esquiva += 1
+				puesto = true
 				break
+
+
+## Cuántos muebles esquiva la paloma en la cinemática: los que la ruta pasa a menos de CERCA_RUTA (al
+## costado o por encima, medido en planta: la mesa con sus sillas, la cama, el sillón, la mesa ratona...).
+const CERCA_RUTA := 1.0
+func _cerca_de_la_ruta() -> int:
+	var n := 0
+	for caja: Array in ce.cajas:
+		for k in range(0, ruta.size(), 3):
+			var q := ruta[k]
+			if absf(q.z) > hz or absf(q.x) > hx:
+				continue   # (lo de afuera de la sala no cuenta)
+			var c: Vector3 = caja[0]
+			if Pasaje._dist_caja(Vector3(q.x, c.y, q.z), c, caja[1], float(caja[2])) < CERCA_RUTA:   # (en planta)
+				n += 1
+				break
+	return n
 
 
 ## El giro de a 90° más cercano (lo que va suelto en un cuarto también va derecho).

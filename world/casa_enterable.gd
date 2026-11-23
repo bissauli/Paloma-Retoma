@@ -160,12 +160,21 @@ func puntos_ruta(desde_frente: bool, inicio: Vector3) -> Array[Vector3]:
 		interior.reverse()
 		pts.append_array(interior)
 		pts.append(Vector3(x_frente, Y_PASO + 0.2, d / 2.0 + 1.6))
-		pts.append(Vector3(x_frente, Y_PASO + 2.0, d / 2.0 + 7.0))
-		pts.append(Vector3(x_frente, Y_PASO + 3.0, d / 2.0 + 9.5))   # Se aleja (plano final; más lejos, el Cabildo)
+		# Se aleja subiendo (plano final): empinado y no muy lejos, porque en las calles de la ciudad enfrente
+		# hay otra fila de edificios con balcones y carteles a 8-10 m
+		pts.append(Vector3(x_frente, Y_PASO + 2.2, d / 2.0 + 4.5))
+		pts.append(Vector3(x_frente, Y_PASO + 4.5, d / 2.0 + 7.0))
 	return pts
 
 
-## ¿Está este punto (global) dentro de la casa (entre las paredes, en la planta baja)?
+## ¿Está este punto (global) dentro de la sala (entre las paredes, del piso al techo)? Con "margen" > 0,
+## además a esa distancia de las paredes. Sin global_transform si la sala no está en la escena.
+func contiene(p: Vector3, margen := 0.0) -> bool:
+	var l := Construir.global_de(self).affine_inverse() * p
+	return absf(l.x) < ancho / 2.0 - ESPESOR - margen and absf(l.z) < fondo / 2.0 - ESPESOR - margen \
+		and l.y > -0.3 and l.y < Pasaje.PLANTA_BAJA - margen
+
+
 ## El nombre de la placa de título en el idioma actual. Los departamentos son "Nombre · 3.º B"
 ## (ver Pasaje.alrededores): se traducen el nombre y el piso por separado.
 func _titulo_traducido() -> String:

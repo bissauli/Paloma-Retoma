@@ -23,7 +23,8 @@ func _ready() -> void:
 	var locales: Array[GenteLocal] = []
 	for g in main.find_children("Gente", "GenteLocal", true, false):
 		locales.append(g)
-	_check("hay gente en los locales (%d)" % locales.size(), locales.size() >= 8)
+	# (cuántos locales hay sale del sorteo de los interiores: ver Pasaje._salas_al_azar)
+	_check("hay gente en los locales (%d)" % locales.size(), locales.size() >= 4)
 	# Nadie se inventa en la puerta: cada local tiene sólo a su empleado
 	var solo_empleado := true
 	for g in locales:

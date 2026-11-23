@@ -19,6 +19,7 @@ func _ready() -> void:
 	cam.fov = 80.0
 	add_child(cam)
 	cam.current = true
+	var i := 0
 	for c in get_tree().get_nodes_in_group("casa_enterable"):
 		var casa := c as CasaEnterable
 		if not casa.con_cinematica:
@@ -39,5 +40,6 @@ func _ready() -> void:
 			cam.look_at(casa.to_global(vista[2]))
 			for k in 15:
 				await get_tree().process_frame
-			get_viewport().get_texture().get_image().save_png(carpeta.path_join("%s_%s.png" % [casa.tema, vista[0]]))
+			get_viewport().get_texture().get_image().save_png(carpeta.path_join("%s_%d_%s.png" % [casa.tema, i, vista[0]]))
+		i += 1
 	get_tree().quit()
