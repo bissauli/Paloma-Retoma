@@ -1,6 +1,6 @@
 extends Node
 ## Lo que le da vida a los departamentos y lo que se rompe:
-## - Vecinos (world/vecinos.gd): en cada ambiente (menos el baño) vive alguien; está adentro del cuarto,
+## - Vecinos (world/vecinos.gd): en cada ambiente vive alguien; está adentro del cuarto,
 ##   no queda debajo de la ruta de la cinemática ni delante de una ventana, y el que está parado no se
 ##   mete en un mueble.
 ## - Cosas para tirar sobre las mesas de los departamentos (PlanoLocal.objetos), y que lo de vidrio o loza
@@ -38,7 +38,7 @@ func _ready() -> void:
 			await _probar_rotura(raiz)
 		raiz.free()
 	for t in Vecinos.QUIENES:
-		if t != "bano" and temas_vistos.has(t) and int(temas_vistos[t]) == 0:
+		if temas_vistos.has(t) and int(temas_vistos[t]) == 0:
 			_falla("en ningún %s vive nadie" % t)
 	print("test_deptos_vida: %s (%d fallas)" % ["OK" if fallas == 0 else "FALLA", fallas])
 	get_tree().quit(0 if fallas == 0 else 1)
@@ -46,7 +46,7 @@ func _ready() -> void:
 
 func _revisar_vecinos(ve: Vecinos, semilla: int) -> void:
 	var ce := ve.ce
-	if ve.tema != "bano" and ve.cuantos() == 0:
+	if ve.cuantos() == 0:
 		_falla("semilla %d, %s: no vive nadie" % [semilla, ve.tema])
 	var ruta := Pasaje._muestras(ce)
 	var hx := ce.ancho / 2.0 - CasaEnterable.ESPESOR

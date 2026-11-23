@@ -235,7 +235,7 @@ const OBJETOS := {
 	"comedor": [["plato", "plato", "vaso", "florero", "botella"], []],
 	"cocina": [["plato", "taza", "frasco", "botella", "fruta"], []],
 	"dormitorio": [["florero", "vaso", "libro"], []],
-	"bano": [["frasco", "botella"], ["f4f4f4", "bfe4f4", "e06a9a"]],
+	"lectura": [["libro", "taza"], ["2f5a8a", "8a2f3a", "4f7a3a", "d8b04a", "6b4a8a"]],
 	"cuarto_chicos": [["vaso", "libro", "caja"], ["3a7fd0", "e0403a", "f2c23a", "4fa060"]],
 	"estudio": [["taza", "libro", "florero"], []],
 	"conventillo": [["taza", "florero", "frasco"], []],

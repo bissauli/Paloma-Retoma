@@ -23,7 +23,7 @@ const FIRMA := {
 	# Ambientes de los departamentos (PlanoCasa)
 	"dormitorio": ["cama", "mesita_luz", "ropero"], "living": ["sillon_azul", "mesa_ratona", "mueble_tv"],
 	"comedor": ["mesa_comedor", "silla", "vajillero"], "cocina": ["heladera_casa", "mesada", "cocina_horno"],
-	"bano": ["banera", "inodoro", "lavatorio"], "cuarto_chicos": ["cama_chica", "cajonera_juguetes"],
+	"lectura": ["biblioteca", "sillon_azul"], "cuarto_chicos": ["cama_chica", "cajonera_juguetes"],
 	"estudio": ["escritorio_pc", "silla", "biblioteca"], "conventillo": ["mesa_mate", "torre_macetas", "cama"],
 }
 ## Lo que va con una mesa: cada silla tiene que estar al lado de una de estas.

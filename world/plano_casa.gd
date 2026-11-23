@@ -58,8 +58,8 @@ static func armar(sala_: Node3D, ce_: CasaEnterable, tema: String) -> int:
 			p._comedor()
 		"cocina":
 			p._cocina()
-		"bano":
-			p._bano()
+		"lectura":
+			p._lectura()
 		"cuarto_chicos":
 			p._cuarto_chicos()
 		"estudio":
@@ -138,13 +138,19 @@ func _cocina() -> void:
 	_en_pared("der", 0.0, "alacena_alta")
 
 
-func _bano() -> void:
-	# La bañera a lo largo de la pared izquierda; inodoro, lavatorio y armario en la de atrás
-	_en_pared("izq", 0.0, "banera")
-	_fila("fondo", -hx + 0.5, ["inodoro", "lavatorio", "armario_bano"], 0.25)
-	if _en_pared("frente", hx * 0.5, "lavarropas"):
-		_en_pared("frente", ultimo.x + 0.65, "tacho", 1.0, false)
-	_en_pared("der", 0.0, "armario_bano")
+func _lectura() -> void:
+	# Bibliotecas en la pared de atrás y en la izquierda; dos sillones con su lámpara de pie y una mesita
+	# en el medio, sobre la alfombra; y una mesa con dos sillas para leer con el libro apoyado
+	_fila("fondo", -hx * 0.8, ["biblioteca", "biblioteca", "biblioteca"])
+	_en_pared("izq", -hz * 0.35, "biblioteca")
+	if _en_pared("der", 0.0, "sillon_azul"):
+		var zs := ultimo.z
+		_poner("mesa_ratona", hx - 0.905 - 1.0, zs, -PI / 2.0)
+		_en_pared("der", zs + 1.35, "lampara_pie", 1.0, false)
+	if _en_pared("frente", hx * 0.45, "sillon_amarillo"):
+		_en_pared("frente", ultimo.x + 1.35, "lampara_pie", 1.0, false)
+	_alfombra(Vector3(hx - 1.9, 0, 0), 2.2, 2.6)
+	_mesa_con_sillas(Vector3(-hx * 0.2, 0, 0), "mesa_comedor", 2)
 
 
 func _cuarto_chicos() -> void:
@@ -200,7 +206,7 @@ const OBSTACULOS := {
 	"dormitorio": {"costado": ["ropero", "planta_alta", "lampara_pie"], "abajo": ["comoda", "sillon_azul", "mesita_luz"]},
 	"comedor": {"costado": ["vajillero", "planta_alta", "lampara_pie"], "abajo": ["comoda", "mesa_ratona", "sillon_azul"]},
 	"cocina": {"costado": ["alacena_alta", "heladera_casa", "alacena_alta"], "abajo": ["mesada", "cocina_horno", "mesada"]},
-	"bano": {"costado": ["armario_bano", "lavatorio", "armario_bano"], "abajo": ["banera", "lavarropas", "tacho"]},
+	"lectura": {"costado": ["biblioteca", "planta_alta", "lampara_pie"], "abajo": ["mesa_ratona", "comoda", "sillon_azul"]},
 	"cuarto_chicos": {"costado": ["cajonera_juguetes", "planta_alta", "lampara_pie"], "abajo": ["mesa_ratona", "comoda", "oso_peluche"]},
 	"estudio": {"costado": ["biblioteca", "archivero", "planta_alta"], "abajo": ["escritorio_pc", "mesa_ratona", "comoda"]},
 	"conventillo": {"costado": ["torre_macetas", "planta_alta", "lampara_pie"], "abajo": ["mesa_mate", "comoda", "jaula"]},
@@ -286,10 +292,10 @@ func _escritorio(lado: String, t: float) -> bool:
 	return _poner("silla", ultimo.x + hacia * (hondo / 2.0 + SILLA_MESA), ultimo.z, -hacia * PI / 2.0)
 
 
-## Plantas en los rincones (donde tiene sentido: ni en la cocina ni en el baño) y una maceta junto a la
+## Plantas en los rincones (donde tiene sentido: no en la cocina) y una maceta junto a la
 ## ventana de adelante.
 func _rincones(tema: String) -> void:
-	if tema in ["cocina", "bano"]:
+	if tema == "cocina":
 		return
 	var esquinas := [Vector3(-hx + 0.55, 0, -hz + 0.55), Vector3(hx - 0.55, 0, -hz + 0.55),
 		Vector3(-hx + 0.55, 0, hz - 0.55), Vector3(hx - 0.55, 0, hz - 0.55)]
@@ -338,7 +344,7 @@ static func asiento_de(nombre: String) -> Dictionary:
 		return _asientos[nombre]
 	var d: Dictionary = MueblesDatos.PIEZAS[nombre]
 	var tam: Vector3 = d["tam"]
-	var res := {"alto": 0.45, "respaldo": -tam.z / 2.0, "x": tam.x * 0.22 if tam.x > 1.2 else 0.0}
+	var res := {"alto": 0.45, "respaldo": -tam.z / 2.0, "frente": tam.z / 2.0, "x": tam.x * 0.22 if tam.x > 1.2 else 0.0}
 	_asientos[nombre] = res
 	var malla := Kit.malla(nombre)
 	if malla == null:
@@ -373,6 +379,20 @@ static func asiento_de(nombre: String) -> Dictionary:
 			n += 1
 	alto /= maxf(n, 1)
 	res["alto"] = alto
+	# El borde de adelante del almohadón: el último punto (de atrás para adelante) a la altura del asiento
+	# (después viene el bisel). Las rodillas tienen que pasarlo: si no, las piernas atraviesan el frente
+	res["frente"] = tam.z / 2.0
+	for k in range(40, 19, -1):
+		if alturas[k] >= alto - 0.05:
+			res["frente"] = zs[k]
+			break
+	# ...y el frente de la base, a la altura de las canillas (puede salir más que el almohadón)
+	var y := 0.12
+	while y < alto - 0.06:
+		var r := tm.intersect_ray(Vector3(x, y, tam.z), Vector3.BACK * -1.0)
+		if r:
+			res["frente"] = maxf(float(res["frente"]), (r["position"] as Vector3).z)
+		y += 0.06
 	# El respaldo: de atrás para adelante, el último punto bastante más alto que el asiento
 	for k in 41:
 		if alturas[k] > alto + 0.15:

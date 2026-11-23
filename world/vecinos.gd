@@ -4,7 +4,8 @@ extends GenteLocal
 ## world/plano_casa.gd): en el living alguien mira la tele desde el sillón y otro da vueltas; en el comedor
 ## comen sentados a la mesa; en la cocina alguien revuelve la olla frente a la mesada; en el estudio
 ## tipean en el escritorio; en el dormitorio ordenan el ropero; en el cuarto de los chicos un pibe anda
-## de acá para allá; en lo de Doña Marta, una abuela con el mate. En el baño, nadie.
+## de acá para allá; en lo de Doña Marta, una abuela con el mate; en la sala de lectura, dos leyendo en los
+## sillones y alguien buscando un libro en la biblioteca.
 ##
 ## Se sientan en las sillas y sillones que dejó PlanoCasa (meta "lugares" de la sala) o se paran
 ## frente al mueble donde hacen algo; los que pasean caminan por la grilla de puntos libres del piso de
@@ -18,6 +19,8 @@ const SUSTO_VEL := 2.5
 const SUSTO_DURA := 1.6
 const RESPALDO_CADERA := 0.07       ## De la cara del respaldo a la cadera (la pose sentada ya lleva la cadera hacia atrás)
 const CADERA_SOBRE_ASIENTO := 0.08  ## La articulación de la cadera, sobre el almohadón
+const MUSLO := 0.45                 ## Largo del muslo de un adulto (antes de tener el modelo: ver ModeloHumano.largo_muslo)
+const RODILLA_AFUERA := 0.08        ## Cuánto pasan las rodillas del borde del almohadón (el grosor de la pierna)
 
 ## Quién vive en cada ambiente: [dónde, personajes posibles]. "dónde": "sillon", "silla_mesa",
 ## "silla_escritorio", "cocina", "ropero", "juguetes" o "pasea". Si no hay ese lugar, pasea.
@@ -32,7 +35,8 @@ const QUIENES := {
 	"estudio": [["silla_escritorio", ["oficinista_mujer", "estudiante", "artesano"]]],
 	"cuarto_chicos": [["pasea", ["pibe", "escolar_nena", "escolar"]], ["juguetes", ["pibe", "escolar"]]],
 	"conventillo": [["silla_mesa", ["estudiante"]], ["pasea", ["abuela", "jubilado"]]],
-	"bano": [],
+	"lectura": [["sillon", ["estudiante", "oficinista_mujer", "turista_gringo"]], ["sillon", ["artesano", "bailarina", "hincha"]],
+		["ropero", ["jubilado", "abuela"]]],
 }
 ## Qué mueble cuenta para cada "dónde".
 const MUEBLES := {"sillon": ["sillon_azul", "sillon_amarillo"], "cocina": ["mesada", "cocina_horno"],
@@ -117,7 +121,7 @@ func _silla_de(l: Dictionary, escritorio: bool) -> bool:
 
 ## Dónde queda la persona en ese lugar: sentada, sobre el asiento medido del mueble (PlanoCasa.asiento_de),
 ## con la espalda contra el respaldo y, en el sillón, sobre el almohadón de un lado; parada, delante del mueble.
-func _donde_queda(l: Dictionary) -> Vector3:
+func _donde_queda(l: Dictionary, muslo := MUSLO) -> Vector3:
 	var g: float = l["giro"]
 	var b := Basis.from_euler(Vector3(0, g, 0))
 	var p: Vector3 = l["pos"]
@@ -125,7 +129,10 @@ func _donde_queda(l: Dictionary) -> Vector3:
 		var a := PlanoCasa.asiento_de(String(l["mueble"]))
 		var esc := float(l.get("escala", 1.0))
 		var lado := float(a["x"]) * (1.0 if hash(p) % 2 == 0 else -1.0)
-		return p + b * (Vector3(lado, 0, float(a["respaldo"]) + RESPALDO_CADERA / esc) * esc)
+		# La espalda contra el respaldo; pero si así las rodillas no llegan al borde del almohadón (un sillón
+		# hondo), más adelante: las piernas tienen que caer por delante del asiento, no atravesarlo
+		var z := maxf(float(a["respaldo"]) + RESPALDO_CADERA / esc, float(a["frente"]) + (RODILLA_AFUERA - muslo) / esc)
+		return p + b * (Vector3(lado, 0, z) * esc)
 	var medio: Vector3 = l["medio"]
 	return p + b * Vector3(0, 0, medio.z + 0.38)
 
@@ -186,7 +193,7 @@ func _poner_en_lugar(personaje: String, l: Dictionary, donde: String) -> void:
 	if m.sentado:
 		m.asiento_extra = _extra_asiento(l, personaje)
 	add_child(m)
-	m.position = _donde_queda(l)
+	m.position = _donde_queda(l, m.largo_muslo() if m.sentado else MUSLO)
 	m.rotation.y = float(l["giro"]) + (PI if m.sentado else 0.0)
 	match donde:
 		"silla_escritorio":
