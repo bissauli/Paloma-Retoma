@@ -153,7 +153,8 @@ func golpear(dir: Vector3, fuerza := 1.0) -> bool:
 		golpeado = true
 		contact_monitor = true
 		max_contacts_reported = 3
-		body_entered.connect(_al_chocar)
+		if not body_entered.is_connected(_al_chocar):   # (al volver a su lugar queda conectada)
+			body_entered.connect(_al_chocar)
 	set_physics_process(true)
 	_t_vuelta = VIDA_SOMBRERO if desechable else TIEMPO_VUELTA
 	return true

@@ -4,7 +4,7 @@ extends RefCounted
 ## - En la PLANTA BAJA, un local (supermercado, verdulería, taller mecánico, café...): la vidriera de
 ##   adelante está abierta hasta el piso, así que se entra caminando o volando. Sin cinemática.
 ## - En un PISO AL AZAR (del 2 al 7), un ambiente de un departamento (living, dormitorio, cocina,
-##   comedor, baño, cuarto de los chicos, estudio o el cuarto de Doña Marta), con una ventana abierta
+##   comedor, sala de lectura, cuarto de los chicos, estudio o el cuarto de Doña Marta), con una ventana abierta
 ##   adelante y otra atrás. Se puede entrar libremente; y si la paloma se acerca a la ventana aparece
 ##   un aviso ("E · ATRAVESAR VOLANDO"): si lo aprieta, la cinemática de world/casa_enterable.gd la
 ##   hace cruzar el cuarto esquivando todo (si no, no pasa nada).
@@ -34,7 +34,7 @@ const MARGEN := 0.45       ## Distancia mínima entre la ruta y cualquier obstá
 ## Los locales de la planta baja y los ambientes de los departamentos (claves de ESCENARIOS).
 const LOCALES := ["supermercado", "verduleria", "mecanico", "panaderia", "fiambreria", "libreria", "cafe",
 	"restaurante", "consultorio", "oficina", "farmacia", "kiosco", "heladeria", "ferreteria", "peluqueria", "floreria"]
-const AMBIENTES := ["living", "dormitorio", "cocina", "comedor", "bano", "cuarto_chicos", "estudio", "conventillo"]
+const AMBIENTES := ["living", "dormitorio", "cocina", "comedor", "lectura", "cuarto_chicos", "estudio", "conventillo"]
 const LETRAS := ["A", "B", "C", "D"]
 const ANCHO_DOS_LOCALES := 14.0   ## Con el frente así de ancho o más, la planta baja tiene dos locales
 
@@ -48,153 +48,153 @@ const ESCENARIOS := {
 	"libreria": {"alturas": [2.2, 2.9, 2.0, 2.8], "amp": 0.45, "medios": ["arriba", "entre", "abajo"],
 		"piso": Color("8a5a35"), "piso2": Color("6f4528"), "suelo": "tablas", "zocalo": Color("6b4a32"),
 		"pared": Color("efe4c8"), "pared_tex": "empapelado", "vigas": true, "toldo": "toldo_rayas_verde",
-		"cortina": "cortina_verde", "cartel": "SILENCIO, POR FAVOR", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_verde", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("ffd9a0"), "postigo": Color("5b3b2a"), "nombres": ["Librería El Palomar", "Libros El Vuelo"],
 		"textos": ["¡Permiso, que pasa la paloma!", "Nadie lee, pero siempre hay migas", "Ni el librero levantó la vista"]},
 	"panaderia": {"alturas": [2.9, 1.9, 2.8], "amp": 0.32, "medios": ["entre", "arriba"],
 		"piso": Color("e9dcc0"), "piso2": Color("c96f4a"), "suelo": "baldosas", "zocalo": Color("c96f4a"),
 		"pared": Color("f3e3c3"), "pared_tex": "azulejo", "vigas": true, "toldo": "toldo_rayas_amarillo",
-		"cortina": "cortina_crema", "cartel": "PAN CALIENTE", "estilo": CasaEnterable.Estilo.TIRABUZON,
+		"cortina": "cortina_crema", "estilo": CasaEnterable.Estilo.TIRABUZON,
 		"luz": Color("ffd59a"), "postigo": Color("2f7d5b"), "nombres": ["Panadería El Hornero", "Panadería La Miga"],
 		"textos": ["¡Atajo por la panadería!", "Olor a pan recién hecho... ¡y a la calle!", "Ni el panadero la vio pasar"]},
 	"conventillo": {"alturas": [2.0, 2.9, 2.1], "amp": 0.32, "medios": ["arriba", "entre"],
 		"piso": Color("7c5a3e"), "piso2": Color("9a6b43"), "suelo": "tablas", "zocalo": Color("2f6b8a"),
 		"pared": Color("c9e0d0"), "pared_tex": "lisa", "vigas": true, "toldo": "toldo_rayas_rojo",
-		"cortina": "cortina_roja", "cartel": "CASA DE DOÑA MARTA", "estilo": CasaEnterable.Estilo.GRUA,
+		"cortina": "cortina_roja", "estilo": CasaEnterable.Estilo.GRUA,
 		"luz": Color("ffdcae"), "postigo": Color("2f6b8a"), "nombres": ["Cuarto de Doña Marta"],
 		"textos": ["¡Permiso, Doña Marta!", "Entre sábanas y macetas", "¡Cuidado con el mate!"]},
 	"oficina": {"alturas": [2.6, 1.9, 2.8, 2.0], "amp": 0.45, "medios": ["abajo", "entre", "arriba"],
 		"piso": Color("8f969c"), "piso2": Color("7f868c"), "suelo": "porcelanato", "zocalo": Color("5f666b"),
 		"pared": Color("e6eaee"), "pared_tex": "lisa", "vigas": false, "toldo": "toldo_rayas_azul",
-		"cortina": "cortina_azul", "cartel": "ATENCIÓN AL CLIENTE", "estilo": CasaEnterable.Estilo.DE_FRENTE,
+		"cortina": "cortina_azul", "estilo": CasaEnterable.Estilo.DE_FRENTE,
 		"luz": Color("f2f5ff"), "postigo": Color("2b4a6b"), "nombres": ["Seguros La Cornisa", "Estudio Pichón & Asoc."],
 		"textos": ["Como Ezio... pero con alas", "Vuelo asegurado, cobertura total", "¡Abran paso, oficinistas!"]},
 	"fiambreria": {"alturas": [2.0, 2.8, 1.9, 2.7], "amp": 0.4, "medios": ["arriba", "entre", "abajo"],
 		"piso": Color("f4f1e8"), "piso2": Color("3a3c40"), "suelo": "baldosas", "zocalo": Color("b8423a"),
 		"pared": Color("f1ead8"), "pared_tex": "azulejo", "vigas": false, "toldo": "toldo_rayas_rojo",
-		"cortina": "cortina_crema", "cartel": "FIAMBRES Y QUESOS", "estilo": CasaEnterable.Estilo.CENITAL,
+		"cortina": "cortina_crema", "estilo": CasaEnterable.Estilo.CENITAL,
 		"luz": Color("fff0d0"), "postigo": Color("b8423a"), "nombres": ["Fiambrería Los Gorriones"],
 		"textos": ["Entrar, esquivar, salir: así se vive en el centro", "¡Perdón, señora, voy apurada!",
 			"Salames a la izquierda, quesos a la derecha"]},
 	"supermercado": {"alturas": [2.4, 2.9, 1.9, 2.7], "amp": 0.42, "medios": ["arriba", "entre", "abajo"],
 		"piso": Color("f2f2ee"), "piso2": Color("d9dcd6"), "suelo": "porcelanato", "zocalo": Color("4f9a5a"),
 		"pared": Color("e8f2e4"), "pared_tex": "lisa", "vigas": false, "toldo": "toldo_rayas_verde",
-		"cortina": "cortina_verde", "cartel": "OFERTAS DE LA SEMANA", "estilo": CasaEnterable.Estilo.TIRABUZON,
+		"cortina": "cortina_verde", "estilo": CasaEnterable.Estilo.TIRABUZON,
 		"luz": Color("f4f8ff"), "postigo": Color("3f7d4a"), "nombres": ["Súper Don Pichón", "Supermercado El Gorrión"],
 		"textos": ["¡Pasillo 3, sin frenar!", "Nadie pagó, pero nadie la vio", "Ofertas a toda velocidad"]},
 	"verduleria": {"alturas": [2.1, 2.8, 2.2], "amp": 0.36, "medios": ["entre", "arriba"],
 		"piso": Color("b7b2a8"), "piso2": Color("a29d93"), "suelo": "baldosas", "zocalo": Color("6b8f3a"),
 		"pared": Color("f1e6d0"), "pared_tex": "lisa", "vigas": true, "toldo": "toldo_rayas_verde",
-		"cortina": "cortina_verde", "cartel": "FRUTAS Y VERDURAS DE ESTACIÓN", "estilo": CasaEnterable.Estilo.CENITAL,
+		"cortina": "cortina_verde", "estilo": CasaEnterable.Estilo.CENITAL,
 		"luz": Color("fff2cf"), "postigo": Color("6b8f3a"), "nombres": ["Verdulería Doña Rosa", "Frutas El Palomar"],
 		"textos": ["¡Esas bananas casi me tapan!", "La fruta más fresca, la paloma más rápida", "¡Ni un tomate tocó!"]},
 	"casa": {"alturas": [2.5, 2.0, 2.9], "amp": 0.34, "medios": ["arriba", "entre"],
 		"piso": Color("b07a4a"), "piso2": Color("94603a"), "suelo": "tablas", "zocalo": Color("8a5a35"),
 		"pared": Color("f4e3cf"), "pared_tex": "empapelado", "vigas": false, "toldo": "toldo_rayas_amarillo",
-		"cortina": "cortina_crema", "cartel": "HOGAR, DULCE HOGAR", "estilo": CasaEnterable.Estilo.GRUA,
+		"cortina": "cortina_crema", "estilo": CasaEnterable.Estilo.GRUA,
 		"luz": Color("ffd9a8"), "postigo": Color("4f7fc0"), "nombres": ["Casa de los Pérez", "Departamento 4.º B"],
 		"textos": ["¡Perdón por entrar sin tocar!", "Living, comedor... ¡y afuera!", "Nadie se despertó"]},
 	"cafe": {"alturas": [2.3, 2.9, 2.0, 2.6], "amp": 0.4, "medios": ["arriba", "entre", "abajo"],
 		"piso": Color("8d9198"), "piso2": Color("7a7e85"), "suelo": "porcelanato", "zocalo": Color("8a5a35"),
 		"pared": Color("f1cf9c"), "pared_tex": "lisa", "vigas": false, "toldo": "toldo_rayas_rojo",
-		"cortina": "cortina_roja", "cartel": "CAFÉ Y MEDIALUNAS", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_roja", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("ffcf8f"), "postigo": Color("7a3f2a"), "nombres": ["Café La Medialuna", "Café Tortoni Chico"],
 		"textos": ["¡Un cortado para llevar!", "Ni una miga en el piso", "Café al paso, bien al paso"]},
 	"restaurante": {"alturas": [2.4, 2.0, 2.8, 2.1], "amp": 0.42, "medios": ["abajo", "entre", "arriba"],
 		"piso": Color("8a5a35"), "piso2": Color("744a2c"), "suelo": "tablas", "zocalo": Color("6b3a2c"),
 		"pared": Color("b8634e"), "pared_tex": "ladrillo", "vigas": false, "toldo": "toldo_rayas_rojo",
-		"cortina": "cortina_roja", "cartel": "MENÚ DEL DÍA", "estilo": CasaEnterable.Estilo.DE_FRENTE,
+		"cortina": "cortina_roja", "estilo": CasaEnterable.Estilo.DE_FRENTE,
 		"luz": Color("ffc98a"), "postigo": Color("7a2f2a"), "nombres": ["Cantina Don Pichón", "Restaurante La Plaza"],
 		"textos": ["¡Mesa para una, de pasada!", "Servilletas volando, ¡perdón!", "La especialidad: el atajo"]},
 	"consultorio": {"alturas": [2.6, 2.0, 2.8], "amp": 0.38, "medios": ["abajo", "entre"],
 		"piso": Color("d8e6ea"), "piso2": Color("b9cfd6"), "suelo": "porcelanato", "zocalo": Color("3f7fb0"),
 		"pared": Color("eef6f6"), "pared_tex": "azulejo", "vigas": false, "toldo": "toldo_rayas_azul",
-		"cortina": "cortina_azul", "cartel": "SILENCIO - CONSULTORIOS", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_azul", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("eef8ff"), "postigo": Color("3f7fb0"), "nombres": ["Consultorios Plaza", "Clínica La Pluma"],
 		"textos": ["¡Que pase la siguiente!", "Turno express", "Control de vuelo: todo en orden"]},
 	"mecanico": {"alturas": [2.4, 2.9, 2.0, 2.7], "amp": 0.42, "medios": ["arriba", "entre", "abajo"],
 		"piso": Color("8e9196"), "piso2": Color("7b7e83"), "suelo": "porcelanato", "zocalo": Color("e2b53c"),
 		"pared": Color("d9d6cf"), "pared_tex": "lisa", "vigas": true, "toldo": "toldo_rayas_amarillo",
-		"cortina": "cortina_crema", "cartel": "TALLER - GOMERÍA - SERVICE", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_crema", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("f6f2e6"), "postigo": Color("3a3c40"), "nombres": ["Taller Mecánico El Pistón", "Gomería Don Tuerca"],
 		"textos": ["¡Cambio de aceite express!", "Pasó volando, ni la vieron", "Service completo de alas"]},
 	"farmacia": {"alturas": [2.5, 2.0, 2.8], "amp": 0.36, "medios": ["arriba", "entre"],
 		"piso": Color("eef2f0"), "piso2": Color("d6dfdb"), "suelo": "porcelanato", "zocalo": Color("3f9a5a"),
 		"pared": Color("f2f7f4"), "pared_tex": "lisa", "vigas": false, "toldo": "toldo_rayas_verde",
-		"cortina": "cortina_verde", "cartel": "FARMACIA DE TURNO", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_verde", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("f2fbff"), "postigo": Color("2f8a4a"), "nombres": ["Farmacia del Pasaje", "Farmacia La Pluma"],
 		"textos": [""]},
 	"kiosco": {"alturas": [2.3, 2.8, 2.1], "amp": 0.34, "medios": ["arriba", "entre"],
 		"piso": Color("d9d2c6"), "piso2": Color("b9b1a5"), "suelo": "baldosas", "zocalo": Color("c8423a"),
 		"pared": Color("f6e7c8"), "pared_tex": "lisa", "vigas": false, "toldo": "toldo_rayas_rojo",
-		"cortina": "cortina_roja", "cartel": "KIOSCO - GOLOSINAS - BEBIDAS", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_roja", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("fff4e0"), "postigo": Color("c8423a"), "nombres": ["Kiosco El Paloma", "Maxikiosco 24 hs"],
 		"textos": [""]},
 	"heladeria": {"alturas": [2.4, 2.9, 2.0], "amp": 0.36, "medios": ["arriba", "entre"],
 		"piso": Color("f4ecef"), "piso2": Color("e7b8c8"), "suelo": "baldosas", "zocalo": Color("e06a9a"),
 		"pared": Color("fde7ef"), "pared_tex": "lisa", "vigas": false, "toldo": "toldo_rayas_rojo",
-		"cortina": "cortina_crema", "cartel": "HELADOS ARTESANALES", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_crema", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("fff2f6"), "postigo": Color("e06a9a"), "nombres": ["Heladería Pistacho", "Heladería La Cucurucha"],
 		"textos": [""]},
 	"ferreteria": {"alturas": [2.4, 2.9, 2.0, 2.7], "amp": 0.42, "medios": ["arriba", "entre", "abajo"],
 		"piso": Color("9a958c"), "piso2": Color("85807a"), "suelo": "porcelanato", "zocalo": Color("d8a03a"),
 		"pared": Color("e4dccd"), "pared_tex": "lisa", "vigas": true, "toldo": "toldo_rayas_amarillo",
-		"cortina": "cortina_crema", "cartel": "TORNILLOS - PINTURAS - HERRAMIENTAS", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_crema", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("fff6e6"), "postigo": Color("4a4a52"), "nombres": ["Ferretería La Tuerca", "Ferretería El Clavo"],
 		"textos": [""]},
 	"peluqueria": {"alturas": [2.5, 2.0, 2.8], "amp": 0.36, "medios": ["arriba", "entre"],
 		"piso": Color("f1ede4"), "piso2": Color("2f3036"), "suelo": "baldosas", "zocalo": Color("e06a9a"),
 		"pared": Color("efe6ee"), "pared_tex": "empapelado", "vigas": false, "toldo": "toldo_rayas_azul",
-		"cortina": "cortina_azul", "cartel": "CORTE - COLOR - PEINADOS", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_azul", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("fff0f4"), "postigo": Color("6b4a8a"), "nombres": ["Peluquería Plumas", "Barbería Don Copete"],
 		"textos": [""]},
 	"floreria": {"alturas": [2.3, 2.8, 2.1], "amp": 0.34, "medios": ["arriba", "entre"],
 		"piso": Color("c9b79a"), "piso2": Color("b3a184"), "suelo": "baldosas", "zocalo": Color("4f8a3a"),
 		"pared": Color("e9f2dc"), "pared_tex": "lisa", "vigas": true, "toldo": "toldo_rayas_verde",
-		"cortina": "cortina_verde", "cartel": "FLORES Y PLANTAS", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_verde", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("fff6e0"), "postigo": Color("4f8a3a"), "nombres": ["Florería Jacarandá", "Vivero La Maceta"],
 		"textos": [""]},
 	# ---- Ambientes de departamento (en los pisos de arriba)
 	"living": {"alturas": [2.4, 2.9, 2.1], "amp": 0.36, "medios": ["arriba", "entre"],
 		"piso": Color("b07a4a"), "piso2": Color("94603a"), "suelo": "tablas", "zocalo": Color("8a5a35"),
 		"pared": Color("efe2cc"), "pared_tex": "empapelado", "vigas": false, "toldo": "toldo_rayas_amarillo",
-		"cortina": "cortina_crema", "cartel": "HOGAR, DULCE HOGAR", "estilo": CasaEnterable.Estilo.GRUA,
+		"cortina": "cortina_crema", "estilo": CasaEnterable.Estilo.GRUA,
 		"luz": Color("ffd9a8"), "postigo": Color("4f7fc0"), "nombres": ["Living"],
 		"textos": ["¡Perdón por entrar sin tocar!", "Sillón, tele y... ¡afuera!", "Nadie levantó la vista de la tele"]},
 	"dormitorio": {"alturas": [2.6, 2.0, 2.8], "amp": 0.34, "medios": ["arriba", "entre"],
 		"piso": Color("a57449"), "piso2": Color("8c5d38"), "suelo": "tablas", "zocalo": Color("6b4a32"),
 		"pared": Color("e7d6ea"), "pared_tex": "empapelado", "vigas": false, "toldo": "toldo_rayas_azul",
-		"cortina": "cortina_azul", "cartel": "DULCES SUEÑOS", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_azul", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("ffd2b0"), "postigo": Color("6b4a8a"), "nombres": ["Dormitorio principal"],
 		"textos": ["¡Shhh, que el dueño duerme!", "Ni una pluma en la almohada", "Pasada en puntas de pie"]},
 	"cocina": {"alturas": [2.3, 2.9, 2.0, 2.6], "amp": 0.4, "medios": ["arriba", "entre", "abajo"],
 		"piso": Color("f1ede4"), "piso2": Color("c94f45"), "suelo": "baldosas", "zocalo": Color("4f9a8a"),
 		"pared": Color("f4f6f2"), "pared_tex": "azulejo", "vigas": false, "toldo": "toldo_rayas_rojo",
-		"cortina": "cortina_roja", "cartel": "¡A COMER!", "estilo": CasaEnterable.Estilo.TIRABUZON,
+		"cortina": "cortina_roja", "estilo": CasaEnterable.Estilo.TIRABUZON,
 		"luz": Color("fff3dc"), "postigo": Color("4f9a8a"), "nombres": ["Cocina"],
 		"textos": ["¡Algo huele rico!", "Ni una miga se cayó", "Esquivando ollas y heladeras"]},
 	"comedor": {"alturas": [2.4, 2.0, 2.8, 2.1], "amp": 0.42, "medios": ["abajo", "entre", "arriba"],
 		"piso": Color("8a5a35"), "piso2": Color("744a2c"), "suelo": "tablas", "zocalo": Color("5b3b2a"),
 		"pared": Color("dfe8d2"), "pared_tex": "empapelado", "vigas": false, "toldo": "toldo_rayas_verde",
-		"cortina": "cortina_verde", "cartel": "LA MESA ESTÁ SERVIDA", "estilo": CasaEnterable.Estilo.DE_FRENTE,
+		"cortina": "cortina_verde", "estilo": CasaEnterable.Estilo.DE_FRENTE,
 		"luz": Color("ffd59a"), "postigo": Color("2f6b4a"), "nombres": ["Comedor"],
 		"textos": ["¡Servilletas por el aire!", "Llegó justo para el postre", "Mesa para una, de pasada"]},
-	"bano": {"alturas": [2.5, 2.0, 2.8], "amp": 0.34, "medios": ["abajo", "entre"],
-		"piso": Color("dfe9ee"), "piso2": Color("c3d4dc"), "suelo": "porcelanato", "zocalo": Color("3f7fb0"),
-		"pared": Color("dff0f6"), "pared_tex": "azulejo", "vigas": false, "toldo": "toldo_rayas_azul",
-		"cortina": "cortina_azul", "cartel": "OCUPADO", "estilo": CasaEnterable.Estilo.CENITAL,
-		"luz": Color("eef8ff"), "postigo": Color("3f7fb0"), "nombres": ["Baño"],
-		"textos": ["¡Perdón, está ocupado!", "Un chapuzón y afuera", "Ni el patito se dio cuenta"]},
+	"lectura": {"alturas": [2.5, 2.0, 2.8], "amp": 0.34, "medios": ["abajo", "entre"],
+		"piso": Color("7a4e2e"), "piso2": Color("643f25"), "suelo": "tablas", "zocalo": Color("4a2f1e"),
+		"pared": Color("e9dcc0"), "pared_tex": "empapelado", "vigas": true, "toldo": "toldo_rayas_verde",
+		"cortina": "cortina_roja", "estilo": CasaEnterable.Estilo.CENITAL,
+		"luz": Color("ffd090"), "postigo": Color("6b3a2a"), "nombres": ["Sala de lectura"],
+		"textos": ["¡Shhh, que están leyendo!", "Ni una página se dio vuelta", "Capítulo uno: la paloma pasa"]},
 	"cuarto_chicos": {"alturas": [2.2, 2.9, 2.1], "amp": 0.36, "medios": ["arriba", "entre"],
 		"piso": Color("c08a5a"), "piso2": Color("a8754a"), "suelo": "tablas", "zocalo": Color("4a90d0"),
 		"pared": Color("d6ecf8"), "pared_tex": "empapelado", "vigas": false, "toldo": "toldo_rayas_amarillo",
-		"cortina": "cortina_crema", "cartel": "ZONA DE JUEGOS", "estilo": CasaEnterable.Estilo.GRUA,
+		"cortina": "cortina_crema", "estilo": CasaEnterable.Estilo.GRUA,
 		"luz": Color("fff0c8"), "postigo": Color("e8665a"), "nombres": ["Cuarto de los chicos"],
 		"textos": ["¡A jugar!", "Esquivando juguetes", "El osito no dijo nada"]},
 	"estudio": {"alturas": [2.6, 1.9, 2.8], "amp": 0.38, "medios": ["abajo", "entre"],
 		"piso": Color("8a5a35"), "piso2": Color("6f4528"), "suelo": "tablas", "zocalo": Color("4a5a3a"),
 		"pared": Color("cfdcc4"), "pared_tex": "lisa", "vigas": false, "toldo": "toldo_rayas_verde",
-		"cortina": "cortina_verde", "cartel": "SILENCIO: SE TRABAJA", "estilo": CasaEnterable.Estilo.PERSECUCION,
+		"cortina": "cortina_verde", "estilo": CasaEnterable.Estilo.PERSECUCION,
 		"luz": Color("ffe0b0"), "postigo": Color("4a5a3a"), "nombres": ["Estudio"],
 		"textos": ["Home office con visitas", "¡Que no se apague la compu!", "Entre libros y papeles"]},
 }
@@ -531,7 +531,7 @@ static func _sala(padre: Node3D, casa: Node3D, w_edificio: float, d: float, colo
 		# Departamento: lo que cuelga sobre la ruta (lámparas, sábanas...) y el resto acomodado como en una
 		# casa de verdad (PlanoCasa: la cama contra la pared con sus mesitas, la mesa con sus sillas...)
 		ce.obstaculos = _obstaculos(sala, ce, tema, true) + PlanoCasa.armar(sala, ce, tema)
-	ce.luz = _adornos(sala, ce, tema, esc["cartel"])
+	ce.luz = _adornos(sala, ce, tema)
 	if local:
 		_mas_adornos(sala, ce, tema)
 	if local:   # En el local también cuentan los muebles de las paredes (estantes, heladeras...)
@@ -762,13 +762,13 @@ const OBSTACULOS := {
 	"peluqueria": {"costado": ["tocador_espejo", "planta_alta"], "arriba": ["lampara_colgante"], "abajo": ["sillon_peluqueria"]},
 	"floreria": {"costado": ["torre_macetas", "planta_alta"], "arriba": ["lampara_colgante"], "abajo": ["balde_flores"]},
 	# Casas: lo de cada ambiente una sola vez; después, cosas que sí se repiten en una casa. Nada de
-	# plantas en el medio de una cocina o un baño: ahí van muebles que de verdad se ven sueltos (la
+	# plantas en el medio de una cocina: ahí van muebles que de verdad se ven sueltos (la
 	# mesada como isla, el lavarropas, sillas, el tacho)
 	"living": {"costado": ["biblioteca", "lampara_pie", "planta_alta"], "arriba": ["lampara_techo"], "abajo": ["mesa_ratona", "sillon_amarillo", "silla"]},
 	"dormitorio": {"costado": ["ropero", "lampara_pie", "planta_alta"], "arriba": ["lampara_techo"], "abajo": ["comoda", "mesita_luz", "silla"]},
 	"cocina": {"costado": ["heladera_casa", "mesada", "lavarropas"], "arriba": ["lampara_colgante"], "abajo": ["mesada", "cocina_horno", "silla"]},
 	"comedor": {"costado": ["vajillero", "lampara_pie", "planta_alta"], "arriba": ["lampara_techo"], "abajo": ["mesa_comedor", "silla"]},
-	"bano": {"costado": ["armario_bano", "lavarropas"], "arriba": ["lampara_colgante"], "abajo": ["banera", "lavatorio", "tacho"]},
+	"lectura": {"costado": ["biblioteca", "lampara_pie", "planta_alta"], "arriba": ["lampara_colgante"], "abajo": ["mesa_ratona", "sillon_azul", "silla"]},
 	"cuarto_chicos": {"costado": ["cajonera_juguetes", "planta_alta"], "arriba": ["movil_estrellas", "lampara_techo"], "abajo": ["mesa_ratona", "oso_peluche", "silla"]},
 	"estudio": {"costado": ["biblioteca", "archivero", "lampara_pie", "planta_alta"], "arriba": ["lampara_verde"], "abajo": ["escritorio_pc", "mesa_ratona", "silla"]},
 }
@@ -868,7 +868,7 @@ static func _marco_ventana(casa: Node3D, cx: float, z_cara: float, afuera: float
 		Construir.caja(casa, Vector3(cx, 0.03, z_cara), Vector3(an, 0.04, CasaEnterable.ESPESOR + 0.1), C_MARCO.darkened(0.1), false)
 
 
-## Adornos contra las paredes (sin colisión, lejos de la ruta), un cartel del tema y la luz cálida.
+## Adornos contra las paredes (sin colisión, lejos de la ruta) y la luz cálida.
 
 
 ## ¿Hay lugar para un adorno de radio "r" y alto "alto" en "p" (local)? No tiene que tapar la ruta
@@ -952,7 +952,7 @@ const DECO := {
 	"dormitorio": ["mesita_luz", "lampara_pie", "maceta", "silla"],
 	"cocina": ["mesada", "lavarropas", "tacho", "silla"],
 	"comedor": ["silla", "silla", "maceta", "lampara_pie"],
-	"bano": ["lavarropas", "tacho"],
+	"lectura": ["lampara_pie", "maceta", "silla", "sillon_amarillo"],
 	"cuarto_chicos": ["cajonera_juguetes", "silla", "lampara_pie", "maceta"],
 	"estudio": ["silla", "lampara_pie", "maceta", "sillon_azul"],
 }
@@ -964,14 +964,14 @@ const DECO_AIRE := {"cafe": 2.4, "heladeria": 2.4, "restaurante": 2.6, "consulto
 ## Lo que va en el rincón de atrás a la izquierda (si no está, el sillón con el gato y la lámpara).
 const RINCON := {"supermercado": "heladera_bebidas", "verduleria": "cajon_verduras", "consultorio": "sillas_espera",
 	"restaurante": "mesa_mantel", "fiambreria": "barril", "panaderia": "canasto_panes", "cafe": "mesa_cafe",
-	"mecanico": "pila_neumaticos", "cocina": "heladera_casa", "bano": "inodoro", "cuarto_chicos": "oso_peluche",
+	"mecanico": "pila_neumaticos", "cocina": "heladera_casa", "cuarto_chicos": "oso_peluche",
 	"dormitorio": "comoda", "farmacia": "balanza_medica", "kiosco": "heladera_bebidas", "heladeria": "mesa_cafe",
 	"ferreteria": "pila_neumaticos", "peluqueria": "sillas_espera", "floreria": "balde_flores", "comedor": "vajillero"}
 ## Algo propio de cada lugar, contra la pared derecha (en los locales, el mostrador o lo típico).
 const PROPIO := {"panaderia": "horno", "oficina": "dispenser", "fiambreria": "barril", "conventillo": "jaula",
 	"libreria": "mesa_ratona", "supermercado": "caja_super", "verduleria": "puesto_frutas", "cafe": "vitrina_tortas",
 	"restaurante": "mesa_mantel", "consultorio": "camilla", "mecanico": "caja_herramientas", "living": "mueble_tv",
-	"dormitorio": "cama", "cocina": "cocina_horno", "comedor": "mesa_comedor", "bano": "lavatorio",
+	"dormitorio": "cama", "cocina": "cocina_horno", "comedor": "mesa_comedor", "lectura": "biblioteca",
 	"cuarto_chicos": "cama_chica", "estudio": "escritorio_pc", "farmacia": "caja_super", "kiosco": "caja_super",
 	"heladeria": "vitrina_helados", "ferreteria": "banco_trabajo", "peluqueria": "tocador_espejo", "floreria": "caja_super"}
 const DECO_ALTO_MAX := 2.5   ## Lo alto se achica a esto: así no le tapa el cuarto a la cámara
@@ -984,11 +984,11 @@ const PARED := {
 	"peluqueria": [1, false, false], "oficina": [1, false, false], "consultorio": [1, false, false],
 	"conventillo": [1, true, true], "living": [2, true, true], "dormitorio": [1, false, true],
 	"comedor": [2, false, true], "cuarto_chicos": [1, true, true], "estudio": [1, true, true],
+	"lectura": [2, true, true],
 }
-## Dónde van plantas en los rincones. En los demás locales van cajas (mercadería) y en la cocina y el
-## baño nada.
+## Dónde van plantas en los rincones. En los demás locales van cajas (mercadería) y en la cocina nada.
 const CON_PLANTAS := ["libreria", "cafe", "restaurante", "peluqueria", "oficina", "consultorio", "floreria",
-	"heladeria", "conventillo", "living", "dormitorio", "comedor", "cuarto_chicos", "estudio"]
+	"heladeria", "conventillo", "living", "dormitorio", "comedor", "cuarto_chicos", "estudio", "lectura"]
 
 
 ## Qué va en un rincón de este lugar: una planta, cajas o nada ("").
@@ -1058,8 +1058,9 @@ static func _mas_adornos(casa: Node3D, ce: CasaEnterable, tema: String) -> void:
 
 
 ## Muebles de adorno contra las paredes y en los rincones (sin colisión: la paloma no se queda
-## adentro), siempre lejos de la ruta y de los obstáculos. Un cartel del tema y la luz cálida.
-static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: String) -> OmniLight3D:
+## adentro), siempre lejos de la ruta y de los obstáculos, y la luz cálida. (Ya no lleva un cartel
+## pintado en la pared, como "OCUPADO" o "¡A COMER!": quedaba raro adentro de una casa o un local.)
+static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String) -> OmniLight3D:
 	var w := ce.ancho
 	var d := ce.fondo
 	var hx := w / 2.0 - CasaEnterable.ESPESOR
@@ -1085,7 +1086,7 @@ static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: Stri
 			Kit.colocar(casa, "gato", ps + Vector3(0.05, 0.45, -0.4), PI / 2.0 + 0.4)
 			_adorno(casa, ce, ruta, "lampara_pie", Vector3(-hx + 0.35, 0.02, -hz + 2.6), 0.0)
 	# Los otros rincones: plantas donde tiene sentido, cajas de mercadería en los demás locales y nada
-	# en la cocina y el baño. Una sola planta junto a la vidriera; las cajas, al fondo
+	# en la cocina. Una sola planta junto a la vidriera; las cajas, al fondo
 	var rincon := "" if casa_de_familia else _rincon_de(tema, ce)
 	if rincon == "maceta":
 		_adorno(casa, ce, ruta, "maceta", Vector3(hx - 0.4, 0.02, hz - 0.4), 0.0)
@@ -1112,14 +1113,6 @@ static func _adornos(casa: Node3D, ce: CasaEnterable, tema: String, cartel: Stri
 			var z := 0.0 if cuadros == 1 else (k - 0.5) * d * 0.4
 			if not _tapado(ce, Vector3(xs, 2.9, z), 0.6):
 				Kit.colocar(casa, "cuadro", Vector3(xs, 2.9, z), -lado * PI / 2.0)
-	# Cartel del tema, pintado en la pared izquierda
-	var l := Construir.cartel(casa, Vector3(-hx + 0.03, 4.9, 0), cartel, Color("3a2a1e"), 56)
-	l.rotation.y = PI / 2.0
-	l.outline_size = 0
-	# Que no sea más largo que la pared: si no entra en una línea, baja a dos (antes los textos largos,
-	# como "TORNILLOS - PINTURAS - HERRAMIENTAS", salían por la fachada y se veían desde la calle)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.width = (hz * 2.0 - 1.2) / l.pixel_size
 	# Luz: una principal del color del lugar (con sombras sólo mientras la paloma pasa, ver
 	# CasaEnterable) y dos de relleno más suaves cerca de las ventanas, como la luz que entra de la calle
 	var color_luz: Color = ESCENARIOS[tema]["luz"]

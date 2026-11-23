@@ -120,7 +120,12 @@ func _comida() -> void:
 func _objetos() -> void:
 	var objetos := get_tree().get_nodes_in_group("golpeables")
 	_check("objetos: hay cosas para tirar en las mesas (%d)" % objetos.size(), objetos.size() >= 6)
-	var g := objetos[objetos.size() - 1] as Golpeable    # De otra mesa que la de la medialuna de antes
+	# El último de las mesas (de otra mesa que la de la medialuna de antes). No uno desechable: si en las
+	# pruebas de antes el aletazo le voló la gorra a alguien que pasaba, la gorra también es Golpeable
+	var g: Golpeable = null
+	for o in objetos:
+		if not (o as Golpeable).desechable:
+			g = o as Golpeable
 	var origen := g.global_position
 	_check("objetos: quietos están congelados (no gastan física)", g.freeze and not g.golpeado)
 	_check("objetos: no bloquean a la paloma (capa 5, ella no la mira)", g.collision_layer == 16 and (paloma.collision_mask & 16) == 0)

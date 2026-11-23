@@ -277,6 +277,24 @@ func _rot(hueso: String, euler: Vector3) -> void:
 	_skel.set_bone_pose_rotation(_idx[hueso], (_rest_l[hueso] as Quaternion) * q)
 
 
+## Largo del muslo (de la cadera a la rodilla), ya con la estatura: sentado, cuánto adelante de la cadera
+## quedan las rodillas (ver Vecinos._donde_queda). 0,45 si todavía no tiene esqueleto.
+func largo_muslo() -> float:
+	if _skel == null:
+		return 0.45
+	var a := _skel.get_bone_global_rest(_idx["muslo_i"]).origin
+	var b := _skel.get_bone_global_rest(_idx["pierna_i"]).origin
+	# La escala de todo lo que hay entre el esqueleto y este nodo (la estatura y la del modelo importado);
+	# sin global_transform: la gente de los departamentos se arma fuera de la escena (ver Arranque)
+	var esc := 1.0
+	var n: Node = _skel
+	while n != null and n != self:
+		if n is Node3D:
+			esc *= (n as Node3D).transform.basis.get_scale().x
+		n = n.get_parent()
+	return a.distance_to(b) * esc
+
+
 func _bajada_sentado() -> float:
 	return float(_datos["cadera"]) - (ALTO_ASIENTO + asiento_extra) * float(_datos["alto"]) / 1.75
 
