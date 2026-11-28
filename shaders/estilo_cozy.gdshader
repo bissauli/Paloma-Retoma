@@ -11,6 +11,9 @@ group_uniforms estilo;
 uniform vec4 color_base : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 // Opcional: si no se asigna vale blanco y no cambia nada. Una sola lectura.
 uniform sampler2D textura_albedo : source_color, hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
+// Imágenes con transparencia sin recorte (las carteleras): lo transparente toma este color. Con alfa 0
+// (lo normal) la textura se usa tal cual. Así comparten este shader en vez de sumar uno más a compilar.
+uniform vec4 fondo_alfa : source_color = vec4(0.0);
 // Atlas de colores (la paleta del Kit): filtro lineal simple, sin mipmaps ni anisotrópico, para que
 // las celdas vecinas no se mezclen de lejos. Si usar_paleta está activo se lee esta en vez de
 // textura_albedo (sigue siendo una sola lectura).
@@ -58,7 +61,8 @@ void fragment() {
 		vec2 plano = n.y >= max(n.x, n.z) ? pos_mundo.xz : (n.x >= n.z ? pos_mundo.zy : pos_mundo.xy);
 		uv = plano * escala_uv_mundo;
 	}
-	vec3 tex = usar_paleta ? texture(textura_paleta, uv).rgb : texture(textura_albedo, uv).rgb;
+	vec4 muestra = usar_paleta ? texture(textura_paleta, uv) : texture(textura_albedo, uv);
+	vec3 tex = mix(muestra.rgb, mix(fondo_alfa.rgb, muestra.rgb, muestra.a), fondo_alfa.a);
 	vec3 albedo = color_base.rgb * tex;
 
 	if (usar_color_vertices) {

@@ -7,6 +7,7 @@ extends Node3D
 ## baile (moverse, volar, picotear, arrullar). Mientras se baña recarga la stamina, y al llegar a 3 s
 ## sale "fresquita": stamina llena y el logro. Los crea world/plaza.gd; sólo hay baño de agua.
 
+const SHADER_AGUA := preload("res://shaders/agua.gdshader")
 const TIEMPO_PREMIO := 3.0
 const RECARGA := 30.0          ## Stamina por segundo mientras se baña
 const RETARDO_AUTO := 1.0      ## En el teléfono: segundos quieta en el agua antes de bañarse
@@ -68,14 +69,9 @@ func _ready() -> void:
 
 func _armar() -> void:
 	_y_agua = altura + 0.02 if altura > 0.0 else 0.014
-	var agua := StandardMaterial3D.new()
-	agua.albedo_color = Color(0.4, 0.78, 0.93, 0.62) if altura > 0.0 else Color(0.45, 0.64, 0.74, 0.55)
-	agua.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	agua.roughness = 0.05
-	agua.metallic_specular = 1.0
-	agua.emission_enabled = true
-	agua.emission = Color(0.1, 0.25, 0.35)
-	agua.emission_energy_multiplier = 0.4
+	var agua := ShaderMaterial.new()
+	agua.shader = SHADER_AGUA
+	agua.set_shader_parameter("color", Color(0.4, 0.78, 0.93, 0.62) if altura > 0.0 else Color(0.45, 0.64, 0.74, 0.55))
 
 	if solo_bano:
 		_y_agua = altura + 0.02

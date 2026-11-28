@@ -23,6 +23,7 @@ const Z_RELLENO := 0.0900
 const CAJA_IMAGEN := Vector2(0.92, 0.66)         ## Tamaño máximo de cada imagen (ancho, alto)
 const SEPARACION := 0.05
 const RELLENOS := 3
+const C_PANEL := Color("f4f5f7")
 const COLORES := [Color("ef5f50"), Color("8fd0f2"), Color("ffdd57"), Color("ff9cc8"), Color("58ba82"), Color("ff9145")]
 
 static var _texturas: Array[Texture2D] = []
@@ -68,7 +69,7 @@ static func poner(padre: Node3D, t: Transform3D) -> void:
 static func _cara(padre: Node3D, t: Transform3D, cara: int, rng: RandomNumberGenerator) -> void:
 	# 1. Panel blanco
 	_quad_en(padre, t, cara, Rect2(PANEL_CENTRO - PANEL_TAM / 2.0, PANEL_TAM), Z_PANEL,
-		Construir.material(Color("f4f5f7"), 0.85))
+		Construir.material(C_PANEL, 0.85))
 	# 2. Dos imágenes, una arriba y otra abajo
 	var primera := _texturas[_siguiente % _texturas.size()]
 	var segunda := _texturas[(_siguiente + 1) % _texturas.size()]
@@ -83,7 +84,10 @@ static func _cara(padre: Node3D, t: Transform3D, cara: int, rng: RandomNumberGen
 		var tam := _ajustar(texs[i])
 		var r := Rect2(cajas[i] - tam / 2.0, tam)
 		ocupado.append(r)
-		_quad_en(padre, t, cara, r, Z_IMAGEN, _material(texs[i]))
+		var imagen := _quad_en(padre, t, cara, r, Z_IMAGEN, _material(texs[i]))
+		# Sueltas (cada una con su distancia de dibujo) y sin contorno de tinta
+		imagen.set_meta(&"no_fusionar", true)
+		imagen.set_meta(&"sin_contorno", true)
 	# 3. Unos pocos cuadros y rectángulos de colores en los huecos
 	var puestos := 0
 	var intentos := 0
@@ -120,7 +124,7 @@ static func _ajustar(tex: Texture2D) -> Vector2:
 
 
 ## Un rectángulo plano pegado a la cara (0 = adelante, 1 = atrás), en el espacio de la pieza.
-static func _quad_en(padre: Node3D, t: Transform3D, cara: int, rect: Rect2, z: float, mat: Material) -> void:
+static func _quad_en(padre: Node3D, t: Transform3D, cara: int, rect: Rect2, z: float, mat: Material) -> MeshInstance3D:
 	var m := MeshInstance3D.new()
 	m.mesh = _malla()
 	m.material_override = mat
@@ -135,6 +139,7 @@ static func _quad_en(padre: Node3D, t: Transform3D, cara: int, rect: Rect2, z: f
 		Vector3(c.x * lado, c.y, z * lado))
 	padre.add_child(m)
 	Construir.poner_global(m, t * local)
+	return m
 
 
 static func _malla() -> QuadMesh:
@@ -144,13 +149,12 @@ static func _malla() -> QuadMesh:
 	return _quad
 
 
-static func _material(tex: Texture2D) -> StandardMaterial3D:
+## Con el shader del resto del mundo (un material iluminado distinto son segundos de compilación en la
+## web). Lo transparente de la imagen queda del color del panel blanco que tiene atrás.
+static func _material(tex: Texture2D) -> ShaderMaterial:
 	if not _materiales.has(tex):
-		var mat := StandardMaterial3D.new()
-		mat.albedo_texture = tex
-		mat.roughness = 1.0
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-		mat.alpha_scissor_threshold = 0.5
-		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		var mat := Construir.material_cozy(0.85)   # Los mismos ajustes que el panel: así no se nota el borde
+		mat.set_shader_parameter("textura_albedo", tex)
+		mat.set_shader_parameter("fondo_alfa", C_PANEL)
 		_materiales[tex] = mat
 	return _materiales[tex]
