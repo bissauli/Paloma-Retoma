@@ -18,7 +18,9 @@ botones DESPEGAR/ALETEAR (mantener), PICADA (mantener), PICOTEAR y ARRULLAR · I
 ## Proyecto
 
 - Código fuente Godot en la raíz (`project.godot`).
-- Build web en `docs/` (exportado con el preset "Web", sin threads para que funcione en GitHub Pages).
+- Build web en `docs/` (exportado con el preset "Web", con hilos). GitHub Pages no manda las cabeceras que
+  piden los hilos: las agrega el service worker de la PWA (`docs/index.service.worker.js`), que en la primera
+  visita se instala y recarga la página.
 - Para regenerarla: Godot → Proyecto → Exportar → Web, o
   `godot --headless --export-release "Web" docs/index.html`.
 - Antes de exportar, y después del último commit, actualizar la versión que muestra el menú (`v0.<commits> (autor del último commit)`):
